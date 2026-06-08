@@ -743,6 +743,42 @@ h3 { font-size: 15px; font-weight: 600; }
   font-style: italic;
   line-height: 1.4;
 }
+
+/* SESSION TIMER BAR */
+.session-timer-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  background: rgba(232, 114, 12, 0.08);
+  border: 1px solid rgba(232, 114, 12, 0.2);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--text-sec);
+}
+.session-timer-bar .timer-value {
+  font-family: 'SF Mono', 'Menlo', monospace;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--orange);
+}
+
+/* SWIPE TO DELETE */
+.swipe-wrapper { position: relative; overflow: hidden; border-radius: var(--radius); margin-bottom: 8px; }
+.swipe-delete-bg { position: absolute; right: 0; top: 0; bottom: 0; width: 80px; background: var(--red); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; font-size: 13px; z-index: 0; }
+.swipe-content { position: relative; z-index: 1; background: var(--card); transition: transform 0.2s ease; }
+
+/* TO BEAT */
+.to-beat { font-size: 11px; color: var(--blue); padding: 4px 8px; background: rgba(52,152,219,0.08); border-radius: 6px; margin-bottom: 8px; display: inline-block; }
+
+/* DROP SET INPUT */
+.drop-input-row { display: flex; gap: 6px; align-items: center; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); }
+.drop-label { font-size: 10px; font-weight: 600; color: var(--red); width: 36px; flex-shrink: 0; text-align: center; }
+
+/* ROUND PILL CLICKABLE */
+.round-pill.clickable { cursor: pointer; }
+.round-pill.viewing { border-color: var(--blue); color: var(--blue); background: rgba(52,152,219,0.15); }
 </style>
 </head>
 <body>
@@ -1227,84 +1263,302 @@ function getVolumeWeight(exId, trackedWeight) {
   return isDumbbellExercise(exId) ? trackedWeight * 2 : trackedWeight;
 }
 
-// =============================================
-// TIMER
-// =============================================
+// Circuit round viewing state
+let viewingRound = {}; // { circuitId: roundNumber (1-based) } when viewing past rounds
 
-let timerInterval = null;
-let timerSeconds = 0;
-let timerMode = 'stopped'; // 'stopped' | 'running' | 'countdown'
-let timerTarget = 0;
-let timerCallback = null;
+// Get "To Beat" data from last session
+function getToBeat(exerciseId) {
+  const sets = getLastSessionSets(exerciseId);
+  if (!sets || sets.length === 0) return null;
+  return sets;
+}
 
-function startTimer(mode, seconds, cb) {
-  stopTimer();
-  timerMode = mode;
-  timerCallback = cb;
-  if (mode === 'countdown') {
-    timerSeconds = seconds;
-    timerTarget = 0;
-  } else {
-    timerSeconds = 0;
-    timerTarget = Infinity;
+function formatToBeat(exerciseId) {
+  const sets = getToBeat(exerciseId);
+  if (!sets) return '';
+  const parts = sets.map((s, i) => 'S' + (i+1) + ': ' + s.weight + 'kg×' + s.reps);
+  return 'To Beat: ' + parts.join(' | ');
+}
+
+// Progressive overload: target rounds for current week
+function getTargetRounds(baseRounds, week) {
+  // 3->3->4->4->4 progression (weeks 1-5)
+  if (baseRounds <= 3) {
+    if (week <= 2) return 3;
+    return 4;
   }
-  timerInterval = setInterval(() => {
-    if (timerMode === 'countdown') {
-      timerSeconds--;
-      if (timerSeconds <= 0) {
-        timerSeconds = 0;
-        stopTimer();
-        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-      }
-    } else {
-      timerSeconds++;
+  return baseRounds;
+}
+
+// =============================================
+// WARMUP AUTO-CHECK (timer-driven)
+// =============================================
+
+function parseDuration(str) {
+  if (!str) return 0;
+  const s = str.replace(/\s/g, '').toLowerCase();
+  if (s.endsWith('s')) return parseInt(s) || 0;
+  if (s.endsWith('m')) return (parseInt(s) || 0) * 60;
+  return parseInt(s) || 0;
+}
+
+function getWarmupThresholds(plan) {
+  // Returns array of { id, cumulativeSeconds } for each exercise with a duration
+  let cumulative = 0;
+  const thresholds = [];
+  plan.warmup.forEach(ex => {
+    const dur = parseDuration(ex.duration);
+    if (dur > 0) {
+      cumulative += dur;
+      thresholds.push({ id: ex.id, at: cumulative });
     }
-    updateTimerDisplay();
-  }, 1000);
-  updateTimerDisplay();
+    // Exercises without duration (e.g. "20 Push-ups") require manual check
+  });
+  return thresholds;
 }
 
-function stopTimer() {
-  if (timerInterval) clearInterval(timerInterval);
-  timerInterval = null;
-  timerMode = 'stopped';
-}
+let lastAutoCheckTime = 0; // prevent double-beeps
 
-function pauseTimer() {
-  if (timerInterval) {
-    clearInterval(timerInterval);
-    timerInterval = null;
+function checkWarmupAutoComplete() {
+  // Only run when we're on warmup tab with a running countup timer
+  if (activeSubTab !== 'warmup' || restTimer.mode !== 'countup') return;
+  if (!activeWorkoutId) return;
+  const plan = WORKOUT_PLANS[activeWorkoutId];
+  if (!plan) return;
+
+  const elapsed = getCountupSeconds();
+  const thresholds = getWarmupThresholds(plan);
+  let changed = false;
+
+  thresholds.forEach(t => {
+    if (elapsed >= t.at && !warmupChecked[t.id]) {
+      warmupChecked[t.id] = true;
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    // Short tick sound for auto-check
+    playTick();
+    if (navigator.vibrate) navigator.vibrate(100);
+    if (activeSession) activeSession.warmupDone = plan.warmup.every(ex => warmupChecked[ex.id]);
+    renderWorkoutDetail();
   }
 }
 
-function resumeTimer() {
-  if (timerMode !== 'stopped' && !timerInterval) {
-    const mode = timerMode;
-    timerInterval = setInterval(() => {
-      if (mode === 'countdown') {
-        timerSeconds--;
-        if (timerSeconds <= 0) {
-          timerSeconds = 0;
-          stopTimer();
-          if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-        }
-      } else {
-        timerSeconds++;
-      }
-      updateTimerDisplay();
-    }, 1000);
+function playTick() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.frequency.value = 660;
+    gain.gain.value = 0.25;
+    osc.start(audioCtx.currentTime);
+    osc.stop(audioCtx.currentTime + 0.08);
+  } catch(e) {}
+}
+
+// =============================================
+// TIMER SYSTEM (Date.now() based, survives app switch)
+// =============================================
+
+let restTimer = {
+  mode: 'stopped',    // 'stopped' | 'countdown' | 'countup'
+  endTime: null,      // Date.now() + ms for countdown
+  startTime: null,    // Date.now() for countup
+  pausedRemaining: null, // ms remaining when paused (countdown)
+  pausedElapsed: null,   // ms elapsed when paused (countup)
+  completed: false
+};
+
+let sessionTimer = {
+  startTime: null,
+  running: false,
+  pausedElapsed: 0
+};
+
+let displayInterval = null;
+
+function startDisplayUpdate() {
+  if (displayInterval) return;
+  displayInterval = setInterval(function() {
+    updateAllTimerDisplays();
+    checkCountdownCompletion();
+    checkWarmupAutoComplete();
+  }, 250);
+}
+
+function stopDisplayUpdate() {
+  if (restTimer.mode === 'stopped' && !sessionTimer.running) {
+    if (displayInterval) { clearInterval(displayInterval); displayInterval = null; }
   }
 }
 
-function formatTime(seconds) {
-  const m = Math.floor(Math.abs(seconds) / 60);
-  const s = Math.abs(seconds) % 60;
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+function getCountdownSeconds() {
+  if (restTimer.mode !== 'countdown') return 0;
+  if (restTimer.pausedRemaining !== null) return Math.max(0, Math.ceil(restTimer.pausedRemaining / 1000));
+  var remaining = restTimer.endTime - Date.now();
+  return Math.max(0, Math.ceil(remaining / 1000));
 }
 
-function updateTimerDisplay() {
-  const el = document.getElementById('timer-display');
-  if (el) el.textContent = formatTime(timerSeconds);
+function getCountupSeconds() {
+  if (restTimer.mode !== 'countup') return 0;
+  if (restTimer.pausedElapsed !== null) return Math.floor(restTimer.pausedElapsed / 1000);
+  return Math.floor((Date.now() - restTimer.startTime) / 1000);
+}
+
+function getTimerSeconds() {
+  if (restTimer.mode === 'countdown') return getCountdownSeconds();
+  if (restTimer.mode === 'countup') return getCountupSeconds();
+  return 0;
+}
+
+function getSessionSeconds() {
+  if (!sessionTimer.startTime) return 0;
+  if (!sessionTimer.running) return Math.floor(sessionTimer.pausedElapsed / 1000);
+  return Math.floor((sessionTimer.pausedElapsed + Date.now() - sessionTimer.startTime) / 1000);
+}
+
+function startCountdown(seconds) {
+  restTimer.mode = 'countdown';
+  restTimer.endTime = Date.now() + seconds * 1000;
+  restTimer.pausedRemaining = null;
+  restTimer.completed = false;
+  startDisplayUpdate();
+  updateAllTimerDisplays();
+}
+
+function startCountup() {
+  restTimer.mode = 'countup';
+  restTimer.startTime = Date.now();
+  restTimer.pausedElapsed = null;
+  restTimer.completed = false;
+  startDisplayUpdate();
+  updateAllTimerDisplays();
+}
+
+function pauseRestTimer() {
+  if (restTimer.mode === 'countdown' && restTimer.pausedRemaining === null) {
+    restTimer.pausedRemaining = Math.max(0, restTimer.endTime - Date.now());
+  } else if (restTimer.mode === 'countup' && restTimer.pausedElapsed === null) {
+    restTimer.pausedElapsed = Date.now() - restTimer.startTime;
+  }
+}
+
+function resumeRestTimer() {
+  if (restTimer.mode === 'countdown' && restTimer.pausedRemaining !== null) {
+    restTimer.endTime = Date.now() + restTimer.pausedRemaining;
+    restTimer.pausedRemaining = null;
+  } else if (restTimer.mode === 'countup' && restTimer.pausedElapsed !== null) {
+    restTimer.startTime = Date.now() - restTimer.pausedElapsed;
+    restTimer.pausedElapsed = null;
+  }
+  startDisplayUpdate();
+}
+
+function stopRestTimer() {
+  restTimer.mode = 'stopped';
+  restTimer.endTime = null;
+  restTimer.startTime = null;
+  restTimer.pausedRemaining = null;
+  restTimer.pausedElapsed = null;
+  restTimer.completed = false;
+  stopDisplayUpdate();
+}
+
+function resetRestTimer() {
+  stopRestTimer();
+  updateAllTimerDisplays();
+}
+
+function isRestTimerPaused() {
+  return (restTimer.mode === 'countdown' && restTimer.pausedRemaining !== null) ||
+         (restTimer.mode === 'countup' && restTimer.pausedElapsed !== null);
+}
+
+function isRestTimerRunning() {
+  return restTimer.mode !== 'stopped' && !isRestTimerPaused();
+}
+
+// Session timer
+function startSessionTimer() {
+  if (sessionTimer.running) return;
+  sessionTimer.startTime = Date.now();
+  sessionTimer.running = true;
+  startDisplayUpdate();
+}
+
+function stopSessionTimer() {
+  if (!sessionTimer.running) return;
+  sessionTimer.pausedElapsed += Date.now() - sessionTimer.startTime;
+  sessionTimer.running = false;
+  stopDisplayUpdate();
+}
+
+function resetSessionTimer() {
+  sessionTimer.startTime = null;
+  sessionTimer.running = false;
+  sessionTimer.pausedElapsed = 0;
+}
+
+// Audio beep
+let audioCtx = null;
+function playBeep() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var playTone = function(freq, startMs) {
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.frequency.value = freq;
+      gain.gain.value = 0.4;
+      var t = audioCtx.currentTime + startMs / 1000;
+      osc.start(t);
+      osc.stop(t + 0.15);
+    };
+    playTone(880, 0);
+    playTone(880, 250);
+    playTone(1100, 500);
+  } catch(e) { console.log('Audio not available'); }
+}
+
+function checkCountdownCompletion() {
+  if (restTimer.mode === 'countdown' && !restTimer.completed && restTimer.pausedRemaining === null) {
+    if (Date.now() >= restTimer.endTime) {
+      restTimer.completed = true;
+      playBeep();
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+    }
+  }
+}
+
+// Visibility change handler - check timer on return
+document.addEventListener('visibilitychange', function() {
+  if (!document.hidden) {
+    checkCountdownCompletion();
+    updateAllTimerDisplays();
+  }
+});
+
+function formatTime(totalSeconds) {
+  var m = Math.floor(Math.abs(totalSeconds) / 60);
+  var s = Math.abs(totalSeconds) % 60;
+  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
+function updateAllTimerDisplays() {
+  // Update all timer-display elements
+  var els = document.querySelectorAll('.rest-timer-display');
+  var sec = getTimerSeconds();
+  els.forEach(function(el) { el.textContent = formatTime(sec); });
+
+  // Session timer
+  var sessionEls = document.querySelectorAll('.session-timer-value');
+  var sessionSec = getSessionSeconds();
+  sessionEls.forEach(function(el) { el.textContent = formatTime(sessionSec); });
 }
 
 // =============================================
@@ -1691,6 +1945,7 @@ function openWorkout(workoutId) {
 
   if (existing) {
     activeSession = JSON.parse(JSON.stringify(existing));
+    activeSession._completed = true;  // It was saved = completed
     activeSubTab = 'done';
   } else {
     activeSession = {
@@ -1708,8 +1963,11 @@ function openWorkout(workoutId) {
       _startTime: Date.now(),
       _currentStrengthSet: {},
       _currentCircuitRound: {},
-      _completed: false
+      _completed: false,
+      _circuitDone: {}
     };
+    resetSessionTimer();
+    startSessionTimer();
   }
 
   navigateTo('training');
@@ -1723,7 +1981,8 @@ function startNextWorkout() {
 
 function backToWeekOverview() {
   trainingView = 'week-overview';
-  stopTimer();
+  stopRestTimer();
+  viewingRound = {};
   renderTrainingPage();
 }
 
@@ -1738,14 +1997,23 @@ function renderWorkoutDetail() {
   const week = selectedWeek || APP_STATE.settings.mesocycle.currentWeek;
   const isCompleted = activeSession && activeSession._completed;
 
-  // Sub tabs
-  const tabs = ['warmup', 'strength', 'zirkel', 'acc'];
-  if (isCompleted) tabs.push('done');
+  // Sub tabs - always show all tabs so user can view rounds even when completed
+  const tabs = ['warmup', 'strength', 'zirkel', 'acc', 'done'];
 
   let tabsHtml = tabs.map(t => {
     const labels = { warmup: 'Warmup', strength: 'Strength', zirkel: 'Zirkel', acc: 'Acc', done: 'Done' };
     return `<button class="sub-tab ${activeSubTab === t ? 'active' : ''}" onclick="switchSubTab('${t}')">${labels[t]}</button>`;
   }).join('');
+
+  // Session timer bar (shown during active workout)
+  let sessionTimerHtml = '';
+  if (activeSession && !activeSession._completed) {
+    sessionTimerHtml = `
+      <div class="session-timer-bar">
+        <span>Session</span>
+        <span class="session-timer-value timer-value">${formatTime(getSessionSeconds())}</span>
+      </div>`;
+  }
 
   let content = '';
   switch (activeSubTab) {
@@ -1761,6 +2029,7 @@ function renderWorkoutDetail() {
     <h2>${plan.name}</h2>
     <p style="color:var(--text-sec);margin-bottom:16px">${plan.subtitle}</p>
     <div class="sub-tabs">${tabsHtml}</div>
+    ${sessionTimerHtml}
     ${content}
   `;
 }
@@ -1775,33 +2044,47 @@ function switchSubTab(tab) {
 // =============================================
 
 function renderWarmupTab(plan) {
+  // Build cumulative time thresholds for display
+  const thresholds = getWarmupThresholds(plan);
+  const thresholdMap = {};
+  thresholds.forEach(t => { thresholdMap[t.id] = t.at; });
+  const elapsed = getCountupSeconds();
+
   let items = '';
   plan.warmup.forEach((ex, i) => {
     const checked = warmupChecked[ex.id] ? 'checked' : '';
+    const threshold = thresholdMap[ex.id];
+    // Show cumulative time as "@ 1:30" next to the duration
+    const autoLabel = threshold !== undefined
+      ? `<span style="color:${elapsed >= threshold ? 'var(--green)' : 'var(--text-ter)'};font-size:11px;margin-left:4px">@ ${formatTime(threshold)}</span>`
+      : (ex.duration ? '' : '<span style="color:var(--text-ter);font-size:11px;margin-left:4px">manuell</span>');
     items += `
       <div class="warmup-item">
         <div class="warmup-check ${checked}" onclick="toggleWarmup('${ex.id}')">
           ${warmupChecked[ex.id] ? ICONS.check : ''}
         </div>
         <div class="warmup-text">${ex.name}</div>
-        <div class="warmup-duration">${ex.duration}</div>
+        <div class="warmup-duration">${ex.duration}${autoLabel}</div>
       </div>`;
   });
 
   const allDone = plan.warmup.every(ex => warmupChecked[ex.id]);
+  const timerRunning = restTimer.mode === 'countup';
+  const totalWarmupTime = thresholds.length > 0 ? thresholds[thresholds.length - 1].at : 0;
 
   return `
     <div class="card" style="text-align:center;padding:24px">
-      <div id="timer-display" class="timer-display">${formatTime(timerSeconds)}</div>
-      <div class="timer-controls">
+      <div class="rest-timer-display timer-display">${formatTime(getTimerSeconds())}</div>
+      ${totalWarmupTime > 0 ? `<div style="font-size:11px;color:var(--text-ter);margin-top:4px">Auto-Check bis ${formatTime(totalWarmupTime)}</div>` : ''}
+      <div class="timer-controls" style="margin-top:8px">
         <button class="timer-btn" onclick="toggleWarmupTimer()">
-          ${timerInterval ? ICONS.pause : ICONS.play}
+          ${isRestTimerRunning() ? ICONS.pause : ICONS.play}
         </button>
         <button class="timer-btn" onclick="resetWarmupTimer()">${ICONS.reset}</button>
       </div>
     </div>
     <div class="card">${items}</div>
-    ${allDone ? '<button class="btn btn-orange" onclick="switchSubTab(\'strength\')">Weiter: Strength</button>' : ''}
+    ${allDone ? '<button class="btn btn-orange" onclick="warmupToStrength()">Weiter: Strength</button>' : ''}
   `;
 }
 
@@ -1812,20 +2095,29 @@ function toggleWarmup(id) {
 }
 
 function toggleWarmupTimer() {
-  if (timerInterval) {
-    pauseTimer();
-  } else if (timerMode === 'stopped') {
-    startTimer('running', 0);
+  if (restTimer.mode === 'countup' && !isRestTimerPaused()) {
+    pauseRestTimer();
+  } else if (restTimer.mode === 'stopped') {
+    startCountup();
+    // Also start session timer on first warmup action
+    if (!sessionTimer.running && !sessionTimer.startTime) startSessionTimer();
   } else {
-    resumeTimer();
+    resumeRestTimer();
   }
   renderWorkoutDetail();
 }
 
 function resetWarmupTimer() {
-  stopTimer();
-  timerSeconds = 0;
+  resetRestTimer();
+  // Also reset auto-checked warmup items
+  warmupChecked = {};
   renderWorkoutDetail();
+}
+
+function warmupToStrength() {
+  // Start session timer if not already started
+  if (!sessionTimer.running && !sessionTimer.startTime) startSessionTimer();
+  switchSubTab('strength');
 }
 
 // =============================================
@@ -1863,7 +2155,13 @@ function renderStrengthTab(plan) {
       <div class="exercise-name">${ex.name}</div>
       <div class="exercise-last">${subtitleText}${lastStr ? ' | Letztes Mal: ' + lastStr : ''}</div>`;
 
-    // Timer section — different for EMOM vs regular
+    // To Beat display
+    const toBeatStr = formatToBeat(ex.id);
+    if (toBeatStr) {
+      html += `<div class="to-beat">${toBeatStr}</div>`;
+    }
+
+    // Timer section - different for EMOM vs regular
     if (isEMOM) {
       // EMOM: show a big 1-minute countdown that auto-restarts
       const emomRound = sessionSets.length + 1;
@@ -1872,11 +2170,11 @@ function renderStrengthTab(plan) {
         <div style="text-align:center;margin:12px 0;padding:12px;border-radius:12px;background:rgba(232,114,12,0.1)">
           <div style="font-size:12px;color:var(--orange);font-weight:600;margin-bottom:4px">EMOM ${ex.emomMinutes} MIN</div>
           <div style="font-size:11px;color:var(--text-sec);margin-bottom:8px">Minute ${Math.min(emomRound, ex.sets)} / ${ex.sets}</div>
-          <div id="timer-display" class="timer-display" style="font-size:48px;padding:4px 0;color:var(--orange)">${formatTime(timerSeconds)}</div>
+          <div class="rest-timer-display" style="font-family:'SF Mono','Menlo',monospace;font-size:48px;font-weight:700;padding:4px 0;color:var(--orange)">${formatTime(getTimerSeconds())}</div>
           <div class="timer-controls" style="margin-top:8px">
             <button class="timer-preset" onclick="startCountdown(60)" style="font-size:14px;padding:8px 16px">60s Start</button>
-            <button class="timer-btn" onclick="toggleCountdownTimer()">${timerInterval ? ICONS.pause : ICONS.play}</button>
-            <button class="timer-btn" onclick="resetCountdownTimer()">${ICONS.reset}</button>
+            <button class="timer-btn" onclick="toggleRestTimer(60)">${isRestTimerRunning() ? ICONS.pause : ICONS.play}</button>
+            <button class="timer-btn" onclick="resetRestTimer(); renderWorkoutDetail();">${ICONS.reset}</button>
           </div>
         </div>`;
     } else {
@@ -1885,29 +2183,32 @@ function renderStrengthTab(plan) {
       const restPresets = ex.restSeconds === 75 ? [60, 75, 90] : [120, 150, 180];
       html += `
         <div style="text-align:center;margin:12px 0">
-          <div id="timer-display" class="timer-display" style="font-size:36px;padding:8px 0">${formatTime(timerSeconds)}</div>
+          <div class="rest-timer-display" style="font-family:'SF Mono','Menlo',monospace;font-size:36px;font-weight:700;color:var(--orange);padding:8px 0">${formatTime(getTimerSeconds())}</div>
           <div class="timer-presets">
-            ${restPresets.map(s => `<button class="timer-preset ${timerSeconds === s ? 'active' : ''}" onclick="startCountdown(${s})">${formatTime(s)}</button>`).join('')}
+            ${restPresets.map(s => `<button class="timer-preset" onclick="startCountdown(${s})">${formatTime(s)}</button>`).join('')}
           </div>
           <div class="timer-controls">
-            <button class="timer-btn" onclick="toggleCountdownTimer()">${timerInterval ? ICONS.pause : ICONS.play}</button>
-            <button class="timer-btn" onclick="resetCountdownTimer()">${ICONS.reset}</button>
+            <button class="timer-btn" onclick="toggleRestTimer(${restDefault})">${isRestTimerRunning() ? ICONS.pause : ICONS.play}</button>
+            <button class="timer-btn" onclick="resetRestTimer(); renderWorkoutDetail();">${ICONS.reset}</button>
           </div>
         </div>`;
     }
 
-    // Completed sets
+    // Completed sets with swipe-to-delete
     sessionSets.forEach((set, i) => {
       const isPR = checkPR(ex.id, set.weight, set.reps);
       html += `
-        <div class="set-card done">
-          <div class="set-header">
-            <span class="set-number">${isEMOM ? 'Min ' + (i + 1) : 'Satz ' + (i + 1)} ${ICONS.check}</span>
-            <span class="set-type">${set.type === 'drop' ? 'Drop' : isEMOM ? 'EMOM' : 'Working'} ${isPR ? ICONS.trophy : ''}</span>
-          </div>
-          <div style="display:flex;gap:12px;font-size:14px;color:var(--text-sec)">
-            <span>${set.weight}kg${dbLabel}</span>
-            <span>${set.reps} Reps</span>
+        <div class="swipe-wrapper" data-ex-id="${ex.id}" data-set-index="${i}">
+          <div class="swipe-delete-bg">Löschen</div>
+          <div class="swipe-content set-card done">
+            <div class="set-header">
+              <span class="set-number">${isEMOM ? 'Min ' + (i + 1) : 'Satz ' + (i + 1)} ${ICONS.check}</span>
+              <span class="set-type">${set.type === 'drop' ? 'Drop' : isEMOM ? 'EMOM' : 'Working'} ${isPR ? ICONS.trophy : ''}</span>
+            </div>
+            <div style="display:flex;gap:12px;font-size:14px;color:var(--text-sec)">
+              <span>${set.weight}kg${dbLabel}</span>
+              <span>${set.reps} Reps</span>
+            </div>
           </div>
         </div>`;
     });
@@ -1949,7 +2250,7 @@ function renderStrengthTab(plan) {
         </div>`;
     }
 
-    // Upcoming sets (dimmed) — show planned pyramid weight or EMOM minutes
+    // Upcoming sets (dimmed) - show planned pyramid weight or EMOM minutes
     for (let i = sessionSets.length + 1; i < totalSets; i++) {
       const upcomingWeight = hasPyramid && ex.pyramidWeights[i] !== undefined
         ? ` @ ${ex.pyramidWeights[i]}kg`
@@ -1992,7 +2293,7 @@ function finishStrengthSet(exId, isBW) {
   if (!activeSession.sets[exId]) activeSession.sets[exId] = [];
   activeSession.sets[exId].push({ weight, reps, type: 'working' });
 
-  // Start rest timer — use exercise-specific rest time
+  // Start rest timer - use exercise-specific rest time
   const exInfo = getExerciseInfo(exId);
   const restTime = (exInfo && exInfo.restSeconds) ? exInfo.restSeconds : 120;
   startCountdown(restTime);
@@ -2025,24 +2326,14 @@ function addDropSet(exId, isBW) {
   renderWorkoutDetail();
 }
 
-function startCountdown(seconds) {
-  startTimer('countdown', seconds);
-}
-
-function toggleCountdownTimer() {
-  if (timerInterval) {
-    pauseTimer();
-  } else if (timerMode === 'stopped') {
-    startTimer('countdown', 150);
+function toggleRestTimer(defaultSeconds) {
+  if (isRestTimerRunning()) {
+    pauseRestTimer();
+  } else if (restTimer.mode === 'stopped') {
+    startCountdown(defaultSeconds || 120);
   } else {
-    resumeTimer();
+    resumeRestTimer();
   }
-  renderWorkoutDetail();
-}
-
-function resetCountdownTimer() {
-  stopTimer();
-  timerSeconds = 0;
   renderWorkoutDetail();
 }
 
@@ -2054,111 +2345,192 @@ function renderZirkelTab(plan) {
   let html = '';
 
   plan.circuits.forEach((circuit, ci) => {
-    const rounds = circuit.doubleRounds ? circuit.rounds * 2 : circuit.rounds;
+    const extraRounds = (activeSession._extraRounds && activeSession._extraRounds[circuit.id]) || 0;
+    const baseRounds = circuit.doubleRounds ? circuit.rounds * 2 : circuit.rounds;
+    const totalRounds = baseRounds + (circuit.doubleRounds ? extraRounds * 2 : extraRounds);
     const completedRounds = activeSession.circuitRounds[circuit.id] || 0;
-    const currentRound = completedRounds + 1;
-    const displayRounds = circuit.rounds;
+    const isDone = activeSession._completed || (activeSession._circuitDone && activeSession._circuitDone[circuit.id]);
     const isDouble = circuit.doubleRounds;
+    const targetRounds = getTargetRounds(circuit.rounds, activeSession.week);
+    const targetTotal = isDouble ? targetRounds * 2 : targetRounds;
 
-    // For double rounds: show main round number + sub-round
-    const getDoubleRoundLabel = (r) => {
-      if (!isDouble) return `${r}`;
-      const mainRound = Math.ceil(r / 2);
-      const subRound = (r % 2 === 1) ? 'a' : 'b';
-      return `${mainRound}${subRound}`;
+    const getDoubleLabel = function(r) {
+      if (!isDouble) return '' + r;
+      var main = Math.ceil(r / 2);
+      var sub = (r % 2 === 1) ? 'a' : 'b';
+      return main + '' + sub;
     };
 
-    html += `
-      <div style="margin-bottom:24px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-          <h3>${circuit.name}</h3>
-          <span style="font-size:12px;color:var(--text-sec)">${circuit.type} | ${displayRounds} Runden${isDouble ? ' (2x)' : ''}</span>
-        </div>
-        ${circuit.note ? `<div style="font-size:11px;color:var(--orange);margin-bottom:8px">${circuit.note}</div>` : ''}
+    // Currently viewing which round? (null = current input)
+    const viewing = viewingRound[circuit.id] || null;
 
-        <div class="round-pills">
-          ${Array.from({length: rounds}, (_, r) => {
-            const rn = r + 1;
-            const cls = rn <= completedRounds ? 'done' : rn === currentRound ? 'current' : '';
-            return `<div class="round-pill ${cls}">${getDoubleRoundLabel(rn)}</div>`;
-          }).join('')}
-        </div>`;
+    html += '<div style="margin-bottom:24px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+        '<h3>' + circuit.name + '</h3>' +
+        '<span style="font-size:12px;color:var(--text-sec)">' + circuit.type + ' | ' + completedRounds + '/' + targetTotal + ' Runden' + (isDouble ? ' (2x)' : '') + '</span>' +
+      '</div>' +
+      (circuit.note ? '<div style="font-size:11px;color:var(--orange);margin-bottom:8px">' + circuit.note + '</div>' : '');
 
-    // Timer — use circuit-specific rest time
+    // Round pills - clickable for completed rounds
+    html += '<div class="round-pills">';
+    for (let r = 1; r <= Math.max(totalRounds, completedRounds); r++) {
+      const isDoneR = r <= completedRounds;
+      const isCurrent = r === completedRounds + 1 && !isDone;
+      const isViewing = viewing === r;
+      let cls = isDoneR ? 'done clickable' : isCurrent ? 'current' : '';
+      if (isViewing) cls = 'viewing clickable';
+      const onclick = isDoneR ? ' onclick="viewCircuitRound(\'' + circuit.id + '\', ' + r + ')"' : '';
+      html += '<div class="round-pill ' + cls + '"' + onclick + '>' + getDoubleLabel(r) + '</div>';
+    }
+    html += '</div>';
+
+    // Timer with reset button
     const circuitRest = circuit.restSeconds || 90;
     const timerPresets = circuitRest >= 150 ? [120, 150, 180] : circuitRest >= 90 ? [60, 90, 120] : [45, 60, 90];
-    html += `
-      <div style="text-align:center;margin:8px 0">
-        <div id="timer-display" class="timer-display" style="font-size:32px;padding:4px 0">${formatTime(timerSeconds)}</div>
-        <div class="timer-presets">
-          ${timerPresets.map(s => `<button class="timer-preset" onclick="startCountdown(${s})">${formatTime(s)}</button>`).join('')}
-        </div>
-      </div>`;
+    html += '<div style="text-align:center;margin:8px 0">' +
+        '<div class="rest-timer-display" style="font-family:\'SF Mono\',\'Menlo\',monospace;font-size:32px;font-weight:700;color:var(--orange);padding:4px 0">' + formatTime(getTimerSeconds()) + '</div>' +
+        '<div class="timer-presets">' +
+          timerPresets.map(function(s) { return '<button class="timer-preset" onclick="startCountdown(' + s + ')">' + formatTime(s) + '</button>'; }).join('') +
+        '</div>' +
+        '<div class="timer-controls" style="margin-top:8px">' +
+          '<button class="timer-btn" onclick="toggleRestTimer(' + circuitRest + ')">' + (isRestTimerRunning() ? ICONS.pause : ICONS.play) + '</button>' +
+          '<button class="timer-btn" onclick="resetRestTimer(); renderWorkoutDetail();">' + ICONS.reset + '</button>' +
+        '</div>' +
+      '</div>';
 
-    // Current round exercises
-    if (currentRound <= rounds) {
-      circuit.exercises.forEach(ex => {
-        const bw = ex.bodyweight;
-        const dbLabel = ex.dumbbell ? ' (pro DB)' : '';
-        const weightLabel = bw ? '@ BW' : '@ ' + ex.weight + 'kg' + dbLabel;
-        html += `
-          <div class="exercise-card">
-            <div class="exercise-name">${ex.name}</div>
-            <div class="exercise-last">${ex.reps} ${weightLabel}${ex.note ? ' (' + ex.note + ')' : ''}</div>
-            <div class="input-row" style="margin-top:8px">
-              ${bw ? '<div class="input-group"><div class="input-label">Gewicht</div><div style="text-align:center;padding:8px;font-size:14px">BW</div></div>' :
-              `<div class="input-group">
-                <div class="input-label">Gewicht (kg)${dbLabel}</div>
-                <input type="number" inputmode="decimal" class="input-field" id="cw-${ex.id}" value="${ex.weight}" step="0.5">
-              </div>`}
-              <div class="input-group">
-                <div class="input-label">Reps</div>
-                <input type="number" inputmode="decimal" class="input-field" id="cr-${ex.id}" value="${parseInt(ex.reps.split('-')[1] || ex.reps.split('+')[0] || ex.reps)}">
-              </div>
-            </div>
-          </div>`;
+    // VIEWING A PAST ROUND
+    if (viewing !== null && viewing <= completedRounds) {
+      html += '<div style="margin:8px 0;padding:8px;border:1px solid var(--blue);border-radius:var(--radius)">' +
+        '<div style="font-size:13px;font-weight:600;color:var(--blue);margin-bottom:8px">Runde ' + getDoubleLabel(viewing) + ' ansehen</div>';
+
+      circuit.exercises.forEach(function(ex) {
+        var sets = activeSession.sets[ex.id] || [];
+        var roundData = sets[viewing - 1]; // 0-indexed
+        if (roundData) {
+          var dbLbl = ex.dumbbell ? ' (DB)' : '';
+          html += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">' +
+            '<span>' + ex.name + '</span>' +
+            '<span style="color:var(--text-sec)">' + roundData.weight + 'kg' + dbLbl + ' × ' + roundData.reps + '</span>' +
+          '</div>';
+        }
       });
 
-      const roundLabel = isDouble ? getDoubleRoundLabel(currentRound) : currentRound;
-      html += `<button class="btn btn-orange" onclick="finishCircuitRound('${circuit.id}', ${ci})">Runde ${roundLabel} done</button>`;
+      html += '<button class="btn btn-sm btn-outline" style="margin-top:8px" onclick="clearViewingRound(\'' + circuit.id + '\')">Zurück</button>' +
+      '</div>';
+    }
+    // CURRENT ROUND INPUT (only if not done and not viewing past)
+    else if (!isDone && completedRounds < totalRounds) {
+      const currentRound = completedRounds + 1;
+
+      circuit.exercises.forEach(function(ex) {
+        var bw = ex.bodyweight;
+        var dbLbl = ex.dumbbell ? ' (pro DB)' : '';
+        var weightLabel = bw ? '@ BW' : '@ ' + ex.weight + 'kg' + dbLbl;
+        var toBeatStr = formatToBeat(ex.id);
+
+        html += '<div class="exercise-card">' +
+          '<div class="exercise-name">' + ex.name + '</div>' +
+          '<div class="exercise-last">' + ex.reps + ' ' + weightLabel + (ex.note ? ' (' + ex.note + ')' : '') + '</div>' +
+          (toBeatStr ? '<div class="to-beat">' + toBeatStr + '</div>' : '') +
+          '<div class="input-row" style="margin-top:8px">' +
+            (bw ? '<div class="input-group"><div class="input-label">Gewicht</div><div style="text-align:center;padding:8px;font-size:14px">BW</div></div>' :
+            '<div class="input-group">' +
+              '<div class="input-label">Gewicht (kg)' + dbLbl + '</div>' +
+              '<input type="number" inputmode="decimal" class="input-field" id="cw-' + ex.id + '" value="' + ex.weight + '" step="0.5">' +
+            '</div>') +
+            '<div class="input-group">' +
+              '<div class="input-label">Reps</div>' +
+              '<input type="number" inputmode="decimal" class="input-field" id="cr-' + ex.id + '" value="' + parseInt(ex.reps.split('-')[1] || ex.reps.split('+')[0] || ex.reps) + '">' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      });
+
+      var roundLabel = isDouble ? getDoubleLabel(currentRound) : currentRound;
+      html += '<button class="btn btn-orange" onclick="finishCircuitRound(\'' + circuit.id + '\', ' + ci + ')">Runde ' + roundLabel + ' done</button>';
+    }
+
+    // Zirkel end / add round buttons
+    if (!isDone && completedRounds > 0) {
+      html += '<div style="display:flex;gap:8px;margin-top:8px">';
+      if (completedRounds >= totalRounds) {
+        html += '<button class="btn btn-sm btn-outline" style="flex:1" onclick="addCircuitRound(\'' + circuit.id + '\', ' + ci + ')">+ Runde</button>';
+      }
+      html += '<button class="btn btn-sm btn-outline" style="flex:1;border-color:var(--green);color:var(--green)" onclick="endCircuit(\'' + circuit.id + '\')">Zirkel beenden</button>';
+      html += '</div>';
+    }
+
+    // If circuit is ended
+    if (isDone) {
+      html += '<div style="text-align:center;padding:12px;color:var(--green);font-size:14px;font-weight:600">✓ Zirkel abgeschlossen (' + completedRounds + ' Runden)</div>';
     }
 
     html += '</div>';
   });
 
-  // Check all circuits done (double rounds count 2x)
-  const allDone = plan.circuits.every(c => {
-    const totalRounds = c.doubleRounds ? c.rounds * 2 : c.rounds;
-    return (activeSession.circuitRounds[c.id] || 0) >= totalRounds;
+  // Check all circuits done
+  const allDone = plan.circuits.every(function(c) {
+    return activeSession._circuitDone && activeSession._circuitDone[c.id];
   });
-  if (allDone) {
+
+  // Also allow progressing if all planned rounds done
+  const allRoundsDone = plan.circuits.every(function(c) {
+    var totalRounds = c.doubleRounds ? c.rounds * 2 : c.rounds;
+    return (activeSession.circuitRounds[c.id] || 0) >= totalRounds || (activeSession._circuitDone && activeSession._circuitDone[c.id]);
+  });
+
+  if (allDone || allRoundsDone) {
     html += '<button class="btn btn-green" style="margin-top:12px" onclick="switchSubTab(\'acc\')">Weiter: Accessories</button>';
   }
 
   return html;
 }
 
+function viewCircuitRound(circuitId, round) {
+  viewingRound[circuitId] = round;
+  renderWorkoutDetail();
+}
+
+function clearViewingRound(circuitId) {
+  delete viewingRound[circuitId];
+  renderWorkoutDetail();
+}
+
+function endCircuit(circuitId) {
+  if (!activeSession._circuitDone) activeSession._circuitDone = {};
+  activeSession._circuitDone[circuitId] = true;
+  saveState();
+  renderWorkoutDetail();
+}
+
+function addCircuitRound(circuitId, circuitIndex) {
+  // Track extra rounds beyond the plan
+  if (!activeSession._extraRounds) activeSession._extraRounds = {};
+  activeSession._extraRounds[circuitId] = (activeSession._extraRounds[circuitId] || 0) + 1;
+  // Un-end the circuit if it was ended
+  if (activeSession._circuitDone) delete activeSession._circuitDone[circuitId];
+  saveState();
+  renderWorkoutDetail();
+}
+
 function finishCircuitRound(circuitId, circuitIndex) {
   const plan = WORKOUT_PLANS[activeWorkoutId];
   const circuit = plan.circuits[circuitIndex];
 
-  // Save exercise data for this round
-  circuit.exercises.forEach(ex => {
-    const bw = ex.bodyweight;
-    const weightEl = document.getElementById(`cw-${ex.id}`);
-    const repsEl = document.getElementById(`cr-${ex.id}`);
-    const weight = bw ? APP_STATE.settings.bodyWeight : (weightEl ? parseFloat(weightEl.value) : ex.weight);
-    const reps = repsEl ? parseInt(repsEl.value) : parseInt(ex.reps.split('-')[1] || ex.reps);
+  circuit.exercises.forEach(function(ex) {
+    var bw = ex.bodyweight;
+    var weightEl = document.getElementById('cw-' + ex.id);
+    var repsEl = document.getElementById('cr-' + ex.id);
+    var weight = bw ? APP_STATE.settings.bodyWeight : (weightEl ? parseFloat(weightEl.value) : ex.weight);
+    var reps = repsEl ? parseInt(repsEl.value) : parseInt(ex.reps.split('-')[1] || ex.reps);
 
     if (!activeSession.sets[ex.id]) activeSession.sets[ex.id] = [];
-    activeSession.sets[ex.id].push({ weight, reps, type: 'working' });
+    activeSession.sets[ex.id].push({ weight: weight, reps: reps, type: 'working' });
   });
 
   activeSession.circuitRounds[circuitId] = (activeSession.circuitRounds[circuitId] || 0) + 1;
 
-  // Use circuit-specific rest time (0 = no auto timer, e.g. for double rounds)
-  const restTime = circuit.restSeconds || 90;
-  if (restTime > 0) startCountdown(restTime);
+  // DON'T auto-start timer - user starts it manually
   saveState();
   renderWorkoutDetail();
 }
@@ -2216,13 +2588,19 @@ function renderAccExercise(ex) {
 
   let setsHtml = '';
 
-  // Completed sets
+  // To Beat display
+  const toBeatStr = formatToBeat(ex.id);
+
+  // Completed sets with swipe-to-delete
   sessionSets.forEach((set, i) => {
     setsHtml += `
-      <div class="set-card done" style="padding:8px 12px">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:13px">Satz ${i + 1} ${ICONS.check}</span>
-          <span style="font-size:13px;color:var(--text-sec)">${set.weight}kg${dbLabel} x${set.reps}</span>
+      <div class="swipe-wrapper" data-ex-id="${ex.id}" data-set-index="${i}">
+        <div class="swipe-delete-bg">Löschen</div>
+        <div class="swipe-content set-card done" style="padding:8px 12px;margin-bottom:0">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:13px">Satz ${i + 1} ${set.type === 'drop' ? '(Drop)' : ''} ${ICONS.check}</span>
+            <span style="font-size:13px;color:var(--text-sec)">${set.weight}kg${dbLabel} x${set.reps}</span>
+          </div>
         </div>
       </div>`;
   });
@@ -2237,8 +2615,19 @@ function renderAccExercise(ex) {
           `<input type="number" inputmode="decimal" class="input-field" style="flex:1;padding:6px" id="aw-${ex.id}" value="${ex.weight || 10}" step="0.5">`}
           <input type="number" inputmode="decimal" class="input-field" style="width:60px;padding:6px" id="ar-${ex.id}" value="${parseInt(ex.reps.split('-')[1] || ex.reps)}">
           <button class="btn btn-orange btn-sm" style="width:auto;padding:6px 12px;min-height:32px" onclick="finishAccSet('${ex.id}', ${bw})">OK</button>
-        </div>
-      </div>`;
+        </div>`;
+
+    // Drop set input row
+    if (ex.dropWeight) {
+      setsHtml += `
+        <div class="drop-input-row">
+          <div class="drop-label">Drop</div>
+          <input type="number" inputmode="decimal" class="input-field" style="flex:1;padding:6px" id="adw-${ex.id}" value="${ex.dropWeight}" step="0.5">
+          <input type="number" inputmode="decimal" class="input-field" style="width:60px;padding:6px" id="adr-${ex.id}" value="${parseInt(ex.reps.split('-')[1] || ex.reps)}">
+        </div>`;
+    }
+
+    setsHtml += '</div>';
   }
 
   return `
@@ -2250,6 +2639,7 @@ function renderAccExercise(ex) {
         </div>
         <span style="font-size:12px;color:var(--text-sec)">${sessionSets.length}/${ex.sets}</span>
       </div>
+      ${toBeatStr ? '<div class="to-beat" style="margin-top:6px">' + toBeatStr + '</div>' : ''}
       <div style="margin-top:8px">${setsHtml}</div>
     </div>`;
 }
@@ -2260,6 +2650,17 @@ function finishAccSet(exId, isBW) {
 
   if (!activeSession.sets[exId]) activeSession.sets[exId] = [];
   activeSession.sets[exId].push({ weight, reps, type: 'working' });
+
+  // Check for drop set
+  const dropWeightEl = document.getElementById('adw-' + exId);
+  const dropRepsEl = document.getElementById('adr-' + exId);
+  if (dropWeightEl && dropRepsEl) {
+    const dw = parseFloat(dropWeightEl.value) || 0;
+    const dr = parseInt(dropRepsEl.value) || 0;
+    if (dw > 0 && dr > 0) {
+      activeSession.sets[exId].push({ weight: dw, reps: dr, type: 'drop' });
+    }
+  }
 
   if (checkPR(exId, weight, reps)) {
     APP_STATE.prs.push({
@@ -2281,9 +2682,13 @@ function finishWorkout() {
   if (!activeSession) return;
 
   activeSession._completed = true;
-  activeSession.duration = activeSession._startTime
-    ? Math.round((Date.now() - activeSession._startTime) / 1000)
-    : 3600;
+
+  // Use session timer for accurate duration
+  const sessionSec = getSessionSeconds();
+  activeSession.duration = sessionSec > 0 ? sessionSec : (activeSession._startTime ? Math.round((Date.now() - activeSession._startTime) / 1000) : 3600);
+
+  stopSessionTimer();
+  stopRestTimer();
 
   // Remove internal props before saving
   const toSave = { ...activeSession };
@@ -2291,6 +2696,8 @@ function finishWorkout() {
   delete toSave._currentStrengthSet;
   delete toSave._currentCircuitRound;
   delete toSave._completed;
+  // Keep _circuitDone and _extraRounds for round viewing after completion
+  // delete toSave._circuitDone;
 
   // Replace or add session
   const idx = APP_STATE.sessions.findIndex(s => s.id === toSave.id);
@@ -2299,8 +2706,6 @@ function finishWorkout() {
   } else {
     APP_STATE.sessions.push(toSave);
   }
-
-  stopTimer();
 
   // Check if auto-goals should be set after W1 completion
   checkAutoGoals();
@@ -2357,7 +2762,7 @@ function checkAutoGoals() {
     hams: baseMuscle.hams
   };
 
-  console.log('Auto-Goals gesetzt! Baseline:', baseTotal, '→ Ziel W5:', APP_STATE.settings.goals.weeklyVolume);
+  console.log('Auto-Goals gesetzt! Baseline:', baseTotal, '-> Ziel W5:', APP_STATE.settings.goals.weeklyVolume);
 }
 
 // Get the progressive target for a specific week (linear ramp from baseline to W5 goal)
@@ -2944,7 +3349,7 @@ function renderSettingsPage() {
     </div>
 
     <div style="text-align:center;padding:20px 0;color:var(--text-ter);font-size:12px">
-      Training Tracker v2.1
+      Training Tracker v3.0
     </div>
   `;
 }
@@ -3012,7 +3417,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '2.1';
+const APP_VERSION = '3.0';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
@@ -3109,6 +3514,62 @@ function startNewMesocycle() {
   delete APP_STATE.settings.goalsBaseline;
   saveState();
   navigateTo('home');
+}
+
+// =============================================
+// SWIPE TO DELETE
+// =============================================
+
+let swipeStartX = 0;
+let swipeCurrentX = 0;
+let swipeEl = null;
+
+document.addEventListener('touchstart', function(e) {
+  var wrapper = e.target.closest('.swipe-wrapper');
+  if (!wrapper) return;
+  swipeEl = wrapper.querySelector('.swipe-content');
+  swipeStartX = e.touches[0].clientX;
+  swipeCurrentX = swipeStartX;
+  if (swipeEl) swipeEl.style.transition = 'none';
+}, { passive: true });
+
+document.addEventListener('touchmove', function(e) {
+  if (!swipeEl) return;
+  swipeCurrentX = e.touches[0].clientX;
+  var diff = swipeCurrentX - swipeStartX;
+  if (diff < 0) {
+    swipeEl.style.transform = 'translateX(' + Math.max(diff, -80) + 'px)';
+  }
+}, { passive: true });
+
+document.addEventListener('touchend', function(e) {
+  if (!swipeEl) return;
+  swipeEl.style.transition = 'transform 0.2s ease';
+  var diff = swipeCurrentX - swipeStartX;
+
+  if (diff < -60) {
+    // Swiped enough - show delete
+    swipeEl.style.transform = 'translateX(-80px)';
+    var wrapper = swipeEl.closest('.swipe-wrapper');
+    var bg = wrapper.querySelector('.swipe-delete-bg');
+    if (bg) {
+      bg.onclick = function() {
+        var exId = wrapper.dataset.exId;
+        var setIdx = parseInt(wrapper.dataset.setIndex);
+        deleteSet(exId, setIdx);
+      };
+    }
+  } else {
+    swipeEl.style.transform = 'translateX(0)';
+  }
+  swipeEl = null;
+});
+
+function deleteSet(exId, setIndex) {
+  if (!activeSession || !activeSession.sets[exId]) return;
+  activeSession.sets[exId].splice(setIndex, 1);
+  saveState();
+  renderWorkoutDetail();
 }
 
 // =============================================
