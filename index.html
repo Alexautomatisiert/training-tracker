@@ -1,0 +1,2775 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0D0D14">
+<title>Training Tracker</title>
+<style>
+/* =============================================
+   CSS CUSTOM PROPERTIES
+   ============================================= */
+:root {
+  --bg: #0D0D14;
+  --card: #1A1A25;
+  --border: #2A2A35;
+  --orange: #E8720C;
+  --green: #28B463;
+  --red: #E24B4A;
+  --blue: #3498DB;
+  --purple: #9B59B6;
+  --text: #fff;
+  --text-sec: #888;
+  --text-ter: #555;
+  --radius: 12px;
+  --nav-height: 64px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+}
+
+/* =============================================
+   RESET & BASE
+   ============================================= */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  font-family: -apple-system, system-ui, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
+  overflow: hidden;
+  height: 100%;
+}
+
+body {
+  height: 100%;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+input, button, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  border: none;
+  outline: none;
+  background: none;
+}
+
+button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+a { color: inherit; text-decoration: none; }
+
+/* =============================================
+   APP SHELL
+   ============================================= */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 430px;
+  margin: 0 auto;
+  position: relative;
+  overflow: hidden;
+}
+
+/* =============================================
+   PAGES
+   ============================================= */
+.page {
+  display: none;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 16px calc(var(--nav-height) + var(--safe-bottom) + 16px) 16px;
+  padding-top: calc(var(--safe-top) + 16px);
+}
+
+.page.active {
+  display: block;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* =============================================
+   BOTTOM NAVIGATION
+   ============================================= */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 430px;
+  display: flex;
+  background: #111118;
+  border-top: 1px solid var(--border);
+  padding-bottom: var(--safe-bottom);
+  z-index: 100;
+}
+
+.nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 0;
+  gap: 4px;
+  color: var(--text-ter);
+  transition: color 0.2s;
+  min-height: var(--nav-height);
+}
+
+.nav-item.active { color: var(--orange); }
+.nav-item svg { width: 24px; height: 24px; }
+.nav-item span { font-size: 10px; font-weight: 500; }
+
+/* =============================================
+   CARDS & COMMON ELEMENTS
+   ============================================= */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.section-title {
+  font-size: 14px;
+  color: var(--text-sec);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+  margin-top: 20px;
+}
+
+.section-title:first-child { margin-top: 0; }
+
+h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+h2 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+h3 { font-size: 15px; font-weight: 600; }
+
+/* =============================================
+   WORKOUT ROW
+   ============================================= */
+.workout-row {
+  display: flex;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+  cursor: pointer;
+  min-height: 56px;
+}
+
+.workout-row:last-child { border-bottom: none; }
+
+.workout-status {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.workout-status.done { background: var(--green); }
+.workout-status.pending { border: 2px solid var(--border); }
+.workout-status.current { border: 2px solid var(--orange); }
+
+.workout-info { flex: 1; }
+.workout-name { font-size: 15px; font-weight: 600; }
+.workout-sub { font-size: 12px; color: var(--text-sec); margin-top: 2px; }
+.workout-day { font-size: 12px; color: var(--text-ter); flex-shrink: 0; }
+
+/* =============================================
+   WEEK PILLS
+   ============================================= */
+.week-pills {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.week-pill {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid var(--border);
+  color: var(--text-sec);
+  background: transparent;
+  flex-shrink: 0;
+}
+
+.week-pill.current { background: var(--orange); color: #fff; border-color: var(--orange); }
+.week-pill.done { background: var(--green); color: #fff; border-color: var(--green); opacity: 0.7; }
+.week-pill.future { opacity: 0.5; }
+
+/* =============================================
+   SUB TABS
+   ============================================= */
+.sub-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 4px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.sub-tab {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-sec);
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.sub-tab.active {
+  background: var(--orange);
+  color: #fff;
+}
+
+/* =============================================
+   BUTTONS
+   ============================================= */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 24px;
+  border-radius: var(--radius);
+  font-size: 16px;
+  font-weight: 600;
+  width: 100%;
+  min-height: 48px;
+  transition: opacity 0.2s;
+}
+
+.btn:active { opacity: 0.8; }
+.btn-orange { background: var(--orange); color: #fff; }
+.btn-green { background: var(--green); color: #fff; }
+.btn-outline { border: 1px solid var(--border); color: var(--text-sec); }
+
+.btn-sm {
+  padding: 8px 16px;
+  font-size: 14px;
+  min-height: 36px;
+  width: auto;
+}
+
+/* =============================================
+   INPUT FIELDS
+   ============================================= */
+.input-field {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 16px;
+  color: var(--text);
+  text-align: center;
+  width: 100%;
+  transition: border-color 0.2s;
+}
+
+.input-field:focus { border-color: var(--orange); }
+
+.input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.input-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.input-label {
+  font-size: 11px;
+  color: var(--text-sec);
+  text-align: center;
+}
+
+/* =============================================
+   TIMER
+   ============================================= */
+.timer-display {
+  font-family: 'SF Mono', 'Menlo', monospace;
+  font-size: 48px;
+  font-weight: 700;
+  color: var(--orange);
+  text-align: center;
+  padding: 16px 0;
+}
+
+.timer-presets {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.timer-preset {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  color: var(--text-sec);
+}
+
+.timer-preset.active { border-color: var(--orange); color: var(--orange); }
+
+.timer-controls {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.timer-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  color: var(--text-sec);
+}
+
+.timer-btn.active { border-color: var(--orange); color: var(--orange); }
+
+/* =============================================
+   SET CARD
+   ============================================= */
+.set-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-bottom: 8px;
+  transition: all 0.2s;
+}
+
+.set-card.done {
+  border-color: var(--green);
+  opacity: 0.6;
+}
+
+.set-card.current { border-color: var(--orange); }
+.set-card.upcoming { opacity: 0.4; }
+
+.set-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.set-number { font-size: 14px; font-weight: 600; }
+.set-type { font-size: 11px; color: var(--text-sec); }
+
+/* =============================================
+   EXERCISE CARD
+   ============================================= */
+.exercise-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.exercise-name { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.exercise-last { font-size: 12px; color: var(--text-sec); margin-bottom: 12px; }
+
+/* =============================================
+   VOLUME BAR
+   ============================================= */
+.volume-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.volume-label { font-size: 13px; width: 70px; flex-shrink: 0; }
+.volume-bar-bg {
+  flex: 1;
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.volume-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.volume-change {
+  font-size: 12px;
+  width: 50px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.volume-change.up { color: var(--green); }
+.volume-change.down { color: var(--red); }
+
+/* =============================================
+   ROUND PILLS
+   ============================================= */
+.round-pills {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  justify-content: center;
+}
+
+.round-pill {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  border: 2px solid var(--border);
+  color: var(--text-sec);
+}
+
+.round-pill.done { background: var(--green); border-color: var(--green); color: #fff; }
+.round-pill.current { border-color: var(--orange); color: var(--orange); }
+
+/* =============================================
+   PROGRESS BAR
+   ============================================= */
+.progress-bar {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--orange);
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+/* =============================================
+   PR BADGE
+   ============================================= */
+.pr-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: rgba(232, 114, 12, 0.15);
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--orange);
+  margin: 2px 4px 2px 0;
+}
+
+/* =============================================
+   FEELING SELECTOR
+   ============================================= */
+.feeling-selector {
+  display: flex;
+  gap: 8px;
+}
+
+.feeling-btn {
+  flex: 1;
+  padding: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  text-align: center;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.feeling-btn.selected { border-color: var(--orange); background: rgba(232, 114, 12, 0.1); }
+
+/* =============================================
+   CHART
+   ============================================= */
+.chart-container {
+  width: 100%;
+  height: 180px;
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.chart-bar-group {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  height: 140px;
+  padding: 0 8px;
+  position: relative;
+}
+
+.chart-bar-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.chart-bar {
+  width: 32px;
+  background: var(--orange);
+  border-radius: 4px 4px 0 0;
+  transition: height 0.5s ease;
+  min-height: 2px;
+}
+
+.chart-label { font-size: 11px; color: var(--text-sec); }
+.chart-value { font-size: 10px; color: var(--text-ter); }
+
+.chart-goal-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 2px dashed var(--text-ter);
+  z-index: 1;
+}
+
+/* =============================================
+   WARMUP ITEM
+   ============================================= */
+.warmup-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.warmup-item:last-child { border-bottom: none; }
+
+.warmup-check {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.warmup-check.checked { background: var(--green); border-color: var(--green); }
+.warmup-text { font-size: 14px; flex: 1; }
+.warmup-duration { font-size: 12px; color: var(--text-sec); }
+
+/* =============================================
+   SETTINGS ROWS
+   ============================================= */
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+  min-height: 48px;
+}
+
+.settings-row:last-child { border-bottom: none; }
+.settings-label { font-size: 15px; }
+.settings-value { font-size: 15px; color: var(--text-sec); }
+
+/* =============================================
+   DONE PAGE STATS
+   ============================================= */
+.done-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.done-stat-box {
+  background: var(--bg);
+  border-radius: var(--radius);
+  padding: 12px;
+  text-align: center;
+}
+
+.done-stat-label { font-size: 12px; color: var(--text-sec); margin-bottom: 4px; }
+.done-stat-value { font-size: 18px; font-weight: 700; }
+.done-stat-sub { font-size: 11px; color: var(--text-ter); margin-top: 2px; }
+
+/* =============================================
+   SUPERSET GROUP
+   ============================================= */
+.superset-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.superset-header {
+  background: rgba(155, 89, 182, 0.1);
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--purple);
+}
+
+.superset-group .exercise-card {
+  border: none;
+  border-radius: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0;
+}
+
+.superset-group .exercise-card:last-child { border-bottom: none; }
+
+/* =============================================
+   BACK BUTTON
+   ============================================= */
+.back-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  color: var(--orange);
+  padding: 8px 0;
+  margin-bottom: 8px;
+}
+
+/* =============================================
+   CELEBRATION
+   ============================================= */
+.celebration {
+  text-align: center;
+  padding: 32px 0 24px;
+}
+
+.celebration-icon {
+  width: 64px;
+  height: 64px;
+  background: var(--green);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+/* =============================================
+   SCROLLBAR STYLE
+   ============================================= */
+.page::-webkit-scrollbar { width: 0; }
+
+/* =============================================
+   EXPANDABLE
+   ============================================= */
+.expandable-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.expandable-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.expandable-content.open { max-height: 500px; }
+
+.chevron {
+  transition: transform 0.3s;
+  color: var(--text-sec);
+}
+
+.chevron.open { transform: rotate(180deg); }
+
+/* =============================================
+   MOTIVATION CARD
+   ============================================= */
+.motivation-card {
+  background: linear-gradient(135deg, rgba(232,114,12,0.15), rgba(155,89,182,0.1));
+  border: 1px solid rgba(232,114,12,0.3);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.motivation-text {
+  font-size: 15px;
+  font-style: italic;
+  line-height: 1.4;
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- =============================================
+       HOME PAGE
+       ============================================= -->
+  <div id="page-home" class="page active">
+    <div id="home-content"></div>
+  </div>
+
+  <!-- =============================================
+       TRAINING PAGE
+       ============================================= -->
+  <div id="page-training" class="page">
+    <div id="training-content"></div>
+  </div>
+
+  <!-- =============================================
+       STATS PAGE
+       ============================================= -->
+  <div id="page-stats" class="page">
+    <div id="stats-content"></div>
+  </div>
+
+  <!-- =============================================
+       SETTINGS PAGE
+       ============================================= -->
+  <div id="page-settings" class="page">
+    <div id="settings-content"></div>
+  </div>
+
+  <!-- =============================================
+       BOTTOM NAVIGATION
+       ============================================= -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-page="home">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/>
+        <polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+      <span>Home</span>
+    </button>
+    <button class="nav-item" data-page="training">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 4v16M18 4v16M2 8h4M18 8h4M2 16h4M18 16h4M6 12h12"/>
+      </svg>
+      <span>Training</span>
+    </button>
+    <button class="nav-item" data-page="stats">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="12" width="4" height="9" rx="1"/>
+        <rect x="10" y="6" width="4" height="15" rx="1"/>
+        <rect x="17" y="3" width="4" height="18" rx="1"/>
+      </svg>
+      <span>Stats</span>
+    </button>
+    <button class="nav-item" data-page="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+      </svg>
+      <span>Settings</span>
+    </button>
+  </nav>
+</div>
+
+<script>
+/* =============================================================================
+   TRAINING APP - MAIN APPLICATION
+   ============================================================================= */
+
+// =============================================
+// DATA: WORKOUT PLAN DEFINITIONS
+// =============================================
+
+const WORKOUT_PLANS = {
+  va: {
+    id: 'va',
+    name: 'Vorderseite A',
+    subtitle: 'Chest Fokus',
+    day: 'Mo',
+    dayIndex: 1,
+    muscleSplit: { brust: 40, quads: 25, trizeps: 15, schultern: 20 },
+    warmup: [
+      { id: 'va-w1', name: 'Iso Aussenrotation R', duration: '30s' },
+      { id: 'va-w2', name: 'Iso Aussenrotation L', duration: '30s' },
+      { id: 'va-w3', name: 'Iso Innenrotation R', duration: '30s' },
+      { id: 'va-w4', name: 'Iso Innenrotation L', duration: '30s' },
+      { id: 'va-w5', name: 'Aussenrotation R', duration: '45s' },
+      { id: 'va-w6', name: 'Aussenrotation L', duration: '45s' },
+      { id: 'va-w7', name: 'Innenrotation R', duration: '45s' },
+      { id: 'va-w8', name: 'Innenrotation L', duration: '45s' },
+      { id: 'va-w9', name: 'Plank Rotation', duration: '60s' },
+      { id: 'va-w10', name: '20 Push-ups', duration: '' }
+    ],
+    strength: [
+      { id: 'va-s1', name: 'Incline DB Press', sets: 3, reps: '6-8', weight: 30, unit: 'kg', bodyweight: false }
+    ],
+    circuits: [
+      {
+        id: 'va-c1',
+        name: 'Zirkel',
+        type: 'Technik',
+        rounds: 4,
+        exercises: [
+          { id: 'va-c1-e1', name: 'Rev. DB Lunge', reps: '10-12', weight: 15, unit: 'kg', bodyweight: false },
+          { id: 'va-c1-e2', name: 'Ring Dips', reps: '8-10', weight: 0, unit: 'kg', bodyweight: true },
+          { id: 'va-c1-e3', name: 'OH Walking Lunges', reps: '10-12', weight: 15, unit: 'kg', bodyweight: false },
+          { id: 'va-c1-e4', name: 'Incline DB Press', reps: '10-12', weight: 25, unit: 'kg', bodyweight: false }
+        ]
+      }
+    ],
+    accessories: [
+      { id: 'va-a1', name: 'Seitliche Schulter', sets: 3, reps: '12-15', weight: 0, unit: 'kg', bodyweight: false, group: null },
+      { id: 'va-a2', name: 'TTB + KTC', sets: 3, reps: '12', weight: 0, unit: 'kg', bodyweight: true, group: 'superset', groupName: 'Bauch Superset' },
+      { id: 'va-a3', name: 'Trizeps', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: false, group: null }
+    ]
+  },
+  vb: {
+    id: 'vb',
+    name: 'Vorderseite B',
+    subtitle: 'Quad Fokus',
+    day: 'Fr',
+    dayIndex: 5,
+    muscleSplit: { quads: 40, brust: 25, trizeps: 15, schultern: 20 },
+    warmup: [
+      { id: 'vb-w1', name: 'Iso Aussenrotation R', duration: '30s' },
+      { id: 'vb-w2', name: 'Iso Aussenrotation L', duration: '30s' },
+      { id: 'vb-w3', name: 'Iso Innenrotation R', duration: '30s' },
+      { id: 'vb-w4', name: 'Iso Innenrotation L', duration: '30s' },
+      { id: 'vb-w5', name: 'Aussenrotation R', duration: '45s' },
+      { id: 'vb-w6', name: 'Aussenrotation L', duration: '45s' },
+      { id: 'vb-w7', name: 'Innenrotation R', duration: '45s' },
+      { id: 'vb-w8', name: 'Innenrotation L', duration: '45s' },
+      { id: 'vb-w9', name: 'Plank Rotation', duration: '60s' },
+      { id: 'vb-w10', name: '20 Push-ups', duration: '' }
+    ],
+    strength: [
+      { id: 'vb-s1', name: 'Bulgarian Split Squats', sets: 3, reps: '8-10', weight: 40, unit: 'kg', bodyweight: false, note: '2x20kg' }
+    ],
+    circuits: [
+      {
+        id: 'vb-c1',
+        name: 'Zirkel',
+        type: 'Heavy',
+        rounds: 4,
+        exercises: [
+          { id: 'vb-c1-e1', name: 'Incline DB Press', reps: '10-12', weight: 25, unit: 'kg', bodyweight: false },
+          { id: 'vb-c1-e2', name: 'Hex Bar Squats', reps: '8-10', weight: 60, unit: 'kg', bodyweight: false },
+          { id: 'vb-c1-e3', name: 'Ring Push-ups', reps: '10-12', weight: 0, unit: 'kg', bodyweight: true },
+          { id: 'vb-c1-e4', name: 'Walking Lunges', reps: '12-15', weight: 0, unit: 'kg', bodyweight: true }
+        ]
+      }
+    ],
+    accessories: [
+      { id: 'vb-a1', name: 'Seitliche Schulter', sets: 3, reps: '12-15', weight: 0, unit: 'kg', bodyweight: false, group: null },
+      { id: 'vb-a2', name: 'TTB + KTC', sets: 3, reps: '12', weight: 0, unit: 'kg', bodyweight: true, group: 'superset', groupName: 'Bauch Superset' },
+      { id: 'vb-a3', name: 'Trizeps', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: false, group: null }
+    ]
+  },
+  ra: {
+    id: 'ra',
+    name: 'Rueckseite A',
+    subtitle: 'Pull + RDL',
+    day: 'Mi',
+    dayIndex: 3,
+    muscleSplit: { ruecken: 50, hams: 25, bizeps: 10, core: 15 },
+    warmup: [
+      { id: 'ra-w1', name: 'Iso Aussenrotation R', duration: '30s' },
+      { id: 'ra-w2', name: 'Iso Aussenrotation L', duration: '30s' },
+      { id: 'ra-w3', name: 'Iso Innenrotation R', duration: '30s' },
+      { id: 'ra-w4', name: 'Iso Innenrotation L', duration: '30s' },
+      { id: 'ra-w5', name: 'Aussenrotation R', duration: '45s' },
+      { id: 'ra-w6', name: 'Aussenrotation L', duration: '45s' },
+      { id: 'ra-w7', name: 'Innenrotation R', duration: '45s' },
+      { id: 'ra-w8', name: 'Innenrotation L', duration: '45s' },
+      { id: 'ra-w9', name: 'Plank Rotation', duration: '60s' },
+      { id: 'ra-w10', name: '10 Scapula Pull-ups', duration: '' }
+    ],
+    strength: [
+      { id: 'ra-s1', name: 'Elevated Seal BB Rows', sets: 3, reps: '6-8', weight: 60, unit: 'kg', bodyweight: false }
+    ],
+    circuits: [
+      {
+        id: 'ra-c1',
+        name: 'Zirkel 1',
+        type: 'Technik',
+        rounds: 4,
+        exercises: [
+          { id: 'ra-c1-e1', name: 'Snatch-Grip RDL/Snatch Combo', reps: '8-10', weight: 35, unit: 'kg', bodyweight: false },
+          { id: 'ra-c1-e2', name: 'Trap Laterals + Rev Flys', reps: '12+12', weight: 5, unit: 'kg', bodyweight: false, note: '5+10kg' }
+        ]
+      },
+      {
+        id: 'ra-c2',
+        name: 'Zirkel 2',
+        type: 'Finisher',
+        rounds: 3,
+        exercises: [
+          { id: 'ra-c2-e1', name: 'Pull-ups', reps: '6-8', weight: 0, unit: 'kg', bodyweight: true },
+          { id: 'ra-c2-e2', name: 'Farmer Carry + Shrugs', reps: '75m+5', weight: 48, unit: 'kg', bodyweight: false, note: '2x24kg' }
+        ]
+      }
+    ],
+    accessories: [
+      { id: 'ra-a1', name: 'Weighted GHD + BW', sets: 3, reps: '12', weight: 15, unit: 'kg', bodyweight: false, group: null },
+      { id: 'ra-a2', name: 'TTB', sets: 3, reps: '12', weight: 0, unit: 'kg', bodyweight: true, group: 'triple', groupName: 'Triple Set Bauch' },
+      { id: 'ra-a3', name: 'KTC', sets: 3, reps: '12', weight: 0, unit: 'kg', bodyweight: true, group: 'triple', groupName: 'Triple Set Bauch' },
+      { id: 'ra-a4', name: 'Frog Situps', sets: 3, reps: '12', weight: 0, unit: 'kg', bodyweight: true, group: 'triple', groupName: 'Triple Set Bauch' },
+      { id: 'ra-a5', name: 'Curls', sets: 3, reps: '10', weight: 15, unit: 'kg', bodyweight: false, group: null }
+    ]
+  },
+  rb: {
+    id: 'rb',
+    name: 'Rueckseite B',
+    subtitle: 'Rows + Pull',
+    day: 'So',
+    dayIndex: 0,
+    muscleSplit: { ruecken: 50, hams: 25, bizeps: 10, core: 15 },
+    warmup: [
+      { id: 'rb-w1', name: 'Iso Aussenrotation R', duration: '30s' },
+      { id: 'rb-w2', name: 'Iso Aussenrotation L', duration: '30s' },
+      { id: 'rb-w3', name: 'Iso Innenrotation R', duration: '30s' },
+      { id: 'rb-w4', name: 'Iso Innenrotation L', duration: '30s' },
+      { id: 'rb-w5', name: 'Aussenrotation R', duration: '45s' },
+      { id: 'rb-w6', name: 'Aussenrotation L', duration: '45s' },
+      { id: 'rb-w7', name: 'Innenrotation R', duration: '45s' },
+      { id: 'rb-w8', name: 'Innenrotation L', duration: '45s' },
+      { id: 'rb-w9', name: 'Plank Rotation', duration: '60s' },
+      { id: 'rb-w10', name: '10 Scapula Pull-ups', duration: '' }
+    ],
+    strength: [
+      { id: 'rb-s1', name: 'Weighted Ring Inverted Row', sets: 5, reps: '6-8', weight: 10, unit: 'kg', bodyweight: false, note: 'BW+10kg' }
+    ],
+    circuits: [
+      {
+        id: 'rb-c1',
+        name: 'Zirkel 1',
+        type: 'Heavy',
+        rounds: 4,
+        exercises: [
+          { id: 'rb-c1-e1', name: 'Weighted Pull-ups', reps: '6-8', weight: 10, unit: 'kg', bodyweight: false },
+          { id: 'rb-c1-e2', name: 'KB RDL + Gorilla Row (breit)', reps: '8-10', weight: 40, unit: 'kg', bodyweight: false, note: '2x20kg' }
+        ]
+      },
+      {
+        id: 'rb-c2',
+        name: 'Zirkel 2',
+        type: 'Volume',
+        rounds: 4,
+        exercises: [
+          { id: 'rb-c2-e1', name: 'Seal Row', reps: '10-12', weight: 25, unit: 'kg', bodyweight: false },
+          { id: 'rb-c2-e2', name: 'Ring Reverse Fly', reps: '12-15', weight: 0, unit: 'kg', bodyweight: true }
+        ]
+      }
+    ],
+    accessories: [
+      { id: 'rb-a1', name: 'GHD back ext', sets: 3, reps: '12', weight: 10, unit: 'kg', bodyweight: false, group: null },
+      { id: 'rb-a2', name: 'GHD sit ups', sets: 3, reps: '10', weight: 0, unit: 'kg', bodyweight: true, group: 'superset', groupName: 'Superset Bauch' },
+      { id: 'rb-a3', name: 'Knee Raises', sets: 3, reps: '10', weight: 0, unit: 'kg', bodyweight: true, group: 'superset', groupName: 'Superset Bauch' },
+      { id: 'rb-a4', name: 'Curls', sets: 3, reps: '10', weight: 15, unit: 'kg', bodyweight: false, group: null }
+    ]
+  }
+};
+
+// Weekly schedule order
+const WEEK_SCHEDULE = ['va', 'ra', 'vb', 'rb'];
+
+// =============================================
+// STATE MANAGEMENT
+// =============================================
+
+const STORAGE_KEY = 'training-app';
+
+function getDefaultState() {
+  return {
+    settings: {
+      bodyWeight: 82.5,
+      weightHistory: [
+        { date: '2026-05-01', weight: 84.0 },
+        { date: '2026-05-15', weight: 83.2 },
+        { date: '2026-06-01', weight: 82.5 }
+      ],
+      mesocycle: { number: 2, currentWeek: 4, weeksHard: 5, weeksDeload: 1 },
+      goals: { weeklyVolume: 13500, ruecken: 5500, brust: 3400, quads: 3000, hams: 2800 }
+    },
+    sessions: [],
+    activeWorkout: null,
+    prs: []
+  };
+}
+
+let APP_STATE = loadState();
+
+function loadState() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return Object.assign(getDefaultState(), parsed);
+    }
+  } catch (e) {
+    console.error('Failed to load state:', e);
+  }
+  return generateSampleData();
+}
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(APP_STATE));
+  } catch (e) {
+    console.error('Failed to save state:', e);
+  }
+}
+
+// =============================================
+// SAMPLE DATA GENERATION
+// =============================================
+
+function generateSampleData() {
+  const state = getDefaultState();
+  const baseDate = new Date('2026-05-11'); // Week 1 start (Monday)
+  const bw = state.settings.bodyWeight;
+
+  // Generate 3 complete weeks + partial week 4
+  for (let week = 1; week <= 4; week++) {
+    const weekStart = new Date(baseDate);
+    weekStart.setDate(weekStart.getDate() + (week - 1) * 7);
+
+    WEEK_SCHEDULE.forEach((wid, idx) => {
+      // Week 4: only first 2 workouts done
+      if (week === 4 && idx >= 2) return;
+
+      const plan = WORKOUT_PLANS[wid];
+      const dayOffsets = { va: 0, ra: 2, vb: 4, rb: 6 };
+      const sessionDate = new Date(weekStart);
+      sessionDate.setDate(sessionDate.getDate() + dayOffsets[wid]);
+
+      const session = {
+        id: `s-w${week}-${wid}`,
+        workoutId: wid,
+        date: sessionDate.toISOString().split('T')[0],
+        week: week,
+        mesocycle: 2,
+        duration: 2700 + Math.floor(Math.random() * 900),
+        feeling: ['hard', 'good', 'easy'][Math.floor(Math.random() * 3)],
+        sets: {},
+        warmupDone: true,
+        circuitRounds: {},
+        notes: ''
+      };
+
+      // Progressive overload: slightly increase weights/reps each week
+      const progression = 1 + (week - 1) * 0.03;
+
+      // Strength sets
+      plan.strength.forEach(ex => {
+        const sets = [];
+        for (let s = 0; s < ex.sets; s++) {
+          const w = ex.bodyweight ? bw : Math.round(ex.weight * progression);
+          const maxRep = parseInt(ex.reps.split('-')[1] || ex.reps);
+          const r = Math.max(maxRep - s, parseInt(ex.reps.split('-')[0] || '6'));
+          sets.push({ weight: w, reps: r, type: 'working' });
+        }
+        session.sets[ex.id] = sets;
+      });
+
+      // Circuit exercises
+      plan.circuits.forEach(circuit => {
+        const rounds = circuit.rounds - (Math.random() > 0.7 ? 1 : 0);
+        session.circuitRounds[circuit.id] = rounds;
+        circuit.exercises.forEach(ex => {
+          const sets = [];
+          for (let r = 0; r < rounds; r++) {
+            const w = ex.bodyweight ? bw : Math.round(ex.weight * progression);
+            const maxRep = parseInt(ex.reps.split('-')[1] || ex.reps.split('+')[0] || ex.reps);
+            sets.push({ weight: w, reps: maxRep, type: 'working' });
+          }
+          session.sets[ex.id] = sets;
+        });
+      });
+
+      // Accessories
+      plan.accessories.forEach(ex => {
+        const sets = [];
+        for (let s = 0; s < ex.sets; s++) {
+          const w = ex.bodyweight ? bw : Math.round((ex.weight || 10) * progression);
+          const maxRep = parseInt(ex.reps.split('-')[1] || ex.reps);
+          sets.push({ weight: w, reps: maxRep, type: 'working' });
+        }
+        session.sets[ex.id] = sets;
+      });
+
+      state.sessions.push(session);
+    });
+  }
+
+  // Detect PRs from sample data
+  state.prs = detectAllPRs(state.sessions);
+
+  return state;
+}
+
+// =============================================
+// PR DETECTION
+// =============================================
+
+function detectAllPRs(sessions) {
+  const prs = [];
+  const bestByExercise = {};
+
+  // Sort sessions by date
+  const sorted = [...sessions].sort((a, b) => a.date.localeCompare(b.date));
+
+  sorted.forEach(session => {
+    Object.entries(session.sets || {}).forEach(([exId, sets]) => {
+      sets.forEach(set => {
+        const volume = set.weight * set.reps;
+        if (!bestByExercise[exId] || volume > bestByExercise[exId]) {
+          if (bestByExercise[exId]) {
+            prs.push({
+              exerciseId: exId,
+              date: session.date,
+              weight: set.weight,
+              reps: set.reps,
+              volume: volume,
+              week: session.week,
+              mesocycle: session.mesocycle
+            });
+          }
+          bestByExercise[exId] = volume;
+        }
+      });
+    });
+  });
+
+  return prs;
+}
+
+function checkPR(exerciseId, weight, reps) {
+  const volume = weight * reps;
+  let best = 0;
+  APP_STATE.sessions.forEach(s => {
+    (s.sets[exerciseId] || []).forEach(set => {
+      const v = set.weight * set.reps;
+      if (v > best) best = v;
+    });
+  });
+  return volume > best && best > 0;
+}
+
+function getExerciseName(exId) {
+  for (const plan of Object.values(WORKOUT_PLANS)) {
+    for (const ex of plan.strength) if (ex.id === exId) return ex.name;
+    for (const c of plan.circuits) for (const ex of c.exercises) if (ex.id === exId) return ex.name;
+    for (const ex of plan.accessories) if (ex.id === exId) return ex.name;
+  }
+  return exId;
+}
+
+// =============================================
+// TIMER
+// =============================================
+
+let timerInterval = null;
+let timerSeconds = 0;
+let timerMode = 'stopped'; // 'stopped' | 'running' | 'countdown'
+let timerTarget = 0;
+let timerCallback = null;
+
+function startTimer(mode, seconds, cb) {
+  stopTimer();
+  timerMode = mode;
+  timerCallback = cb;
+  if (mode === 'countdown') {
+    timerSeconds = seconds;
+    timerTarget = 0;
+  } else {
+    timerSeconds = 0;
+    timerTarget = Infinity;
+  }
+  timerInterval = setInterval(() => {
+    if (timerMode === 'countdown') {
+      timerSeconds--;
+      if (timerSeconds <= 0) {
+        timerSeconds = 0;
+        stopTimer();
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      }
+    } else {
+      timerSeconds++;
+    }
+    updateTimerDisplay();
+  }, 1000);
+  updateTimerDisplay();
+}
+
+function stopTimer() {
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = null;
+  timerMode = 'stopped';
+}
+
+function pauseTimer() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+}
+
+function resumeTimer() {
+  if (timerMode !== 'stopped' && !timerInterval) {
+    const mode = timerMode;
+    timerInterval = setInterval(() => {
+      if (mode === 'countdown') {
+        timerSeconds--;
+        if (timerSeconds <= 0) {
+          timerSeconds = 0;
+          stopTimer();
+          if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+        }
+      } else {
+        timerSeconds++;
+      }
+      updateTimerDisplay();
+    }, 1000);
+  }
+}
+
+function formatTime(seconds) {
+  const m = Math.floor(Math.abs(seconds) / 60);
+  const s = Math.abs(seconds) % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function updateTimerDisplay() {
+  const el = document.getElementById('timer-display');
+  if (el) el.textContent = formatTime(timerSeconds);
+}
+
+// =============================================
+// VOLUME CALCULATIONS
+// =============================================
+
+function calcSessionVolume(session) {
+  let total = 0;
+  Object.values(session.sets || {}).forEach(sets => {
+    sets.forEach(set => { total += set.weight * set.reps; });
+  });
+  return total;
+}
+
+function calcMuscleVolume(session, muscle) {
+  const plan = WORKOUT_PLANS[session.workoutId];
+  if (!plan) return 0;
+  const totalVolume = calcSessionVolume(session);
+  const pct = plan.muscleSplit[muscle] || 0;
+  return Math.round(totalVolume * pct / 100);
+}
+
+function calcWeekVolume(week, mesocycle) {
+  return APP_STATE.sessions
+    .filter(s => s.week === week && s.mesocycle === (mesocycle || APP_STATE.settings.mesocycle.number))
+    .reduce((sum, s) => sum + calcSessionVolume(s), 0);
+}
+
+function calcWeekMuscleVolume(week, muscle, mesocycle) {
+  return APP_STATE.sessions
+    .filter(s => s.week === week && s.mesocycle === (mesocycle || APP_STATE.settings.mesocycle.number))
+    .reduce((sum, s) => sum + calcMuscleVolume(s, muscle), 0);
+}
+
+function getLastSession(workoutId) {
+  const sessions = APP_STATE.sessions
+    .filter(s => s.workoutId === workoutId)
+    .sort((a, b) => b.date.localeCompare(a.date));
+  return sessions[0] || null;
+}
+
+function getLastSessionSets(exerciseId) {
+  const sorted = [...APP_STATE.sessions].sort((a, b) => b.date.localeCompare(a.date));
+  for (const s of sorted) {
+    if (s.sets[exerciseId]) return s.sets[exerciseId];
+  }
+  return null;
+}
+
+function formatLastSession(exerciseId) {
+  const sets = getLastSessionSets(exerciseId);
+  if (!sets || sets.length === 0) return null;
+  const reps = sets.map(s => s.reps).join('/');
+  const w = sets[0].weight;
+  return `${reps} @ ${w}kg`;
+}
+
+function calcTotalReps(sets) {
+  return (sets || []).reduce((sum, s) => sum + s.reps, 0);
+}
+
+function calcTotalVolume(sets) {
+  return (sets || []).reduce((sum, s) => sum + s.weight * s.reps, 0);
+}
+
+// =============================================
+// DATE HELPERS
+// =============================================
+
+function getWeekDateRange(week) {
+  const baseDate = new Date('2026-05-11'); // Meso 2, Week 1 start
+  const start = new Date(baseDate);
+  start.setDate(start.getDate() + (week - 1) * 7);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  const fmt = d => `${d.getDate()}.${d.getMonth() + 1}`;
+  return `${fmt(start)} - ${fmt(end)}`;
+}
+
+function getCurrentWeekWorkoutStatus(workoutId) {
+  const cw = APP_STATE.settings.mesocycle.currentWeek;
+  const session = APP_STATE.sessions.find(
+    s => s.workoutId === workoutId && s.week === cw && s.mesocycle === APP_STATE.settings.mesocycle.number
+  );
+  if (session) return 'done';
+  // Check if this is the next workout
+  const doneCount = APP_STATE.sessions.filter(
+    s => s.week === cw && s.mesocycle === APP_STATE.settings.mesocycle.number
+  ).length;
+  if (WEEK_SCHEDULE.indexOf(workoutId) === doneCount) return 'current';
+  if (WEEK_SCHEDULE.indexOf(workoutId) < doneCount) return 'done';
+  return 'pending';
+}
+
+function getNextWorkoutId() {
+  const cw = APP_STATE.settings.mesocycle.currentWeek;
+  const doneCount = APP_STATE.sessions.filter(
+    s => s.week === cw && s.mesocycle === APP_STATE.settings.mesocycle.number
+  ).length;
+  return WEEK_SCHEDULE[Math.min(doneCount, WEEK_SCHEDULE.length - 1)];
+}
+
+// =============================================
+// UUID
+// =============================================
+
+function uuid() {
+  return 'xxxxxxxx-xxxx-4xxx'.replace(/x/g, () => (Math.random() * 16 | 0).toString(16));
+}
+
+// =============================================
+// SVG ICONS
+// =============================================
+
+const ICONS = {
+  check: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><polyline points="4 12 10 18 20 6"/></svg>',
+  trophy: '<svg viewBox="0 0 24 24" width="14" height="14" fill="var(--orange)" stroke="none"><path d="M6 2h12v6a6 6 0 11-12 0V2zM4 2H2v4a2 2 0 002 2h2V2zM20 2h2v4a2 2 0 01-2 2h-2V2zM9 18h6M12 14v4M8 22h8"/></svg>',
+  chevDown: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>',
+  play: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="6 3 20 12 6 21"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="5" y="3" width="5" height="18"/><rect x="14" y="3" width="5" height="18"/></svg>',
+  reset: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 115.64 5.64L1 10M22.99 14l-4.64 4.36A9 9 0 013.51 15"/></svg>',
+  back: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>'
+};
+
+// =============================================
+// NAVIGATION
+// =============================================
+
+let currentPage = 'home';
+let trainingView = 'week-overview'; // 'week-overview' | 'workout-detail'
+let activeWorkoutId = null;
+let activeSubTab = 'warmup';
+let selectedWeek = null;
+let statsTab = 'alle';
+
+// Active workout state
+let activeSession = null;
+let warmupChecked = {};
+let warmupTimerRunning = false;
+
+function navigateTo(page) {
+  currentPage = page;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(`page-${page}`).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelector(`[data-page="${page}"]`).classList.add('active');
+  renderPage(page);
+}
+
+function renderPage(page) {
+  switch (page) {
+    case 'home': renderHomePage(); break;
+    case 'training': renderTrainingPage(); break;
+    case 'stats': renderStatsPage(); break;
+    case 'settings': renderSettingsPage(); break;
+  }
+}
+
+// =============================================
+// HOME PAGE RENDER
+// =============================================
+
+function renderHomePage() {
+  const cw = APP_STATE.settings.mesocycle.currentWeek;
+  const meso = APP_STATE.settings.mesocycle;
+  const totalWeeks = meso.weeksHard + meso.weeksDeload;
+  const progressPct = (cw / totalWeeks) * 100;
+
+  // This week's workouts
+  let workoutRows = '';
+  WEEK_SCHEDULE.forEach(wid => {
+    const plan = WORKOUT_PLANS[wid];
+    const status = getCurrentWeekWorkoutStatus(wid);
+    const statusClass = status;
+    const checkHtml = status === 'done' ? ICONS.check : '';
+    workoutRows += `
+      <div class="workout-row" onclick="openWorkout('${wid}')">
+        <div class="workout-status ${statusClass}">${checkHtml}</div>
+        <div class="workout-info">
+          <div class="workout-name">${plan.name}</div>
+          <div class="workout-sub">${plan.subtitle}</div>
+        </div>
+        <div class="workout-day">${plan.day}</div>
+      </div>`;
+  });
+
+  // Volume last week
+  const lastWeek = Math.max(1, cw - 1);
+  const muscles = ['ruecken', 'brust', 'quads', 'hams'];
+  const muscleLabels = { ruecken: 'Ruecken', brust: 'Brust', quads: 'Quads', hams: 'Hams' };
+  const muscleColors = { ruecken: 'var(--blue)', brust: 'var(--orange)', quads: 'var(--green)', hams: 'var(--purple)' };
+
+  let volumeBars = '';
+  const maxMuscleVol = Math.max(...muscles.map(m => calcWeekMuscleVolume(lastWeek, m)));
+  muscles.forEach(m => {
+    const vol = calcWeekMuscleVolume(lastWeek, m);
+    const prevVol = lastWeek > 1 ? calcWeekMuscleVolume(lastWeek - 1, m) : vol;
+    const change = prevVol > 0 ? Math.round((vol - prevVol) / prevVol * 100) : 0;
+    const pct = maxMuscleVol > 0 ? (vol / maxMuscleVol * 100) : 0;
+    const changeClass = change >= 0 ? 'up' : 'down';
+    const changeStr = change >= 0 ? `+${change}%` : `${change}%`;
+    volumeBars += `
+      <div class="volume-bar-row">
+        <div class="volume-label">${muscleLabels[m]}</div>
+        <div class="volume-bar-bg"><div class="volume-bar-fill" style="width:${pct}%;background:${muscleColors[m]}"></div></div>
+        <div class="volume-change ${changeClass}">${changeStr}</div>
+      </div>`;
+  });
+
+  // Recent PRs
+  const recentPRs = APP_STATE.prs.slice(-5).reverse();
+  let prHtml = '';
+  if (recentPRs.length > 0) {
+    prHtml = '<div class="card"><h3>Aktuelle PRs</h3><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">';
+    recentPRs.forEach(pr => {
+      prHtml += `<div class="pr-badge">${ICONS.trophy} ${getExerciseName(pr.exerciseId)} ${pr.weight}kg x${pr.reps}</div>`;
+    });
+    prHtml += '</div></div>';
+  }
+
+  document.getElementById('home-content').innerHTML = `
+    <h1>Training</h1>
+    <p style="color:var(--text-sec);margin-bottom:20px">Dein Fortschritt</p>
+
+    <!-- Mesocycle Card -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h3>Mesozyklus ${meso.number}</h3>
+        <span style="color:var(--orange);font-size:14px;font-weight:600">Woche ${cw}</span>
+      </div>
+      <div style="display:flex;gap:4px;margin-bottom:8px">
+        ${Array.from({length: meso.weeksHard}, (_, i) => {
+          const w = i + 1;
+          const cls = w < cw ? 'done' : w === cw ? 'current' : 'future';
+          return `<div class="week-pill" style="padding:4px 8px;font-size:11px;flex:1;text-align:center;${cls === 'done' ? 'background:var(--green);border-color:var(--green);color:#fff;opacity:0.7' : cls === 'current' ? 'background:var(--orange);border-color:var(--orange);color:#fff' : 'opacity:0.5'}">W${w}</div>`;
+        }).join('')}
+        <div class="week-pill" style="padding:4px 8px;font-size:11px;flex:1;text-align:center;opacity:0.5">DL</div>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${progressPct}%"></div></div>
+    </div>
+
+    <!-- This Week -->
+    <div class="section-title">Diese Woche</div>
+    <div class="card">${workoutRows}</div>
+
+    <!-- Volume Last Week -->
+    <div class="section-title">Volumen W${lastWeek}</div>
+    <div class="card">
+      <div class="expandable-header" onclick="toggleExpand(this)">
+        <span style="font-size:14px;font-weight:600">Muskelgruppen</span>
+        <span class="chevron">${ICONS.chevDown}</span>
+      </div>
+      <div class="expandable-content open" style="margin-top:12px">
+        ${volumeBars}
+      </div>
+    </div>
+
+    ${prHtml}
+  `;
+}
+
+function toggleExpand(el) {
+  const content = el.nextElementSibling;
+  const chevron = el.querySelector('.chevron');
+  content.classList.toggle('open');
+  chevron.classList.toggle('open');
+}
+
+// =============================================
+// TRAINING PAGE RENDER
+// =============================================
+
+function renderTrainingPage() {
+  if (trainingView === 'workout-detail') {
+    renderWorkoutDetail();
+  } else {
+    renderWeekOverview();
+  }
+}
+
+function renderWeekOverview() {
+  selectedWeek = selectedWeek || APP_STATE.settings.mesocycle.currentWeek;
+  const cw = APP_STATE.settings.mesocycle.currentWeek;
+  const meso = APP_STATE.settings.mesocycle;
+  const totalWeeks = meso.weeksHard + meso.weeksDeload;
+
+  // Week pills
+  let weekPills = '';
+  for (let w = 1; w <= meso.weeksHard; w++) {
+    const cls = w < cw ? 'done' : w === cw ? 'current' : 'future';
+    const selected = w === selectedWeek ? 'border:2px solid #fff;' : '';
+    weekPills += `<button class="week-pill ${cls}" style="${selected}" onclick="selectWeek(${w})">W${w}</button>`;
+  }
+  weekPills += `<button class="week-pill future" onclick="selectWeek(${totalWeeks})">DL</button>`;
+
+  // Workout rows for selected week
+  let workoutRows = '';
+  WEEK_SCHEDULE.forEach(wid => {
+    const plan = WORKOUT_PLANS[wid];
+    const session = APP_STATE.sessions.find(
+      s => s.workoutId === wid && s.week === selectedWeek && s.mesocycle === meso.number
+    );
+    const isDone = !!session;
+    const status = isDone ? 'done' : (selectedWeek === cw ? getCurrentWeekWorkoutStatus(wid) : 'pending');
+    const checkHtml = isDone ? ICONS.check : '';
+    const volStr = session ? `${Math.round(calcSessionVolume(session) / 1000)}t` : '-';
+
+    workoutRows += `
+      <div class="workout-row" onclick="openWorkout('${wid}')">
+        <div class="workout-status ${status}">${checkHtml}</div>
+        <div class="workout-info">
+          <div class="workout-name">${plan.name}</div>
+          <div class="workout-sub">${plan.subtitle} ${isDone ? '- ' + volStr : ''}</div>
+        </div>
+        <div class="workout-day">${plan.day}</div>
+      </div>`;
+  });
+
+  // Weekly summary
+  const weekSessions = APP_STATE.sessions.filter(s => s.week === selectedWeek && s.mesocycle === meso.number);
+  const weekVol = weekSessions.reduce((sum, s) => sum + calcSessionVolume(s), 0);
+
+  // Next workout button (only show for current week)
+  const nextBtn = selectedWeek === cw
+    ? `<button class="btn btn-orange" style="margin:16px 0" onclick="startNextWorkout()">Naechstes Training starten</button>`
+    : '';
+
+  document.getElementById('training-content').innerHTML = `
+    <h1>Training</h1>
+    <p style="color:var(--text-sec);margin-bottom:16px">Wochenplan</p>
+
+    <div class="week-pills">${weekPills}</div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <span style="font-size:14px;font-weight:600">Woche ${selectedWeek}</span>
+      <span style="font-size:12px;color:var(--text-sec)">${getWeekDateRange(selectedWeek)}</span>
+    </div>
+
+    ${nextBtn}
+
+    <div class="card">${workoutRows}</div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between">
+        <div>
+          <div style="font-size:12px;color:var(--text-sec)">Sessions</div>
+          <div style="font-size:20px;font-weight:700">${weekSessions.length}/4</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:12px;color:var(--text-sec)">Volumen</div>
+          <div style="font-size:20px;font-weight:700">${(weekVol / 1000).toFixed(1)}t</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function selectWeek(w) {
+  selectedWeek = w;
+  renderWeekOverview();
+}
+
+function openWorkout(workoutId) {
+  activeWorkoutId = workoutId;
+  trainingView = 'workout-detail';
+  activeSubTab = 'warmup';
+  warmupChecked = {};
+
+  // Check if there's an existing session for this workout in current week
+  const existing = APP_STATE.sessions.find(
+    s => s.workoutId === workoutId &&
+         s.week === (selectedWeek || APP_STATE.settings.mesocycle.currentWeek) &&
+         s.mesocycle === APP_STATE.settings.mesocycle.number
+  );
+
+  if (existing) {
+    activeSession = JSON.parse(JSON.stringify(existing));
+    activeSubTab = 'done';
+  } else {
+    activeSession = {
+      id: uuid(),
+      workoutId: workoutId,
+      date: new Date().toISOString().split('T')[0],
+      week: selectedWeek || APP_STATE.settings.mesocycle.currentWeek,
+      mesocycle: APP_STATE.settings.mesocycle.number,
+      duration: 0,
+      feeling: null,
+      sets: {},
+      warmupDone: false,
+      circuitRounds: {},
+      notes: '',
+      _startTime: Date.now(),
+      _currentStrengthSet: {},
+      _currentCircuitRound: {},
+      _completed: false
+    };
+  }
+
+  navigateTo('training');
+}
+
+function startNextWorkout() {
+  const nextId = getNextWorkoutId();
+  selectedWeek = APP_STATE.settings.mesocycle.currentWeek;
+  openWorkout(nextId);
+}
+
+function backToWeekOverview() {
+  trainingView = 'week-overview';
+  stopTimer();
+  renderTrainingPage();
+}
+
+// =============================================
+// WORKOUT DETAIL RENDER
+// =============================================
+
+function renderWorkoutDetail() {
+  const plan = WORKOUT_PLANS[activeWorkoutId];
+  if (!plan) return;
+
+  const week = selectedWeek || APP_STATE.settings.mesocycle.currentWeek;
+  const isCompleted = activeSession && activeSession._completed;
+
+  // Sub tabs
+  const tabs = ['warmup', 'strength', 'zirkel', 'acc'];
+  if (isCompleted) tabs.push('done');
+
+  let tabsHtml = tabs.map(t => {
+    const labels = { warmup: 'Warmup', strength: 'Strength', zirkel: 'Zirkel', acc: 'Acc', done: 'Done' };
+    return `<button class="sub-tab ${activeSubTab === t ? 'active' : ''}" onclick="switchSubTab('${t}')">${labels[t]}</button>`;
+  }).join('');
+
+  let content = '';
+  switch (activeSubTab) {
+    case 'warmup': content = renderWarmupTab(plan); break;
+    case 'strength': content = renderStrengthTab(plan); break;
+    case 'zirkel': content = renderZirkelTab(plan); break;
+    case 'acc': content = renderAccTab(plan); break;
+    case 'done': content = renderDoneTab(plan); break;
+  }
+
+  document.getElementById('training-content').innerHTML = `
+    <button class="back-btn" onclick="backToWeekOverview()">${ICONS.back} Woche ${week}</button>
+    <h2>${plan.name}</h2>
+    <p style="color:var(--text-sec);margin-bottom:16px">${plan.subtitle}</p>
+    <div class="sub-tabs">${tabsHtml}</div>
+    ${content}
+  `;
+}
+
+function switchSubTab(tab) {
+  activeSubTab = tab;
+  renderWorkoutDetail();
+}
+
+// =============================================
+// WARMUP TAB
+// =============================================
+
+function renderWarmupTab(plan) {
+  let items = '';
+  plan.warmup.forEach((ex, i) => {
+    const checked = warmupChecked[ex.id] ? 'checked' : '';
+    items += `
+      <div class="warmup-item">
+        <div class="warmup-check ${checked}" onclick="toggleWarmup('${ex.id}')">
+          ${warmupChecked[ex.id] ? ICONS.check : ''}
+        </div>
+        <div class="warmup-text">${ex.name}</div>
+        <div class="warmup-duration">${ex.duration}</div>
+      </div>`;
+  });
+
+  const allDone = plan.warmup.every(ex => warmupChecked[ex.id]);
+
+  return `
+    <div class="card" style="text-align:center;padding:24px">
+      <div id="timer-display" class="timer-display">${formatTime(timerSeconds)}</div>
+      <div class="timer-controls">
+        <button class="timer-btn" onclick="toggleWarmupTimer()">
+          ${timerInterval ? ICONS.pause : ICONS.play}
+        </button>
+        <button class="timer-btn" onclick="resetWarmupTimer()">${ICONS.reset}</button>
+      </div>
+    </div>
+    <div class="card">${items}</div>
+    ${allDone ? '<button class="btn btn-orange" onclick="switchSubTab(\'strength\')">Weiter: Strength</button>' : ''}
+  `;
+}
+
+function toggleWarmup(id) {
+  warmupChecked[id] = !warmupChecked[id];
+  if (activeSession) activeSession.warmupDone = Object.values(warmupChecked).every(v => v);
+  renderWorkoutDetail();
+}
+
+function toggleWarmupTimer() {
+  if (timerInterval) {
+    pauseTimer();
+  } else if (timerMode === 'stopped') {
+    startTimer('running', 0);
+  } else {
+    resumeTimer();
+  }
+  renderWorkoutDetail();
+}
+
+function resetWarmupTimer() {
+  stopTimer();
+  timerSeconds = 0;
+  renderWorkoutDetail();
+}
+
+// =============================================
+// STRENGTH TAB
+// =============================================
+
+function renderStrengthTab(plan) {
+  let html = '';
+
+  plan.strength.forEach(ex => {
+    const lastStr = formatLastSession(ex.id);
+    const sessionSets = activeSession.sets[ex.id] || [];
+    const currentSetIndex = activeSession._currentStrengthSet
+      ? (activeSession._currentStrengthSet[ex.id] || sessionSets.length)
+      : sessionSets.length;
+
+    html += `<div class="exercise-card">
+      <div class="exercise-name">${ex.name}</div>
+      <div class="exercise-last">${ex.sets}x${ex.reps} @ ${ex.weight}kg${lastStr ? ' | Letztes Mal: ' + lastStr : ''}</div>`;
+
+    // Timer for rest
+    html += `
+      <div style="text-align:center;margin:12px 0">
+        <div id="timer-display" class="timer-display" style="font-size:36px;padding:8px 0">${formatTime(timerSeconds)}</div>
+        <div class="timer-presets">
+          ${[120, 150, 180].map(s => `<button class="timer-preset ${timerSeconds === s ? 'active' : ''}" onclick="startCountdown(${s})">${formatTime(s)}</button>`).join('')}
+        </div>
+        <div class="timer-controls">
+          <button class="timer-btn" onclick="toggleCountdownTimer()">${timerInterval ? ICONS.pause : ICONS.play}</button>
+          <button class="timer-btn" onclick="resetCountdownTimer()">${ICONS.reset}</button>
+        </div>
+      </div>`;
+
+    // Completed sets
+    sessionSets.forEach((set, i) => {
+      const isPR = checkPR(ex.id, set.weight, set.reps);
+      html += `
+        <div class="set-card done">
+          <div class="set-header">
+            <span class="set-number">Satz ${i + 1} ${ICONS.check}</span>
+            <span class="set-type">${set.type === 'drop' ? 'Drop' : 'Working'} ${isPR ? ICONS.trophy : ''}</span>
+          </div>
+          <div style="display:flex;gap:12px;font-size:14px;color:var(--text-sec)">
+            <span>${set.weight}kg</span>
+            <span>${set.reps} Reps</span>
+          </div>
+        </div>`;
+    });
+
+    // Current set input
+    const totalSets = ex.sets;
+    if (currentSetIndex < totalSets || !activeSession._completed) {
+      const setNum = sessionSets.length + 1;
+      const bw = ex.bodyweight;
+      html += `
+        <div class="set-card current">
+          <div class="set-header">
+            <span class="set-number">Satz ${setNum}</span>
+            <span class="set-type">Working</span>
+          </div>
+          <div class="input-row">
+            ${bw ? '<div class="input-group"><div class="input-label">Gewicht</div><div style="text-align:center;padding:10px;font-size:16px">BW</div></div>' :
+            `<div class="input-group">
+              <div class="input-label">Gewicht (kg)</div>
+              <input type="number" inputmode="decimal" class="input-field" id="weight-${ex.id}" value="${ex.weight}" step="0.5">
+            </div>`}
+            <div class="input-group">
+              <div class="input-label">Reps</div>
+              <input type="number" inputmode="decimal" class="input-field" id="reps-${ex.id}" value="${parseInt(ex.reps.split('-')[1] || ex.reps)}">
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-orange" style="flex:2" onclick="finishStrengthSet('${ex.id}', ${bw})">Satz fertig</button>
+          <button class="btn btn-outline btn-sm" onclick="addDropSet('${ex.id}', ${bw})">+ Drop</button>
+        </div>`;
+    }
+
+    // Upcoming sets (dimmed)
+    for (let i = sessionSets.length + 1; i < totalSets; i++) {
+      html += `
+        <div class="set-card upcoming" style="margin-top:8px">
+          <div class="set-header">
+            <span class="set-number">Satz ${i + 1}</span>
+            <span class="set-type">Working</span>
+          </div>
+        </div>`;
+    }
+
+    html += '</div>';
+  });
+
+  // Check if all strength sets are done
+  const allDone = plan.strength.every(ex => {
+    const sets = activeSession.sets[ex.id] || [];
+    return sets.length >= ex.sets;
+  });
+
+  if (allDone) {
+    html += '<button class="btn btn-green" style="margin-top:12px" onclick="switchSubTab(\'zirkel\')">Weiter: Zirkel</button>';
+  }
+
+  return html;
+}
+
+function finishStrengthSet(exId, isBW) {
+  const weight = isBW ? APP_STATE.settings.bodyWeight : parseFloat(document.getElementById(`weight-${exId}`).value) || 0;
+  const reps = parseInt(document.getElementById(`reps-${exId}`).value) || 0;
+
+  if (!activeSession.sets[exId]) activeSession.sets[exId] = [];
+  activeSession.sets[exId].push({ weight, reps, type: 'working' });
+
+  // Start rest timer
+  startCountdown(150);
+
+  // Check for PR
+  if (checkPR(exId, weight, reps)) {
+    APP_STATE.prs.push({
+      exerciseId: exId,
+      date: activeSession.date,
+      weight, reps,
+      volume: weight * reps,
+      week: activeSession.week,
+      mesocycle: activeSession.mesocycle
+    });
+  }
+
+  saveState();
+  renderWorkoutDetail();
+}
+
+function addDropSet(exId, isBW) {
+  const weight = isBW ? APP_STATE.settings.bodyWeight : parseFloat(document.getElementById(`weight-${exId}`).value) || 0;
+  const reps = parseInt(document.getElementById(`reps-${exId}`).value) || 0;
+
+  if (!activeSession.sets[exId]) activeSession.sets[exId] = [];
+  activeSession.sets[exId].push({ weight: Math.round(weight * 0.7), reps, type: 'drop' });
+
+  startCountdown(90);
+  saveState();
+  renderWorkoutDetail();
+}
+
+function startCountdown(seconds) {
+  startTimer('countdown', seconds);
+}
+
+function toggleCountdownTimer() {
+  if (timerInterval) {
+    pauseTimer();
+  } else if (timerMode === 'stopped') {
+    startTimer('countdown', 150);
+  } else {
+    resumeTimer();
+  }
+  renderWorkoutDetail();
+}
+
+function resetCountdownTimer() {
+  stopTimer();
+  timerSeconds = 0;
+  renderWorkoutDetail();
+}
+
+// =============================================
+// ZIRKEL TAB
+// =============================================
+
+function renderZirkelTab(plan) {
+  let html = '';
+
+  plan.circuits.forEach((circuit, ci) => {
+    const rounds = circuit.rounds;
+    const completedRounds = activeSession.circuitRounds[circuit.id] || 0;
+    const currentRound = completedRounds + 1;
+
+    html += `
+      <div style="margin-bottom:24px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h3>${circuit.name}</h3>
+          <span style="font-size:12px;color:var(--text-sec)">${circuit.type} | ${rounds} Runden</span>
+        </div>
+
+        <div class="round-pills">
+          ${Array.from({length: rounds}, (_, r) => {
+            const rn = r + 1;
+            const cls = rn <= completedRounds ? 'done' : rn === currentRound ? 'current' : '';
+            return `<div class="round-pill ${cls}">${rn}</div>`;
+          }).join('')}
+        </div>`;
+
+    // Timer
+    html += `
+      <div style="text-align:center;margin:8px 0">
+        <div id="timer-display" class="timer-display" style="font-size:32px;padding:4px 0">${formatTime(timerSeconds)}</div>
+        <div class="timer-presets">
+          ${[60, 90, 120].map(s => `<button class="timer-preset" onclick="startCountdown(${s})">${formatTime(s)}</button>`).join('')}
+        </div>
+      </div>`;
+
+    // Current round exercises
+    if (currentRound <= rounds) {
+      circuit.exercises.forEach(ex => {
+        const bw = ex.bodyweight;
+        html += `
+          <div class="exercise-card">
+            <div class="exercise-name">${ex.name}</div>
+            <div class="exercise-last">${ex.reps} ${bw ? '@ BW' : '@ ' + ex.weight + 'kg'}${ex.note ? ' (' + ex.note + ')' : ''}</div>
+            <div class="input-row" style="margin-top:8px">
+              ${bw ? '<div class="input-group"><div class="input-label">Gewicht</div><div style="text-align:center;padding:8px;font-size:14px">BW</div></div>' :
+              `<div class="input-group">
+                <div class="input-label">Gewicht (kg)</div>
+                <input type="number" inputmode="decimal" class="input-field" id="cw-${ex.id}" value="${ex.weight}" step="0.5">
+              </div>`}
+              <div class="input-group">
+                <div class="input-label">Reps</div>
+                <input type="number" inputmode="decimal" class="input-field" id="cr-${ex.id}" value="${parseInt(ex.reps.split('-')[1] || ex.reps.split('+')[0] || ex.reps)}">
+              </div>
+            </div>
+          </div>`;
+      });
+
+      html += `<button class="btn btn-orange" onclick="finishCircuitRound('${circuit.id}', ${ci})">Runde ${currentRound} done</button>`;
+    }
+
+    html += '</div>';
+  });
+
+  // Check all circuits done
+  const allDone = plan.circuits.every(c => (activeSession.circuitRounds[c.id] || 0) >= c.rounds);
+  if (allDone) {
+    html += '<button class="btn btn-green" style="margin-top:12px" onclick="switchSubTab(\'acc\')">Weiter: Accessories</button>';
+  }
+
+  return html;
+}
+
+function finishCircuitRound(circuitId, circuitIndex) {
+  const plan = WORKOUT_PLANS[activeWorkoutId];
+  const circuit = plan.circuits[circuitIndex];
+
+  // Save exercise data for this round
+  circuit.exercises.forEach(ex => {
+    const bw = ex.bodyweight;
+    const weightEl = document.getElementById(`cw-${ex.id}`);
+    const repsEl = document.getElementById(`cr-${ex.id}`);
+    const weight = bw ? APP_STATE.settings.bodyWeight : (weightEl ? parseFloat(weightEl.value) : ex.weight);
+    const reps = repsEl ? parseInt(repsEl.value) : parseInt(ex.reps.split('-')[1] || ex.reps);
+
+    if (!activeSession.sets[ex.id]) activeSession.sets[ex.id] = [];
+    activeSession.sets[ex.id].push({ weight, reps, type: 'working' });
+  });
+
+  activeSession.circuitRounds[circuitId] = (activeSession.circuitRounds[circuitId] || 0) + 1;
+
+  startCountdown(90);
+  saveState();
+  renderWorkoutDetail();
+}
+
+// =============================================
+// ACCESSORIES TAB
+// =============================================
+
+function renderAccTab(plan) {
+  let html = '';
+  let currentGroup = null;
+  let groupHtml = '';
+
+  plan.accessories.forEach((ex, i) => {
+    // Handle grouped exercises
+    if (ex.group && ex.groupName) {
+      if (currentGroup !== ex.groupName) {
+        if (currentGroup) html += groupHtml + '</div>';
+        currentGroup = ex.groupName;
+        const typeLabel = ex.group === 'triple' ? 'Triple Set' : 'Superset';
+        groupHtml = `<div class="superset-group"><div class="superset-header">${typeLabel}: ${ex.groupName}</div>`;
+      }
+      groupHtml += renderAccExercise(ex);
+
+      // Check if next is same group
+      const next = plan.accessories[i + 1];
+      if (!next || next.groupName !== ex.groupName) {
+        html += groupHtml + '</div>';
+        currentGroup = null;
+        groupHtml = '';
+      }
+    } else {
+      if (currentGroup) {
+        html += groupHtml + '</div>';
+        currentGroup = null;
+        groupHtml = '';
+      }
+      html += renderAccExercise(ex);
+    }
+  });
+
+  if (currentGroup) html += groupHtml + '</div>';
+
+  html += '<button class="btn btn-green" style="margin-top:20px" onclick="finishWorkout()">Training abschliessen</button>';
+
+  return html;
+}
+
+function renderAccExercise(ex) {
+  const sessionSets = activeSession.sets[ex.id] || [];
+  const bw = ex.bodyweight;
+  const lastStr = formatLastSession(ex.id);
+
+  let setsHtml = '';
+
+  // Completed sets
+  sessionSets.forEach((set, i) => {
+    setsHtml += `
+      <div class="set-card done" style="padding:8px 12px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:13px">Satz ${i + 1} ${ICONS.check}</span>
+          <span style="font-size:13px;color:var(--text-sec)">${set.weight}kg x${set.reps}</span>
+        </div>
+      </div>`;
+  });
+
+  // Current set input if not all done
+  if (sessionSets.length < ex.sets) {
+    setsHtml += `
+      <div class="set-card current" style="padding:8px 12px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:13px;width:50px">Satz ${sessionSets.length + 1}</span>
+          ${bw ? '<span style="font-size:13px;flex:1;text-align:center">BW</span>' :
+          `<input type="number" inputmode="decimal" class="input-field" style="flex:1;padding:6px" id="aw-${ex.id}" value="${ex.weight || 10}" step="0.5">`}
+          <input type="number" inputmode="decimal" class="input-field" style="width:60px;padding:6px" id="ar-${ex.id}" value="${parseInt(ex.reps.split('-')[1] || ex.reps)}">
+          <button class="btn btn-orange btn-sm" style="width:auto;padding:6px 12px;min-height:32px" onclick="finishAccSet('${ex.id}', ${bw})">OK</button>
+        </div>
+      </div>`;
+  }
+
+  return `
+    <div class="exercise-card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div class="exercise-name" style="font-size:14px">${ex.name}</div>
+          <div class="exercise-last" style="font-size:11px">${ex.sets}x${ex.reps}${lastStr ? ' | ' + lastStr : ''}</div>
+        </div>
+        <span style="font-size:12px;color:var(--text-sec)">${sessionSets.length}/${ex.sets}</span>
+      </div>
+      <div style="margin-top:8px">${setsHtml}</div>
+    </div>`;
+}
+
+function finishAccSet(exId, isBW) {
+  const weight = isBW ? APP_STATE.settings.bodyWeight : parseFloat(document.getElementById(`aw-${exId}`).value) || 0;
+  const reps = parseInt(document.getElementById(`ar-${exId}`).value) || 0;
+
+  if (!activeSession.sets[exId]) activeSession.sets[exId] = [];
+  activeSession.sets[exId].push({ weight, reps, type: 'working' });
+
+  if (checkPR(exId, weight, reps)) {
+    APP_STATE.prs.push({
+      exerciseId: exId, date: activeSession.date,
+      weight, reps, volume: weight * reps,
+      week: activeSession.week, mesocycle: activeSession.mesocycle
+    });
+  }
+
+  saveState();
+  renderWorkoutDetail();
+}
+
+// =============================================
+// FINISH WORKOUT
+// =============================================
+
+function finishWorkout() {
+  if (!activeSession) return;
+
+  activeSession._completed = true;
+  activeSession.duration = activeSession._startTime
+    ? Math.round((Date.now() - activeSession._startTime) / 1000)
+    : 3600;
+
+  // Remove internal props before saving
+  const toSave = { ...activeSession };
+  delete toSave._startTime;
+  delete toSave._currentStrengthSet;
+  delete toSave._currentCircuitRound;
+  delete toSave._completed;
+
+  // Replace or add session
+  const idx = APP_STATE.sessions.findIndex(s => s.id === toSave.id);
+  if (idx >= 0) {
+    APP_STATE.sessions[idx] = toSave;
+  } else {
+    APP_STATE.sessions.push(toSave);
+  }
+
+  stopTimer();
+  saveState();
+
+  activeSubTab = 'done';
+  renderWorkoutDetail();
+}
+
+// =============================================
+// DONE TAB
+// =============================================
+
+function renderDoneTab(plan) {
+  const session = activeSession || APP_STATE.sessions.find(
+    s => s.workoutId === activeWorkoutId &&
+         s.week === (selectedWeek || APP_STATE.settings.mesocycle.currentWeek) &&
+         s.mesocycle === APP_STATE.settings.mesocycle.number
+  );
+
+  if (!session) return '<p style="text-align:center;color:var(--text-sec);padding:40px 0">Kein abgeschlossenes Training</p>';
+
+  const totalVol = calcSessionVolume(session);
+  const duration = session.duration || 0;
+  const durationMin = Math.round(duration / 60);
+
+  // Muscle volume boxes
+  const split = plan.muscleSplit;
+  const muscleLabels = { ruecken: 'Ruecken', brust: 'Brust', quads: 'Quads', hams: 'Hams', bizeps: 'Bizeps', core: 'Core', trizeps: 'Trizeps', schultern: 'Schultern' };
+
+  let statsBoxes = '';
+  Object.entries(split).forEach(([muscle, pct]) => {
+    const vol = Math.round(totalVol * pct / 100);
+    const totalReps = Object.entries(session.sets || {}).reduce((sum, [_, sets]) => sum + calcTotalReps(sets), 0);
+    const muscleReps = Math.round(totalReps * pct / 100);
+    statsBoxes += `
+      <div class="done-stat-box">
+        <div class="done-stat-label">${muscleLabels[muscle] || muscle}</div>
+        <div class="done-stat-value">${(vol / 1000).toFixed(1)}t</div>
+        <div class="done-stat-sub">${muscleReps} Reps</div>
+      </div>`;
+  });
+
+  // PRs from this session
+  const sessionPRs = APP_STATE.prs.filter(pr => pr.date === session.date);
+  let prHtml = '';
+  if (sessionPRs.length > 0) {
+    prHtml = '<div style="display:flex;flex-wrap:wrap;gap:4px;margin:12px 0">';
+    sessionPRs.forEach(pr => {
+      prHtml += `<div class="pr-badge">${ICONS.trophy} ${getExerciseName(pr.exerciseId)} ${pr.weight}kg x${pr.reps}</div>`;
+    });
+    prHtml += '</div>';
+  }
+
+  // Compare with last session
+  const lastSession = APP_STATE.sessions.find(
+    s => s.workoutId === session.workoutId && s.id !== session.id && s.date < session.date
+  );
+  let improvHtml = '';
+  if (lastSession) {
+    const lastVol = calcSessionVolume(lastSession);
+    const volChange = totalVol - lastVol;
+    const volPct = lastVol > 0 ? Math.round(volChange / lastVol * 100) : 0;
+    const changeClass = volChange >= 0 ? 'up' : 'down';
+    const sign = volChange >= 0 ? '+' : '';
+    improvHtml = `
+      <div class="card">
+        <h3>Steigerungen</h3>
+        <div style="margin-top:8px;display:flex;justify-content:space-between">
+          <span>Volumen vs. letztes Mal</span>
+          <span class="volume-change ${changeClass}">${sign}${volPct}% (${sign}${(volChange/1000).toFixed(1)}t)</span>
+        </div>
+      </div>`;
+  }
+
+  // Motivation messages
+  const motivations = [
+    'Jede Wiederholung zaehlt. Du wirst staerker!',
+    'Konsistenz schlaegt Intensitaet. Weiter so!',
+    'Der Koerper erreicht, was der Geist glaubt.',
+    'Fortschritt ist Fortschritt, egal wie klein.',
+    'Heute hast du dein zukuenftiges Ich staerker gemacht.'
+  ];
+  const motivText = motivations[Math.floor(Math.random() * motivations.length)];
+
+  // Feeling selector
+  const feeling = session.feeling || (activeSession && activeSession.feeling);
+  const feelings = [
+    { id: 'hard', label: 'Hart' },
+    { id: 'good', label: 'Gut' },
+    { id: 'easy', label: 'Easy' }
+  ];
+
+  return `
+    <div class="celebration">
+      <div class="celebration-icon">${ICONS.check}</div>
+      <h2>Stark trainiert!</h2>
+      <p style="color:var(--text-sec);margin-top:4px">${plan.name} | ${durationMin} Min.</p>
+    </div>
+
+    <div class="done-stats">${statsBoxes}</div>
+
+    ${prHtml}
+
+    ${improvHtml}
+
+    <div class="motivation-card">
+      <div class="motivation-text">${motivText}</div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:12px">Wie hat es sich angefuehlt?</h3>
+      <div class="feeling-selector">
+        ${feelings.map(f => `
+          <button class="feeling-btn ${feeling === f.id ? 'selected' : ''}" onclick="setFeeling('${f.id}')">
+            ${f.label}
+          </button>
+        `).join('')}
+      </div>
+    </div>
+
+    <button class="btn btn-outline" style="margin-top:12px" onclick="backToWeekOverview()">Zurueck zur Uebersicht</button>
+  `;
+}
+
+function setFeeling(feeling) {
+  if (activeSession) {
+    activeSession.feeling = feeling;
+    // Update saved session too
+    const idx = APP_STATE.sessions.findIndex(s => s.id === activeSession.id);
+    if (idx >= 0) APP_STATE.sessions[idx].feeling = feeling;
+    saveState();
+    renderWorkoutDetail();
+  }
+}
+
+// =============================================
+// STATS PAGE RENDER
+// =============================================
+
+function renderStatsPage() {
+  const allTabs = ['alle', 'ruecken', 'brust', 'quads', 'hams', 'bizeps', 'trizeps'];
+  const tabLabels = { alle: 'Alle', ruecken: 'Ruecken', brust: 'Brust', quads: 'Quads', hams: 'Hams', bizeps: 'Bizeps', trizeps: 'Trizeps' };
+
+  let tabsHtml = allTabs.map(t =>
+    `<button class="sub-tab ${statsTab === t ? 'active' : ''}" onclick="switchStatsTab('${t}')">${tabLabels[t]}</button>`
+  ).join('');
+
+  let content = '';
+  if (statsTab === 'alle') {
+    content = renderStatsAll();
+  } else {
+    content = renderStatsMuscle(statsTab);
+  }
+
+  document.getElementById('stats-content').innerHTML = `
+    <h1>Statistiken</h1>
+    <p style="color:var(--text-sec);margin-bottom:16px">Mesozyklus ${APP_STATE.settings.mesocycle.number}</p>
+    <div class="sub-tabs">${tabsHtml}</div>
+    ${content}
+  `;
+}
+
+function switchStatsTab(tab) {
+  statsTab = tab;
+  renderStatsPage();
+}
+
+function renderStatsAll() {
+  const cw = APP_STATE.settings.mesocycle.currentWeek;
+  const goal = APP_STATE.settings.goals.weeklyVolume;
+
+  // Weekly volume chart
+  let bars = '';
+  let maxVol = goal;
+  for (let w = 1; w <= cw; w++) {
+    const vol = calcWeekVolume(w);
+    if (vol > maxVol) maxVol = vol;
+  }
+
+  for (let w = 1; w <= cw; w++) {
+    const vol = calcWeekVolume(w);
+    const pct = maxVol > 0 ? (vol / maxVol * 100) : 0;
+    bars += `
+      <div class="chart-bar-wrapper">
+        <div class="chart-value">${(vol/1000).toFixed(1)}t</div>
+        <div class="chart-bar" style="height:${pct}%"></div>
+        <div class="chart-label">W${w}</div>
+      </div>`;
+  }
+
+  const goalPct = maxVol > 0 ? (goal / maxVol * 100) : 50;
+  const goalBottom = goalPct;
+
+  // Mesocycle progress
+  const startVol = calcWeekVolume(1);
+  const currentVol = calcWeekVolume(cw);
+  const progressPct = goal > 0 ? Math.min(100, (currentVol / goal * 100)) : 0;
+
+  // 1RM estimates (simplified: max weight * (1 + reps/30))
+  const strengthExercises = [];
+  Object.values(WORKOUT_PLANS).forEach(plan => {
+    plan.strength.forEach(ex => {
+      let best1RM = 0;
+      let first1RM = 0;
+      APP_STATE.sessions.forEach((s, si) => {
+        (s.sets[ex.id] || []).forEach(set => {
+          const est = set.weight * (1 + set.reps / 30);
+          if (si < 4 && !first1RM) first1RM = est;
+          if (est > best1RM) best1RM = est;
+        });
+      });
+      if (best1RM > 0) {
+        const change = first1RM > 0 ? Math.round((best1RM - first1RM) / first1RM * 100) : 0;
+        strengthExercises.push({ name: ex.name, rm: Math.round(best1RM * 10) / 10, change });
+      }
+    });
+  });
+
+  let rmHtml = '';
+  strengthExercises.forEach(ex => {
+    const cls = ex.change >= 0 ? 'up' : 'down';
+    const sign = ex.change >= 0 ? '+' : '';
+    rmHtml += `
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:14px">${ex.name}</span>
+        <div style="display:flex;gap:12px;align-items:center">
+          <span style="font-size:14px;font-weight:600">${ex.rm}kg</span>
+          <span class="volume-change ${cls}" style="font-size:12px">${sign}${ex.change}%</span>
+        </div>
+      </div>`;
+  });
+
+  // Recent PRs
+  const recentPRs = APP_STATE.prs.filter(pr => pr.mesocycle === APP_STATE.settings.mesocycle.number).slice(-8).reverse();
+  let prHtml = '';
+  recentPRs.forEach(pr => {
+    prHtml += `<div class="pr-badge">${ICONS.trophy} ${getExerciseName(pr.exerciseId)} ${pr.weight}kg x${pr.reps}</div>`;
+  });
+
+  return `
+    <div class="card">
+      <h3 style="margin-bottom:12px">Wochen-Volumen</h3>
+      <div class="chart-container">
+        <div class="chart-bar-group" style="position:relative">
+          <div class="chart-goal-line" style="bottom:${goalBottom}%;position:absolute;left:0;right:0"></div>
+          ${bars}
+        </div>
+        <div style="text-align:right;font-size:10px;color:var(--text-ter);margin-top:4px">Ziel: ${(goal/1000).toFixed(1)}t ---</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:8px">Mesozyklus Fortschritt</h3>
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-sec);margin-bottom:8px">
+        <span>Start: ${(startVol/1000).toFixed(1)}t</span>
+        <span>Aktuell: ${(currentVol/1000).toFixed(1)}t</span>
+        <span>Ziel: ${(goal/1000).toFixed(1)}t</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${progressPct}%"></div></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:8px">1RM Entwicklung</h3>
+      ${rmHtml}
+    </div>
+
+    ${prHtml ? '<div class="card"><h3 style="margin-bottom:8px">PRs Mesozyklus</h3><div style="display:flex;flex-wrap:wrap;gap:4px">' + prHtml + '</div></div>' : ''}
+  `;
+}
+
+function renderStatsMuscle(muscle) {
+  const cw = APP_STATE.settings.mesocycle.currentWeek;
+  const goal = APP_STATE.settings.goals[muscle] || 3000;
+  const muscleLabels = { ruecken: 'Ruecken', brust: 'Brust', quads: 'Quads', hams: 'Hamstrings', bizeps: 'Bizeps', trizeps: 'Trizeps' };
+
+  // Weekly chart for this muscle
+  let bars = '';
+  let maxVol = goal;
+  for (let w = 1; w <= cw; w++) {
+    const vol = calcWeekMuscleVolume(w, muscle);
+    if (vol > maxVol) maxVol = vol;
+  }
+
+  const muscleColors = { ruecken: 'var(--blue)', brust: 'var(--orange)', quads: 'var(--green)', hams: 'var(--purple)', bizeps: 'var(--red)', trizeps: '#3498DB' };
+  const barColor = muscleColors[muscle] || 'var(--orange)';
+
+  for (let w = 1; w <= cw; w++) {
+    const vol = calcWeekMuscleVolume(w, muscle);
+    const pct = maxVol > 0 ? (vol / maxVol * 100) : 0;
+    bars += `
+      <div class="chart-bar-wrapper">
+        <div class="chart-value">${(vol/1000).toFixed(1)}t</div>
+        <div class="chart-bar" style="height:${pct}%;background:${barColor}"></div>
+        <div class="chart-label">W${w}</div>
+      </div>`;
+  }
+
+  // Progression
+  const startVol = calcWeekMuscleVolume(1, muscle);
+  const currentVol = calcWeekMuscleVolume(cw, muscle);
+  const progressPct = goal > 0 ? Math.min(100, (currentVol / goal * 100)) : 0;
+
+  // Exercises for this muscle
+  const exercises = [];
+  Object.values(WORKOUT_PLANS).forEach(plan => {
+    if (!plan.muscleSplit[muscle]) return;
+    const allExercises = [...plan.strength, ...plan.circuits.flatMap(c => c.exercises), ...plan.accessories];
+    allExercises.forEach(ex => {
+      if (exercises.find(e => e.id === ex.id)) return;
+      let best1RM = 0, first1RM = 0;
+      APP_STATE.sessions.forEach((s, si) => {
+        (s.sets[ex.id] || []).forEach(set => {
+          const est = set.weight * (1 + set.reps / 30);
+          if (si < 4 && !first1RM) first1RM = est;
+          if (est > best1RM) best1RM = est;
+        });
+      });
+      if (best1RM > 0) {
+        const change = first1RM > 0 ? Math.round((best1RM - first1RM) / first1RM * 100) : 0;
+        exercises.push({ id: ex.id, name: ex.name, rm: Math.round(best1RM * 10) / 10, change });
+      }
+    });
+  });
+
+  let exHtml = '';
+  exercises.forEach(ex => {
+    const cls = ex.change >= 0 ? 'up' : 'down';
+    const sign = ex.change >= 0 ? '+' : '';
+    exHtml += `
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:14px">${ex.name}</span>
+        <div style="display:flex;gap:12px;align-items:center">
+          <span style="font-size:14px;font-weight:600">${ex.rm}kg</span>
+          <span class="volume-change ${cls}">${sign}${ex.change}%</span>
+        </div>
+      </div>`;
+  });
+
+  // PRs for this muscle
+  const musclePRs = APP_STATE.prs.filter(pr => {
+    const exName = getExerciseName(pr.exerciseId);
+    return exercises.some(e => e.id === pr.exerciseId) && pr.mesocycle === APP_STATE.settings.mesocycle.number;
+  }).slice(-6).reverse();
+
+  let prHtml = '';
+  musclePRs.forEach(pr => {
+    prHtml += `<div class="pr-badge">${ICONS.trophy} ${getExerciseName(pr.exerciseId)} ${pr.weight}kg x${pr.reps}</div>`;
+  });
+
+  const goalPct = maxVol > 0 ? (goal / maxVol * 100) : 50;
+
+  return `
+    <div class="card">
+      <h3 style="margin-bottom:12px">${muscleLabels[muscle]} Wochen-Volumen</h3>
+      <div class="chart-container">
+        <div class="chart-bar-group" style="position:relative">
+          <div class="chart-goal-line" style="bottom:${goalPct}%"></div>
+          ${bars}
+        </div>
+        <div style="text-align:right;font-size:10px;color:var(--text-ter);margin-top:4px">Ziel: ${(goal/1000).toFixed(1)}t ---</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:8px">Progression</h3>
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-sec);margin-bottom:8px">
+        <span>Start: ${(startVol/1000).toFixed(1)}t</span>
+        <span>Aktuell: ${(currentVol/1000).toFixed(1)}t</span>
+        <span>Ziel: ${(goal/1000).toFixed(1)}t</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${progressPct}%;background:${barColor}"></div></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:8px">Uebungen</h3>
+      ${exHtml || '<p style="color:var(--text-sec);font-size:14px">Keine Daten</p>'}
+    </div>
+
+    ${prHtml ? '<div class="card"><h3 style="margin-bottom:8px">PRs</h3><div style="display:flex;flex-wrap:wrap;gap:4px">' + prHtml + '</div></div>' : ''}
+  `;
+}
+
+// =============================================
+// SETTINGS PAGE RENDER
+// =============================================
+
+function renderSettingsPage() {
+  const s = APP_STATE.settings;
+  const meso = s.mesocycle;
+
+  // Weight history
+  let weightHistory = '';
+  (s.weightHistory || []).slice().reverse().forEach(entry => {
+    weightHistory += `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;color:var(--text-sec)">
+      <span>${entry.date}</span><span>${entry.weight} kg</span>
+    </div>`;
+  });
+
+  // Workout plan rows
+  let planRows = '';
+  WEEK_SCHEDULE.forEach(wid => {
+    const plan = WORKOUT_PLANS[wid];
+    planRows += `
+      <div class="settings-row">
+        <div>
+          <div class="settings-label">${plan.name}</div>
+          <div style="font-size:12px;color:var(--text-sec)">${plan.subtitle}</div>
+        </div>
+        <div class="settings-value">${plan.day}</div>
+      </div>`;
+  });
+
+  document.getElementById('settings-content').innerHTML = `
+    <h1>Einstellungen</h1>
+    <p style="color:var(--text-sec);margin-bottom:20px">App-Konfiguration</p>
+
+    <!-- Body Section -->
+    <div class="section-title">Koerper</div>
+    <div class="card">
+      <div class="settings-row">
+        <div class="settings-label">Koerpergewicht</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="number" inputmode="decimal" class="input-field" style="width:80px;text-align:right" value="${s.bodyWeight}" id="body-weight-input" step="0.1">
+          <span style="color:var(--text-sec)">kg</span>
+          <button class="btn btn-sm btn-orange" style="padding:6px 10px;min-height:28px;font-size:12px" onclick="updateBodyWeight()">OK</button>
+        </div>
+      </div>
+      <div class="settings-row" style="flex-direction:column;align-items:stretch">
+        <div class="expandable-header" onclick="toggleExpand(this)" style="width:100%">
+          <span class="settings-label">Gewichtsverlauf</span>
+          <span class="chevron">${ICONS.chevDown}</span>
+        </div>
+        <div class="expandable-content">
+          <div style="margin-top:8px">${weightHistory}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Training Plans -->
+    <div class="section-title">Trainingsplaene</div>
+    <div class="card">${planRows}</div>
+
+    <!-- Mesocycle -->
+    <div class="section-title">Mesozyklus</div>
+    <div class="card">
+      <div class="settings-row">
+        <div class="settings-label">Zykluslaenge</div>
+        <div class="settings-value">${meso.weeksHard}+${meso.weeksDeload}</div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-label">Aktueller Zyklus</div>
+        <div class="settings-value">${meso.number}</div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-label">Aktuelle Woche</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="btn btn-sm btn-outline" style="padding:4px 10px;min-height:28px" onclick="changeWeek(-1)">-</button>
+          <span class="settings-value">${meso.currentWeek}</span>
+          <button class="btn btn-sm btn-outline" style="padding:4px 10px;min-height:28px" onclick="changeWeek(1)">+</button>
+        </div>
+      </div>
+      <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:8px">
+        <div class="settings-label">Ziele definieren</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
+          <div>
+            <div style="font-size:11px;color:var(--text-sec);margin-bottom:4px">Wochen-Vol.</div>
+            <input type="number" inputmode="decimal" class="input-field" value="${s.goals.weeklyVolume}" id="goal-total" style="font-size:13px">
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text-sec);margin-bottom:4px">Ruecken</div>
+            <input type="number" inputmode="decimal" class="input-field" value="${s.goals.ruecken}" id="goal-ruecken" style="font-size:13px">
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text-sec);margin-bottom:4px">Brust</div>
+            <input type="number" inputmode="decimal" class="input-field" value="${s.goals.brust}" id="goal-brust" style="font-size:13px">
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text-sec);margin-bottom:4px">Quads</div>
+            <input type="number" inputmode="decimal" class="input-field" value="${s.goals.quads}" id="goal-quads" style="font-size:13px">
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text-sec);margin-bottom:4px">Hams</div>
+            <input type="number" inputmode="decimal" class="input-field" value="${s.goals.hams}" id="goal-hams" style="font-size:13px">
+          </div>
+        </div>
+        <button class="btn btn-sm btn-orange" style="margin-top:8px" onclick="saveGoals()">Ziele speichern</button>
+      </div>
+    </div>
+
+    <!-- App -->
+    <div class="section-title">App</div>
+    <div class="card">
+      <div class="settings-row" onclick="exportData()" style="cursor:pointer">
+        <div class="settings-label">Daten exportieren</div>
+        <span style="color:var(--text-sec);font-size:18px">&rarr;</span>
+      </div>
+      <div class="settings-row" onclick="confirmDeleteData()" style="cursor:pointer">
+        <div class="settings-label" style="color:var(--red)">Daten loeschen</div>
+        <span style="color:var(--red);font-size:18px">&rarr;</span>
+      </div>
+    </div>
+
+    <div style="text-align:center;padding:20px 0;color:var(--text-ter);font-size:12px">
+      Training Tracker v1.0
+    </div>
+  `;
+}
+
+function updateBodyWeight() {
+  const val = parseFloat(document.getElementById('body-weight-input').value);
+  if (!isNaN(val) && val > 0) {
+    APP_STATE.settings.bodyWeight = val;
+    APP_STATE.settings.weightHistory.push({
+      date: new Date().toISOString().split('T')[0],
+      weight: val
+    });
+    saveState();
+    renderSettingsPage();
+  }
+}
+
+function changeWeek(delta) {
+  const meso = APP_STATE.settings.mesocycle;
+  const totalWeeks = meso.weeksHard + meso.weeksDeload;
+  meso.currentWeek = Math.max(1, Math.min(totalWeeks, meso.currentWeek + delta));
+  selectedWeek = meso.currentWeek;
+  saveState();
+  renderSettingsPage();
+}
+
+function saveGoals() {
+  APP_STATE.settings.goals.weeklyVolume = parseInt(document.getElementById('goal-total').value) || 13500;
+  APP_STATE.settings.goals.ruecken = parseInt(document.getElementById('goal-ruecken').value) || 5500;
+  APP_STATE.settings.goals.brust = parseInt(document.getElementById('goal-brust').value) || 3400;
+  APP_STATE.settings.goals.quads = parseInt(document.getElementById('goal-quads').value) || 3000;
+  APP_STATE.settings.goals.hams = parseInt(document.getElementById('goal-hams').value) || 2800;
+  saveState();
+  renderSettingsPage();
+}
+
+function exportData() {
+  const dataStr = JSON.stringify(APP_STATE, null, 2);
+  const blob = new Blob([dataStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `training-data-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function confirmDeleteData() {
+  if (confirm('Alle Trainingsdaten wirklich loeschen? Das kann nicht rueckgaengig gemacht werden.')) {
+    localStorage.removeItem(STORAGE_KEY);
+    APP_STATE = generateSampleData();
+    saveState();
+    navigateTo('settings');
+  }
+}
+
+// =============================================
+// NAVIGATION EVENT LISTENERS
+// =============================================
+
+document.querySelectorAll('.nav-item').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const page = btn.dataset.page;
+    if (page === 'training') {
+      trainingView = 'week-overview';
+    }
+    navigateTo(page);
+  });
+});
+
+// =============================================
+// INITIAL RENDER
+// =============================================
+
+renderHomePage();
+saveState();
+
+</script>
+</body>
+</html>
