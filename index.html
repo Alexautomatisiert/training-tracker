@@ -767,7 +767,8 @@ h3 { font-size: 15px; font-weight: 600; }
 
 /* SWIPE TO DELETE */
 .swipe-wrapper { position: relative; overflow: hidden; border-radius: var(--radius); margin-bottom: 8px; }
-.swipe-delete-bg { position: absolute; right: 0; top: 0; bottom: 0; width: 80px; background: var(--red); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; font-size: 13px; z-index: 0; }
+.swipe-delete-bg { position: absolute; right: 0; top: 0; bottom: 0; width: 80px; background: var(--red); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; font-size: 13px; z-index: 0; opacity: 0; transition: opacity 0.15s ease; }
+.swipe-wrapper.swiping .swipe-delete-bg { opacity: 1; }
 .swipe-content { position: relative; z-index: 1; background: var(--card); transition: transform 0.2s ease; }
 
 /* TO BEAT */
@@ -1050,6 +1051,46 @@ const WORKOUT_PLANS = {
       { id: 'rb-a3', name: 'Hammer Curls', sets: 3, reps: '10-12', weight: 15, unit: 'kg', bodyweight: false, dumbbell: true, group: null, dropWeight: 10, note: 'DropSet 15+10kg' }
     ]
   }
+};
+
+// Exercise → primary muscle group mapping (for stats filtering)
+const EXERCISE_MUSCLE = {
+  // Vorderseite A
+  'va-s1': 'brust',       // DB Incline Press
+  'va-c1-e1': 'quads',    // DB Rev. Lunges
+  'va-c1-e2': 'brust',    // Weighted Ring Dips
+  'va-c1-e3': 'quads',    // DB OH Walking Lunges
+  'va-c1-e4': 'brust',    // DB Incline Press (circuit)
+  'va-a1': 'trizeps',     // Tricep KB Extensions
+  'va-a2': 'schultern',   // DB Lateral Raise
+  'va-a3': 'core',        // TTB + KTC
+  // Rueckseite A
+  'ra-s1': 'ruecken',     // BB Seal Rows
+  'ra-c1-e1': 'ruecken',  // Snatches
+  'ra-c1-e2': 'ruecken',  // DB Y-Raises + Trap Laterals
+  'ra-c2-e1': 'ruecken',  // Pull Ups
+  'ra-c2-e2': 'ruecken',  // Farmers Carries + Shrugs
+  'ra-a1': 'hams',        // Weighted GHD Hypers
+  'ra-a2': 'core',        // TTB + GHD Situps
+  'ra-a3': 'bizeps',      // African Curls
+  // Vorderseite B
+  'vb-s1': 'quads',       // Bulgarian Split Squats
+  'vb-c1-e1': 'brust',    // Incline DB Press
+  'vb-c1-e2': 'quads',    // DB Squats
+  'vb-c1-e3': 'brust',    // Ring Push Ups
+  'vb-c1-e4': 'quads',    // Walking Lunges
+  'vb-a1': 'trizeps',     // Tricep KB Extensions
+  'vb-a2': 'schultern',   // DB Lou Raises + Lateral Raise
+  'vb-a3': 'core',        // TTB + KTC
+  // Rueckseite B
+  'rb-s1': 'ruecken',     // DB Seal Rows
+  'rb-c1-e1': 'ruecken',  // Ring Pull Ups
+  'rb-c1-e2': 'hams',     // DB SL RDLs + Row
+  'rb-c2-e1': 'ruecken',  // Ring Rev Fly
+  'rb-c2-e2': 'ruecken',  // Banded Rev Fly
+  'rb-a1': 'hams',        // SL GHD Hypers + GHD Hypers
+  'rb-a2': 'core',        // TTB + GHD Situps
+  'rb-a3': 'bizeps'       // Hammer Curls
 };
 
 // Weekly schedule order
@@ -3264,12 +3305,12 @@ function renderStatsMuscle(muscle) {
   const currentVol = calcWeekMuscleVolume(cw, muscle);
   const progressPct = goal > 0 ? Math.min(100, (currentVol / goal * 100)) : 0;
 
-  // Exercises for this muscle
+  // Exercises for this muscle (filtered by EXERCISE_MUSCLE map)
   const exercises = [];
   Object.values(WORKOUT_PLANS).forEach(plan => {
-    if (!plan.muscleSplit[muscle]) return;
     const allExercises = [...plan.strength, ...plan.circuits.flatMap(c => c.exercises), ...plan.accessories];
     allExercises.forEach(ex => {
+      if (EXERCISE_MUSCLE[ex.id] !== muscle) return;
       if (exercises.find(e => e.id === ex.id)) return;
       let best1RM = 0, first1RM = 0;
       APP_STATE.sessions.forEach((s, si) => {
@@ -3336,7 +3377,7 @@ function renderStatsMuscle(muscle) {
     </div>
 
     <div class="card">
-      <h3 style="margin-bottom:8px">Uebungen</h3>
+      <h3 style="margin-bottom:8px">1RM Entwicklung</h3>
       ${exHtml || '<p style="color:var(--text-sec);font-size:14px">Keine Daten</p>'}
     </div>
 
@@ -3721,6 +3762,8 @@ document.addEventListener('touchmove', function(e) {
   var diff = swipeCurrentX - swipeStartX;
   if (Math.abs(diff) > 5) swipeHappened = true;
   if (diff < 0) {
+    var wrapper = swipeEl.closest('.swipe-wrapper');
+    if (wrapper && !wrapper.classList.contains('swiping')) wrapper.classList.add('swiping');
     swipeEl.style.transform = 'translateX(' + Math.max(diff, -80) + 'px)';
   }
 }, { passive: true });
@@ -3744,6 +3787,8 @@ document.addEventListener('touchend', function(e) {
     }
   } else {
     swipeEl.style.transform = 'translateX(0)';
+    var w = swipeEl.closest('.swipe-wrapper');
+    if (w) w.classList.remove('swiping');
   }
   swipeEl = null;
 });
