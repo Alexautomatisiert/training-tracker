@@ -1083,7 +1083,17 @@ function loadState() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
-      return Object.assign(getDefaultState(), parsed);
+      const state = Object.assign(getDefaultState(), parsed);
+      // Repair any NaN values in session sets (caused by iOS locale decimal bug)
+      (state.sessions || []).forEach(function(session) {
+        Object.keys(session.sets || {}).forEach(function(exId) {
+          (session.sets[exId] || []).forEach(function(set) {
+            if (set.weight === null || set.weight === undefined || isNaN(set.weight)) set.weight = 0;
+            if (set.reps === null || set.reps === undefined || isNaN(set.reps)) set.reps = 0;
+          });
+        });
+      });
+      return state;
     }
   } catch (e) {
     console.error('Failed to load state:', e);
@@ -1569,7 +1579,11 @@ function calcSessionVolume(session) {
   let total = 0;
   Object.entries(session.sets || {}).forEach(([exId, sets]) => {
     const multiplier = isDumbbellExercise(exId) ? 2 : 1;
-    sets.forEach(set => { total += set.weight * multiplier * set.reps; });
+    sets.forEach(set => {
+      const w = Number(set.weight) || 0;
+      const r = Number(set.reps) || 0;
+      total += w * multiplier * r;
+    });
   });
   return total;
 }
@@ -1618,11 +1632,11 @@ function formatLastSession(exerciseId) {
 }
 
 function calcTotalReps(sets) {
-  return (sets || []).reduce((sum, s) => sum + s.reps, 0);
+  return (sets || []).reduce((sum, s) => sum + (Number(s.reps) || 0), 0);
 }
 
 function calcTotalVolume(sets) {
-  return (sets || []).reduce((sum, s) => sum + s.weight * s.reps, 0);
+  return (sets || []).reduce((sum, s) => sum + (Number(s.weight) || 0) * (Number(s.reps) || 0), 0);
 }
 
 // =============================================
@@ -1680,7 +1694,7 @@ const ICONS = {
   chevDown: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>',
   play: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="6 3 20 12 6 21"/></svg>',
   pause: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="5" y="3" width="5" height="18"/><rect x="14" y="3" width="5" height="18"/></svg>',
-  reset: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 115.64 5.64L1 10M22.99 14l-4.64 4.36A9 9 0 013.51 15"/></svg>',
+  reset: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>',
   back: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>'
 };
 
@@ -2287,7 +2301,8 @@ function renderStrengthTab(plan) {
 }
 
 function finishStrengthSet(exId, isBW) {
-  const weight = isBW ? APP_STATE.settings.bodyWeight : parseFloat(document.getElementById(`weight-${exId}`).value) || 0;
+  const rawW = document.getElementById(`weight-${exId}`).value.replace(',', '.');
+  const weight = isBW ? APP_STATE.settings.bodyWeight : (parseFloat(rawW) || 0);
   const reps = parseInt(document.getElementById(`reps-${exId}`).value) || 0;
 
   if (!activeSession.sets[exId]) activeSession.sets[exId] = [];
@@ -2315,7 +2330,8 @@ function finishStrengthSet(exId, isBW) {
 }
 
 function addDropSet(exId, isBW) {
-  const weight = isBW ? APP_STATE.settings.bodyWeight : parseFloat(document.getElementById(`weight-${exId}`).value) || 0;
+  const rawW = document.getElementById(`weight-${exId}`).value.replace(',', '.');
+  const weight = isBW ? APP_STATE.settings.bodyWeight : (parseFloat(rawW) || 0);
   const reps = parseInt(document.getElementById(`reps-${exId}`).value) || 0;
 
   if (!activeSession.sets[exId]) activeSession.sets[exId] = [];
@@ -2521,8 +2537,8 @@ function finishCircuitRound(circuitId, circuitIndex) {
     var bw = ex.bodyweight;
     var weightEl = document.getElementById('cw-' + ex.id);
     var repsEl = document.getElementById('cr-' + ex.id);
-    var weight = bw ? APP_STATE.settings.bodyWeight : (weightEl ? parseFloat(weightEl.value) : ex.weight);
-    var reps = repsEl ? parseInt(repsEl.value) : parseInt(ex.reps.split('-')[1] || ex.reps);
+    var weight = bw ? APP_STATE.settings.bodyWeight : (weightEl ? (parseFloat(weightEl.value.replace(',', '.')) || ex.weight || 0) : ex.weight || 0);
+    var reps = repsEl ? (parseInt(repsEl.value) || parseInt(ex.reps.split('-')[1] || ex.reps) || 0) : (parseInt(ex.reps.split('-')[1] || ex.reps) || 0);
 
     if (!activeSession.sets[ex.id]) activeSession.sets[ex.id] = [];
     activeSession.sets[ex.id].push({ weight: weight, reps: reps, type: 'working' });
@@ -2645,7 +2661,8 @@ function renderAccExercise(ex) {
 }
 
 function finishAccSet(exId, isBW) {
-  const weight = isBW ? APP_STATE.settings.bodyWeight : parseFloat(document.getElementById(`aw-${exId}`).value) || 0;
+  const rawW = document.getElementById(`aw-${exId}`).value.replace(',', '.');
+  const weight = isBW ? APP_STATE.settings.bodyWeight : (parseFloat(rawW) || 0);
   const reps = parseInt(document.getElementById(`ar-${exId}`).value) || 0;
 
   if (!activeSession.sets[exId]) activeSession.sets[exId] = [];
@@ -2655,7 +2672,7 @@ function finishAccSet(exId, isBW) {
   const dropWeightEl = document.getElementById('adw-' + exId);
   const dropRepsEl = document.getElementById('adr-' + exId);
   if (dropWeightEl && dropRepsEl) {
-    const dw = parseFloat(dropWeightEl.value) || 0;
+    const dw = parseFloat((dropWeightEl.value || '0').replace(',', '.')) || 0;
     const dr = parseInt(dropRepsEl.value) || 0;
     if (dw > 0 && dr > 0) {
       activeSession.sets[exId].push({ weight: dw, reps: dr, type: 'drop' });
@@ -2804,7 +2821,7 @@ function renderDoneTab(plan) {
   if (!session) return '<p style="text-align:center;color:var(--text-sec);padding:40px 0">Kein abgeschlossenes Training</p>';
 
   const totalVol = calcSessionVolume(session);
-  const duration = session.duration || 0;
+  const duration = session.duration || (sessionTimer.running ? getSessionSeconds() : 0);
   const durationMin = Math.round(duration / 60);
 
   // Muscle volume boxes
