@@ -1856,7 +1856,8 @@ function renderStrengthTab(plan) {
     } else {
       subtitleText = `${ex.sets}x${ex.reps} @ ${ex.weight}kg${dbLabel}`;
     }
-    if (ex.note) subtitleText += ` (${ex.note})`;
+    // Only append note if it adds new info (skip if EMOM/pyramid already says it all)
+    if (ex.note && !isEMOM && !hasPyramid) subtitleText += ` (${ex.note})`;
 
     html += `<div class="exercise-card">
       <div class="exercise-name">${ex.name}</div>
@@ -1921,7 +1922,8 @@ function renderStrengthTab(plan) {
         ? ex.pyramidWeights[sessionSets.length]
         : (ex.pyramidWeights && ex.pyramidWeights[sessionSets.length] !== undefined ? ex.pyramidWeights[sessionSets.length] : ex.weight);
       const setLabel = isEMOM ? 'EMOM'
-        : hasPyramid ? (sessionSets.length < Math.ceil(ex.sets / 2) ? 'Aufsteigend' : 'Absteigend')
+        : (ex.pyramid && hasPyramid) ? (sessionSets.length < Math.ceil(ex.sets / 2) ? 'Aufsteigend' : 'Absteigend')
+        : (hasPyramid && !ex.pyramid) ? (sessionSets.length < ex.sets - 1 ? 'Top Set' : 'Backoff')
         : 'Working';
       html += `
         <div class="set-card current">
@@ -1955,7 +1957,9 @@ function renderStrengthTab(plan) {
       const upcomingLabel = isEMOM ? `Min ${i + 1}`
         : `Satz ${i + 1}${upcomingWeight}`;
       const upcomingType = isEMOM ? 'EMOM'
-        : hasPyramid ? (i < Math.ceil(ex.sets / 2) ? 'Aufsteigend' : 'Absteigend') : 'Working';
+        : (ex.pyramid && hasPyramid) ? (i < Math.ceil(ex.sets / 2) ? 'Aufsteigend' : 'Absteigend')
+        : (hasPyramid && !ex.pyramid) ? (i < ex.sets - 1 ? 'Top Set' : 'Backoff')
+        : 'Working';
       html += `
         <div class="set-card upcoming" style="margin-top:8px">
           <div class="set-header">
@@ -3006,6 +3010,13 @@ function applyCustomWeights() {
       for (const ex of plan.accessories) { if (ex.id === exId) ex.weight = w; }
     }
   }
+}
+// Clear stale customWeights on version update
+const APP_VERSION = '2.1';
+if (APP_STATE._appVersion !== APP_VERSION) {
+  APP_STATE.customWeights = {};
+  APP_STATE._appVersion = APP_VERSION;
+  saveState();
 }
 applyCustomWeights();
 
