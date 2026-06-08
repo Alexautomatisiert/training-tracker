@@ -841,7 +841,7 @@ const WORKOUT_PLANS = {
       { id: 'va-w10', name: '20 Push-ups', duration: '' }
     ],
     strength: [
-      { id: 'va-s1', name: 'Incline DB Press', sets: 3, reps: '6-8', weight: 30, unit: 'kg', bodyweight: false }
+      { id: 'va-s1', name: 'DB Incline Press', sets: 3, reps: '6-8', weight: 30, unit: 'kg', bodyweight: false, dumbbell: true, restSeconds: 120, note: '2x Top + 1x Backoff 25kg', pyramidWeights: [30, 30, 25] }
     ],
     circuits: [
       {
@@ -849,18 +849,73 @@ const WORKOUT_PLANS = {
         name: 'Zirkel',
         type: 'Technik',
         rounds: 4,
+        restSeconds: 150,
         exercises: [
-          { id: 'va-c1-e1', name: 'Rev. DB Lunge', reps: '10-12', weight: 15, unit: 'kg', bodyweight: false },
-          { id: 'va-c1-e2', name: 'Ring Dips', reps: '8-10', weight: 0, unit: 'kg', bodyweight: true },
-          { id: 'va-c1-e3', name: 'OH Walking Lunges', reps: '10-12', weight: 15, unit: 'kg', bodyweight: false },
-          { id: 'va-c1-e4', name: 'Incline DB Press', reps: '10-12', weight: 25, unit: 'kg', bodyweight: false }
+          { id: 'va-c1-e1', name: 'DB Rev. Lunges', reps: '10-12', weight: 22.5, unit: 'kg', bodyweight: false, dumbbell: true },
+          { id: 'va-c1-e2', name: 'Weighted Ring Dips', reps: '8-10', weight: 5, unit: 'kg', bodyweight: false, note: 'BW+5kg' },
+          { id: 'va-c1-e3', name: 'DB OH Walking Lunges', reps: '10-12', weight: 17.5, unit: 'kg', bodyweight: false, dumbbell: true },
+          { id: 'va-c1-e4', name: 'DB Incline Press', reps: '10-12', weight: 22.5, unit: 'kg', bodyweight: false, dumbbell: true }
         ]
       }
     ],
     accessories: [
-      { id: 'va-a1', name: 'Seitliche Schulter', sets: 3, reps: '12-15', weight: 0, unit: 'kg', bodyweight: false, group: null },
-      { id: 'va-a2', name: 'TTB + KTC', sets: 3, reps: '12', weight: 0, unit: 'kg', bodyweight: true, group: 'superset', groupName: 'Bauch Superset' },
-      { id: 'va-a3', name: 'Trizeps', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: false, group: null }
+      { id: 'va-a1', name: 'Tricep KB Extensions', sets: 3, reps: '10-12', weight: 16, unit: 'kg', bodyweight: false, group: null, dropWeight: 12, note: 'DropSet 16+12kg' },
+      { id: 'va-a2', name: 'DB Lateral Raise', sets: 3, reps: '12-15', weight: 10, unit: 'kg', bodyweight: false, dumbbell: true, group: null, dropWeight: 5, note: 'DropSet 10+5kg' },
+      { id: 'va-a3', name: 'TTB + KTC', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, group: null }
+    ]
+  },
+  ra: {
+    id: 'ra',
+    name: 'Rueckseite A',
+    subtitle: 'Seal Rows + Snatches',
+    day: 'Mi',
+    dayIndex: 3,
+    muscleSplit: { ruecken: 50, hams: 25, bizeps: 10, core: 15 },
+    warmup: [
+      { id: 'ra-w1', name: 'Iso Aussenrotation R', duration: '30s' },
+      { id: 'ra-w2', name: 'Iso Aussenrotation L', duration: '30s' },
+      { id: 'ra-w3', name: 'Iso Innenrotation R', duration: '30s' },
+      { id: 'ra-w4', name: 'Iso Innenrotation L', duration: '30s' },
+      { id: 'ra-w5', name: 'Aussenrotation R', duration: '45s' },
+      { id: 'ra-w6', name: 'Aussenrotation L', duration: '45s' },
+      { id: 'ra-w7', name: 'Innenrotation R', duration: '45s' },
+      { id: 'ra-w8', name: 'Innenrotation L', duration: '45s' },
+      { id: 'ra-w9', name: 'Plank Rotation', duration: '60s' },
+      { id: 'ra-w10', name: '10 Scapula Pull-ups', duration: '' }
+    ],
+    strength: [
+      { id: 'ra-s1', name: 'BB Seal Rows', sets: 10, reps: '5-6', weight: 50, unit: 'kg', bodyweight: false, restSeconds: 60, emom: true, emomMinutes: 10, note: 'EMOM 10min @ 50kg' }
+    ],
+    circuits: [
+      {
+        id: 'ra-c1',
+        name: 'Zirkel 1',
+        type: 'Technik',
+        rounds: 4,
+        restSeconds: 150,
+        exercises: [
+          { id: 'ra-c1-e1', name: 'Snatches', reps: '6-8', weight: 30, unit: 'kg', bodyweight: false },
+          { id: 'ra-c1-e2', name: 'DB Y-Raises + Trap Laterals', reps: '10+10', weight: 5, unit: 'kg', bodyweight: false, dumbbell: true, note: 'SuperSet 5kg + 10kg', supersetWeights: [5, 10] }
+        ]
+      },
+      {
+        id: 'ra-c2',
+        name: 'Zirkel 2',
+        type: 'Finisher',
+        rounds: 3,
+        restSeconds: 0,
+        doubleRounds: true,
+        note: 'Double Rounds: jede Runde = 2x durch',
+        exercises: [
+          { id: 'ra-c2-e1', name: 'Pull Ups', reps: '6-8', weight: 0, unit: 'kg', bodyweight: true },
+          { id: 'ra-c2-e2', name: 'Farmers Carries + Shrugs', reps: '75m+5', weight: 64, unit: 'kg', bodyweight: false, note: '2x32kg' }
+        ]
+      }
+    ],
+    accessories: [
+      { id: 'ra-a1', name: 'Weighted GHD Hypers + BW GHD Hypers', sets: 3, reps: '10-12', weight: 10, unit: 'kg', bodyweight: false, group: null, note: 'DropSet 10kg + BW' },
+      { id: 'ra-a2', name: 'TTB + GHD Situps', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, group: null },
+      { id: 'ra-a3', name: 'African Curls', sets: 3, reps: '10-12', weight: 12.5, unit: 'kg', bodyweight: false, group: null, dropWeight: 7.5, note: 'DropSet 12.5+7.5kg' }
     ]
   },
   vb: {
@@ -883,7 +938,7 @@ const WORKOUT_PLANS = {
       { id: 'vb-w10', name: '20 Push-ups', duration: '' }
     ],
     strength: [
-      { id: 'vb-s1', name: 'Bulgarian Split Squats', sets: 3, reps: '8-10', weight: 40, unit: 'kg', bodyweight: false, note: '2x20kg' }
+      { id: 'vb-s1', name: 'Bulgarian Split Squats', sets: 2, reps: '8-10', weight: 22.5, unit: 'kg', bodyweight: false, dumbbell: true, restSeconds: 120, note: '2x22.5kg DB' }
     ],
     circuits: [
       {
@@ -891,76 +946,25 @@ const WORKOUT_PLANS = {
         name: 'Zirkel',
         type: 'Heavy',
         rounds: 4,
+        restSeconds: 150,
         exercises: [
-          { id: 'vb-c1-e1', name: 'Incline DB Press', reps: '10-12', weight: 25, unit: 'kg', bodyweight: false },
-          { id: 'vb-c1-e2', name: 'Hex Bar Squats', reps: '8-10', weight: 60, unit: 'kg', bodyweight: false },
-          { id: 'vb-c1-e3', name: 'Ring Push-ups', reps: '10-12', weight: 0, unit: 'kg', bodyweight: true },
-          { id: 'vb-c1-e4', name: 'Walking Lunges', reps: '12-15', weight: 0, unit: 'kg', bodyweight: true }
+          { id: 'vb-c1-e1', name: 'Incline DB Press', reps: '10-12', weight: 25, unit: 'kg', bodyweight: false, dumbbell: true },
+          { id: 'vb-c1-e2', name: 'DB Squats', reps: '8-10', weight: 20, unit: 'kg', bodyweight: false, dumbbell: true },
+          { id: 'vb-c1-e3', name: 'Ring Push Ups', reps: '10-12', weight: 0, unit: 'kg', bodyweight: true },
+          { id: 'vb-c1-e4', name: 'Walking Lunges', reps: '12-15', weight: 20, unit: 'kg', bodyweight: false, dumbbell: true }
         ]
       }
     ],
     accessories: [
-      { id: 'vb-a1', name: 'Seitliche Schulter', sets: 3, reps: '12-15', weight: 0, unit: 'kg', bodyweight: false, group: null },
-      { id: 'vb-a2', name: 'TTB + KTC', sets: 3, reps: '12', weight: 0, unit: 'kg', bodyweight: true, group: 'superset', groupName: 'Bauch Superset' },
-      { id: 'vb-a3', name: 'Trizeps', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: false, group: null }
-    ]
-  },
-  ra: {
-    id: 'ra',
-    name: 'Rueckseite A',
-    subtitle: 'Pull + RDL',
-    day: 'Mi',
-    dayIndex: 3,
-    muscleSplit: { ruecken: 50, hams: 25, bizeps: 10, core: 15 },
-    warmup: [
-      { id: 'ra-w1', name: 'Iso Aussenrotation R', duration: '30s' },
-      { id: 'ra-w2', name: 'Iso Aussenrotation L', duration: '30s' },
-      { id: 'ra-w3', name: 'Iso Innenrotation R', duration: '30s' },
-      { id: 'ra-w4', name: 'Iso Innenrotation L', duration: '30s' },
-      { id: 'ra-w5', name: 'Aussenrotation R', duration: '45s' },
-      { id: 'ra-w6', name: 'Aussenrotation L', duration: '45s' },
-      { id: 'ra-w7', name: 'Innenrotation R', duration: '45s' },
-      { id: 'ra-w8', name: 'Innenrotation L', duration: '45s' },
-      { id: 'ra-w9', name: 'Plank Rotation', duration: '60s' },
-      { id: 'ra-w10', name: '10 Scapula Pull-ups', duration: '' }
-    ],
-    strength: [
-      { id: 'ra-s1', name: 'Elevated Seal BB Rows', sets: 3, reps: '6-8', weight: 60, unit: 'kg', bodyweight: false }
-    ],
-    circuits: [
-      {
-        id: 'ra-c1',
-        name: 'Zirkel 1',
-        type: 'Technik',
-        rounds: 4,
-        exercises: [
-          { id: 'ra-c1-e1', name: 'Snatch-Grip RDL/Snatch Combo', reps: '8-10', weight: 35, unit: 'kg', bodyweight: false },
-          { id: 'ra-c1-e2', name: 'Trap Laterals + Rev Flys', reps: '12+12', weight: 5, unit: 'kg', bodyweight: false, note: '5+10kg' }
-        ]
-      },
-      {
-        id: 'ra-c2',
-        name: 'Zirkel 2',
-        type: 'Finisher',
-        rounds: 3,
-        exercises: [
-          { id: 'ra-c2-e1', name: 'Pull-ups', reps: '6-8', weight: 0, unit: 'kg', bodyweight: true },
-          { id: 'ra-c2-e2', name: 'Farmer Carry + Shrugs', reps: '75m+5', weight: 48, unit: 'kg', bodyweight: false, note: '2x24kg' }
-        ]
-      }
-    ],
-    accessories: [
-      { id: 'ra-a1', name: 'Weighted GHD + BW', sets: 3, reps: '12', weight: 15, unit: 'kg', bodyweight: false, group: null },
-      { id: 'ra-a2', name: 'TTB', sets: 3, reps: '12', weight: 0, unit: 'kg', bodyweight: true, group: 'triple', groupName: 'Triple Set Bauch' },
-      { id: 'ra-a3', name: 'KTC', sets: 3, reps: '12', weight: 0, unit: 'kg', bodyweight: true, group: 'triple', groupName: 'Triple Set Bauch' },
-      { id: 'ra-a4', name: 'Frog Situps', sets: 3, reps: '12', weight: 0, unit: 'kg', bodyweight: true, group: 'triple', groupName: 'Triple Set Bauch' },
-      { id: 'ra-a5', name: 'Curls', sets: 3, reps: '10', weight: 15, unit: 'kg', bodyweight: false, group: null }
+      { id: 'vb-a1', name: 'Tricep KB Extensions', sets: 3, reps: '10-12', weight: 16, unit: 'kg', bodyweight: false, group: null, dropWeight: 12, note: 'DropSet 16+12kg' },
+      { id: 'vb-a2', name: 'DB Lou Raises + Lateral Raise', sets: 3, reps: '12-15', weight: 7.5, unit: 'kg', bodyweight: false, dumbbell: true, group: null, note: 'SuperSet 7.5kg' },
+      { id: 'vb-a3', name: 'TTB + KTC', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, group: null }
     ]
   },
   rb: {
     id: 'rb',
     name: 'Rueckseite B',
-    subtitle: 'Rows + Pull',
+    subtitle: 'DB Rows + Pull',
     day: 'So',
     dayIndex: 0,
     muscleSplit: { ruecken: 50, hams: 25, bizeps: 10, core: 15 },
@@ -977,7 +981,7 @@ const WORKOUT_PLANS = {
       { id: 'rb-w10', name: '10 Scapula Pull-ups', duration: '' }
     ],
     strength: [
-      { id: 'rb-s1', name: 'Weighted Ring Inverted Row', sets: 5, reps: '6-8', weight: 10, unit: 'kg', bodyweight: false, note: 'BW+10kg' }
+      { id: 'rb-s1', name: 'DB Seal Rows', sets: 6, reps: '6-8', weight: 22.5, unit: 'kg', bodyweight: false, dumbbell: true, restSeconds: 75, pyramid: true, pyramidWeights: [17.5, 20, 22.5, 22.5, 20, 17.5], note: 'Pyramid 17.5-20-22.5-22.5-20-17.5' }
     ],
     circuits: [
       {
@@ -985,9 +989,10 @@ const WORKOUT_PLANS = {
         name: 'Zirkel 1',
         type: 'Heavy',
         rounds: 4,
+        restSeconds: 90,
         exercises: [
-          { id: 'rb-c1-e1', name: 'Weighted Pull-ups', reps: '6-8', weight: 10, unit: 'kg', bodyweight: false },
-          { id: 'rb-c1-e2', name: 'KB RDL + Gorilla Row (breit)', reps: '8-10', weight: 40, unit: 'kg', bodyweight: false, note: '2x20kg' }
+          { id: 'rb-c1-e1', name: 'Ring Pull Ups', reps: '6-8', weight: 0, unit: 'kg', bodyweight: true },
+          { id: 'rb-c1-e2', name: 'DB SL RDLs + Row', reps: '8-10', weight: 10, unit: 'kg', bodyweight: false, dumbbell: true }
         ]
       },
       {
@@ -995,17 +1000,17 @@ const WORKOUT_PLANS = {
         name: 'Zirkel 2',
         type: 'Volume',
         rounds: 4,
+        restSeconds: 90,
         exercises: [
-          { id: 'rb-c2-e1', name: 'Seal Row', reps: '10-12', weight: 25, unit: 'kg', bodyweight: false },
-          { id: 'rb-c2-e2', name: 'Ring Reverse Fly', reps: '12-15', weight: 0, unit: 'kg', bodyweight: true }
+          { id: 'rb-c2-e1', name: 'Ring Rev Fly', reps: '12-15', weight: 0, unit: 'kg', bodyweight: true },
+          { id: 'rb-c2-e2', name: 'Banded Rev Fly', reps: '15-20', weight: 0, unit: 'kg', bodyweight: true, note: 'Red Band' }
         ]
       }
     ],
     accessories: [
-      { id: 'rb-a1', name: 'GHD back ext', sets: 3, reps: '12', weight: 10, unit: 'kg', bodyweight: false, group: null },
-      { id: 'rb-a2', name: 'GHD sit ups', sets: 3, reps: '10', weight: 0, unit: 'kg', bodyweight: true, group: 'superset', groupName: 'Superset Bauch' },
-      { id: 'rb-a3', name: 'Knee Raises', sets: 3, reps: '10', weight: 0, unit: 'kg', bodyweight: true, group: 'superset', groupName: 'Superset Bauch' },
-      { id: 'rb-a4', name: 'Curls', sets: 3, reps: '10', weight: 15, unit: 'kg', bodyweight: false, group: null }
+      { id: 'rb-a1', name: 'SL GHD Hypers + GHD Hypers', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, group: null, note: 'BW only' },
+      { id: 'rb-a2', name: 'TTB + GHD Situps', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, group: null },
+      { id: 'rb-a3', name: 'Hammer Curls', sets: 3, reps: '10-12', weight: 15, unit: 'kg', bodyweight: false, dumbbell: true, group: null, dropWeight: 10, note: 'DropSet 15+10kg' }
     ]
   }
 };
@@ -1203,6 +1208,25 @@ function getExerciseName(exId) {
   return exId;
 }
 
+function getExerciseInfo(exId) {
+  for (const plan of Object.values(WORKOUT_PLANS)) {
+    for (const ex of plan.strength) if (ex.id === exId) return ex;
+    for (const c of plan.circuits) for (const ex of c.exercises) if (ex.id === exId) return ex;
+    for (const ex of plan.accessories) if (ex.id === exId) return ex;
+  }
+  return null;
+}
+
+function isDumbbellExercise(exId) {
+  const ex = getExerciseInfo(exId);
+  return ex ? !!ex.dumbbell : false;
+}
+
+// Get effective weight for volume calculation (doubles for DB exercises)
+function getVolumeWeight(exId, trackedWeight) {
+  return isDumbbellExercise(exId) ? trackedWeight * 2 : trackedWeight;
+}
+
 // =============================================
 // TIMER
 // =============================================
@@ -1289,8 +1313,9 @@ function updateTimerDisplay() {
 
 function calcSessionVolume(session) {
   let total = 0;
-  Object.values(session.sets || {}).forEach(sets => {
-    sets.forEach(set => { total += set.weight * set.reps; });
+  Object.entries(session.sets || {}).forEach(([exId, sets]) => {
+    const multiplier = isDumbbellExercise(exId) ? 2 : 1;
+    sets.forEach(set => { total += set.weight * multiplier * set.reps; });
   });
   return total;
 }
@@ -1816,23 +1841,59 @@ function renderStrengthTab(plan) {
     const currentSetIndex = activeSession._currentStrengthSet
       ? (activeSession._currentStrengthSet[ex.id] || sessionSets.length)
       : sessionSets.length;
+    const hasPyramid = ex.pyramidWeights && ex.pyramidWeights.length > 0;
+    const isEMOM = !!ex.emom;
+    const dbLabel = ex.dumbbell ? ' (pro DB)' : '';
+
+    // Build subtitle line
+    let subtitleText = '';
+    if (isEMOM) {
+      subtitleText = `EMOM ${ex.emomMinutes}min @ ${ex.weight}kg${dbLabel}`;
+    } else if (hasPyramid) {
+      subtitleText = `Pyramid ${ex.sets}x${ex.reps} | ${ex.pyramidWeights.join('-')}kg${dbLabel}`;
+    } else if (ex.pyramidWeights && ex.pyramidWeights.length === ex.sets) {
+      subtitleText = `${ex.sets}x${ex.reps} | ${ex.pyramidWeights.join('-')}kg${dbLabel}`;
+    } else {
+      subtitleText = `${ex.sets}x${ex.reps} @ ${ex.weight}kg${dbLabel}`;
+    }
+    if (ex.note) subtitleText += ` (${ex.note})`;
 
     html += `<div class="exercise-card">
       <div class="exercise-name">${ex.name}</div>
-      <div class="exercise-last">${ex.sets}x${ex.reps} @ ${ex.weight}kg${lastStr ? ' | Letztes Mal: ' + lastStr : ''}</div>`;
+      <div class="exercise-last">${subtitleText}${lastStr ? ' | Letztes Mal: ' + lastStr : ''}</div>`;
 
-    // Timer for rest
-    html += `
-      <div style="text-align:center;margin:12px 0">
-        <div id="timer-display" class="timer-display" style="font-size:36px;padding:8px 0">${formatTime(timerSeconds)}</div>
-        <div class="timer-presets">
-          ${[120, 150, 180].map(s => `<button class="timer-preset ${timerSeconds === s ? 'active' : ''}" onclick="startCountdown(${s})">${formatTime(s)}</button>`).join('')}
-        </div>
-        <div class="timer-controls">
-          <button class="timer-btn" onclick="toggleCountdownTimer()">${timerInterval ? ICONS.pause : ICONS.play}</button>
-          <button class="timer-btn" onclick="resetCountdownTimer()">${ICONS.reset}</button>
-        </div>
-      </div>`;
+    // Timer section — different for EMOM vs regular
+    if (isEMOM) {
+      // EMOM: show a big 1-minute countdown that auto-restarts
+      const emomRound = sessionSets.length + 1;
+      const emomDone = sessionSets.length >= ex.sets;
+      html += `
+        <div style="text-align:center;margin:12px 0;padding:12px;border-radius:12px;background:rgba(232,114,12,0.1)">
+          <div style="font-size:12px;color:var(--orange);font-weight:600;margin-bottom:4px">EMOM ${ex.emomMinutes} MIN</div>
+          <div style="font-size:11px;color:var(--text-sec);margin-bottom:8px">Minute ${Math.min(emomRound, ex.sets)} / ${ex.sets}</div>
+          <div id="timer-display" class="timer-display" style="font-size:48px;padding:4px 0;color:var(--orange)">${formatTime(timerSeconds)}</div>
+          <div class="timer-controls" style="margin-top:8px">
+            <button class="timer-preset" onclick="startCountdown(60)" style="font-size:14px;padding:8px 16px">60s Start</button>
+            <button class="timer-btn" onclick="toggleCountdownTimer()">${timerInterval ? ICONS.pause : ICONS.play}</button>
+            <button class="timer-btn" onclick="resetCountdownTimer()">${ICONS.reset}</button>
+          </div>
+        </div>`;
+    } else {
+      // Regular rest timer
+      const restDefault = ex.restSeconds || 120;
+      const restPresets = ex.restSeconds === 75 ? [60, 75, 90] : [120, 150, 180];
+      html += `
+        <div style="text-align:center;margin:12px 0">
+          <div id="timer-display" class="timer-display" style="font-size:36px;padding:8px 0">${formatTime(timerSeconds)}</div>
+          <div class="timer-presets">
+            ${restPresets.map(s => `<button class="timer-preset ${timerSeconds === s ? 'active' : ''}" onclick="startCountdown(${s})">${formatTime(s)}</button>`).join('')}
+          </div>
+          <div class="timer-controls">
+            <button class="timer-btn" onclick="toggleCountdownTimer()">${timerInterval ? ICONS.pause : ICONS.play}</button>
+            <button class="timer-btn" onclick="resetCountdownTimer()">${ICONS.reset}</button>
+          </div>
+        </div>`;
+    }
 
     // Completed sets
     sessionSets.forEach((set, i) => {
@@ -1840,11 +1901,11 @@ function renderStrengthTab(plan) {
       html += `
         <div class="set-card done">
           <div class="set-header">
-            <span class="set-number">Satz ${i + 1} ${ICONS.check}</span>
-            <span class="set-type">${set.type === 'drop' ? 'Drop' : 'Working'} ${isPR ? ICONS.trophy : ''}</span>
+            <span class="set-number">${isEMOM ? 'Min ' + (i + 1) : 'Satz ' + (i + 1)} ${ICONS.check}</span>
+            <span class="set-type">${set.type === 'drop' ? 'Drop' : isEMOM ? 'EMOM' : 'Working'} ${isPR ? ICONS.trophy : ''}</span>
           </div>
           <div style="display:flex;gap:12px;font-size:14px;color:var(--text-sec)">
-            <span>${set.weight}kg</span>
+            <span>${set.weight}kg${dbLabel}</span>
             <span>${set.reps} Reps</span>
           </div>
         </div>`;
@@ -1855,17 +1916,24 @@ function renderStrengthTab(plan) {
     if (currentSetIndex < totalSets || !activeSession._completed) {
       const setNum = sessionSets.length + 1;
       const bw = ex.bodyweight;
+      // For pyramid: use the weight for this specific set
+      const defaultWeight = hasPyramid && ex.pyramidWeights[sessionSets.length] !== undefined
+        ? ex.pyramidWeights[sessionSets.length]
+        : (ex.pyramidWeights && ex.pyramidWeights[sessionSets.length] !== undefined ? ex.pyramidWeights[sessionSets.length] : ex.weight);
+      const setLabel = isEMOM ? 'EMOM'
+        : hasPyramid ? (sessionSets.length < Math.ceil(ex.sets / 2) ? 'Aufsteigend' : 'Absteigend')
+        : 'Working';
       html += `
         <div class="set-card current">
           <div class="set-header">
-            <span class="set-number">Satz ${setNum}</span>
-            <span class="set-type">Working</span>
+            <span class="set-number">${isEMOM ? 'Min ' + setNum : 'Satz ' + setNum}</span>
+            <span class="set-type">${setLabel}</span>
           </div>
           <div class="input-row">
             ${bw ? '<div class="input-group"><div class="input-label">Gewicht</div><div style="text-align:center;padding:10px;font-size:16px">BW</div></div>' :
             `<div class="input-group">
-              <div class="input-label">Gewicht (kg)</div>
-              <input type="number" inputmode="decimal" class="input-field" id="weight-${ex.id}" value="${ex.weight}" step="0.5">
+              <div class="input-label">Gewicht (kg)${dbLabel}</div>
+              <input type="number" inputmode="decimal" class="input-field" id="weight-${ex.id}" value="${defaultWeight}" step="0.5">
             </div>`}
             <div class="input-group">
               <div class="input-label">Reps</div>
@@ -1874,18 +1942,25 @@ function renderStrengthTab(plan) {
           </div>
         </div>
         <div style="display:flex;gap:8px;margin-top:8px">
-          <button class="btn btn-orange" style="flex:2" onclick="finishStrengthSet('${ex.id}', ${bw})">Satz fertig</button>
-          <button class="btn btn-outline btn-sm" onclick="addDropSet('${ex.id}', ${bw})">+ Drop</button>
+          <button class="btn btn-orange" style="flex:2" onclick="finishStrengthSet('${ex.id}', ${bw})">${isEMOM ? 'Minute done' : 'Satz fertig'}</button>
+          ${isEMOM ? '' : '<button class="btn btn-outline btn-sm" onclick="addDropSet(\'' + ex.id + '\', ' + bw + ')">+ Drop</button>'}
         </div>`;
     }
 
-    // Upcoming sets (dimmed)
+    // Upcoming sets (dimmed) — show planned pyramid weight or EMOM minutes
     for (let i = sessionSets.length + 1; i < totalSets; i++) {
+      const upcomingWeight = hasPyramid && ex.pyramidWeights[i] !== undefined
+        ? ` @ ${ex.pyramidWeights[i]}kg`
+        : (ex.pyramidWeights && ex.pyramidWeights[i] !== undefined ? ` @ ${ex.pyramidWeights[i]}kg` : '');
+      const upcomingLabel = isEMOM ? `Min ${i + 1}`
+        : `Satz ${i + 1}${upcomingWeight}`;
+      const upcomingType = isEMOM ? 'EMOM'
+        : hasPyramid ? (i < Math.ceil(ex.sets / 2) ? 'Aufsteigend' : 'Absteigend') : 'Working';
       html += `
         <div class="set-card upcoming" style="margin-top:8px">
           <div class="set-header">
-            <span class="set-number">Satz ${i + 1}</span>
-            <span class="set-type">Working</span>
+            <span class="set-number">${upcomingLabel}</span>
+            <span class="set-type">${upcomingType}</span>
           </div>
         </div>`;
     }
@@ -1913,8 +1988,10 @@ function finishStrengthSet(exId, isBW) {
   if (!activeSession.sets[exId]) activeSession.sets[exId] = [];
   activeSession.sets[exId].push({ weight, reps, type: 'working' });
 
-  // Start rest timer
-  startCountdown(150);
+  // Start rest timer — use exercise-specific rest time
+  const exInfo = getExerciseInfo(exId);
+  const restTime = (exInfo && exInfo.restSeconds) ? exInfo.restSeconds : 120;
+  startCountdown(restTime);
 
   // Check for PR
   if (checkPR(exId, weight, reps)) {
@@ -1973,31 +2050,44 @@ function renderZirkelTab(plan) {
   let html = '';
 
   plan.circuits.forEach((circuit, ci) => {
-    const rounds = circuit.rounds;
+    const rounds = circuit.doubleRounds ? circuit.rounds * 2 : circuit.rounds;
     const completedRounds = activeSession.circuitRounds[circuit.id] || 0;
     const currentRound = completedRounds + 1;
+    const displayRounds = circuit.rounds;
+    const isDouble = circuit.doubleRounds;
+
+    // For double rounds: show main round number + sub-round
+    const getDoubleRoundLabel = (r) => {
+      if (!isDouble) return `${r}`;
+      const mainRound = Math.ceil(r / 2);
+      const subRound = (r % 2 === 1) ? 'a' : 'b';
+      return `${mainRound}${subRound}`;
+    };
 
     html += `
       <div style="margin-bottom:24px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
           <h3>${circuit.name}</h3>
-          <span style="font-size:12px;color:var(--text-sec)">${circuit.type} | ${rounds} Runden</span>
+          <span style="font-size:12px;color:var(--text-sec)">${circuit.type} | ${displayRounds} Runden${isDouble ? ' (2x)' : ''}</span>
         </div>
+        ${circuit.note ? `<div style="font-size:11px;color:var(--orange);margin-bottom:8px">${circuit.note}</div>` : ''}
 
         <div class="round-pills">
           ${Array.from({length: rounds}, (_, r) => {
             const rn = r + 1;
             const cls = rn <= completedRounds ? 'done' : rn === currentRound ? 'current' : '';
-            return `<div class="round-pill ${cls}">${rn}</div>`;
+            return `<div class="round-pill ${cls}">${getDoubleRoundLabel(rn)}</div>`;
           }).join('')}
         </div>`;
 
-    // Timer
+    // Timer — use circuit-specific rest time
+    const circuitRest = circuit.restSeconds || 90;
+    const timerPresets = circuitRest >= 150 ? [120, 150, 180] : circuitRest >= 90 ? [60, 90, 120] : [45, 60, 90];
     html += `
       <div style="text-align:center;margin:8px 0">
         <div id="timer-display" class="timer-display" style="font-size:32px;padding:4px 0">${formatTime(timerSeconds)}</div>
         <div class="timer-presets">
-          ${[60, 90, 120].map(s => `<button class="timer-preset" onclick="startCountdown(${s})">${formatTime(s)}</button>`).join('')}
+          ${timerPresets.map(s => `<button class="timer-preset" onclick="startCountdown(${s})">${formatTime(s)}</button>`).join('')}
         </div>
       </div>`;
 
@@ -2005,14 +2095,16 @@ function renderZirkelTab(plan) {
     if (currentRound <= rounds) {
       circuit.exercises.forEach(ex => {
         const bw = ex.bodyweight;
+        const dbLabel = ex.dumbbell ? ' (pro DB)' : '';
+        const weightLabel = bw ? '@ BW' : '@ ' + ex.weight + 'kg' + dbLabel;
         html += `
           <div class="exercise-card">
             <div class="exercise-name">${ex.name}</div>
-            <div class="exercise-last">${ex.reps} ${bw ? '@ BW' : '@ ' + ex.weight + 'kg'}${ex.note ? ' (' + ex.note + ')' : ''}</div>
+            <div class="exercise-last">${ex.reps} ${weightLabel}${ex.note ? ' (' + ex.note + ')' : ''}</div>
             <div class="input-row" style="margin-top:8px">
               ${bw ? '<div class="input-group"><div class="input-label">Gewicht</div><div style="text-align:center;padding:8px;font-size:14px">BW</div></div>' :
               `<div class="input-group">
-                <div class="input-label">Gewicht (kg)</div>
+                <div class="input-label">Gewicht (kg)${dbLabel}</div>
                 <input type="number" inputmode="decimal" class="input-field" id="cw-${ex.id}" value="${ex.weight}" step="0.5">
               </div>`}
               <div class="input-group">
@@ -2023,14 +2115,18 @@ function renderZirkelTab(plan) {
           </div>`;
       });
 
-      html += `<button class="btn btn-orange" onclick="finishCircuitRound('${circuit.id}', ${ci})">Runde ${currentRound} done</button>`;
+      const roundLabel = isDouble ? getDoubleRoundLabel(currentRound) : currentRound;
+      html += `<button class="btn btn-orange" onclick="finishCircuitRound('${circuit.id}', ${ci})">Runde ${roundLabel} done</button>`;
     }
 
     html += '</div>';
   });
 
-  // Check all circuits done
-  const allDone = plan.circuits.every(c => (activeSession.circuitRounds[c.id] || 0) >= c.rounds);
+  // Check all circuits done (double rounds count 2x)
+  const allDone = plan.circuits.every(c => {
+    const totalRounds = c.doubleRounds ? c.rounds * 2 : c.rounds;
+    return (activeSession.circuitRounds[c.id] || 0) >= totalRounds;
+  });
   if (allDone) {
     html += '<button class="btn btn-green" style="margin-top:12px" onclick="switchSubTab(\'acc\')">Weiter: Accessories</button>';
   }
@@ -2056,7 +2152,9 @@ function finishCircuitRound(circuitId, circuitIndex) {
 
   activeSession.circuitRounds[circuitId] = (activeSession.circuitRounds[circuitId] || 0) + 1;
 
-  startCountdown(90);
+  // Use circuit-specific rest time (0 = no auto timer, e.g. for double rounds)
+  const restTime = circuit.restSeconds || 90;
+  if (restTime > 0) startCountdown(restTime);
   saveState();
   renderWorkoutDetail();
 }
@@ -2109,6 +2207,8 @@ function renderAccExercise(ex) {
   const sessionSets = activeSession.sets[ex.id] || [];
   const bw = ex.bodyweight;
   const lastStr = formatLastSession(ex.id);
+  const dbLabel = ex.dumbbell ? ' (DB)' : '';
+  const noteStr = ex.note ? ` | ${ex.note}` : '';
 
   let setsHtml = '';
 
@@ -2118,7 +2218,7 @@ function renderAccExercise(ex) {
       <div class="set-card done" style="padding:8px 12px">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <span style="font-size:13px">Satz ${i + 1} ${ICONS.check}</span>
-          <span style="font-size:13px;color:var(--text-sec)">${set.weight}kg x${set.reps}</span>
+          <span style="font-size:13px;color:var(--text-sec)">${set.weight}kg${dbLabel} x${set.reps}</span>
         </div>
       </div>`;
   });
@@ -2142,7 +2242,7 @@ function renderAccExercise(ex) {
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div>
           <div class="exercise-name" style="font-size:14px">${ex.name}</div>
-          <div class="exercise-last" style="font-size:11px">${ex.sets}x${ex.reps}${lastStr ? ' | ' + lastStr : ''}</div>
+          <div class="exercise-last" style="font-size:11px">${ex.sets}x${ex.reps}${dbLabel}${noteStr}${lastStr ? ' | ' + lastStr : ''}</div>
         </div>
         <span style="font-size:12px;color:var(--text-sec)">${sessionSets.length}/${ex.sets}</span>
       </div>
@@ -2840,7 +2940,7 @@ function renderSettingsPage() {
     </div>
 
     <div style="text-align:center;padding:20px 0;color:var(--text-ter);font-size:12px">
-      Training Tracker v2.0
+      Training Tracker v2.1
     </div>
   `;
 }
@@ -2933,16 +3033,18 @@ function exportCSV() {
       Object.entries(session.sets || {}).forEach(([exId, sets]) => {
         const exName = getExerciseName(exId);
         sets.forEach((set, i) => {
+          const isDB = isDumbbellExercise(exId);
+          const volMultiplier = isDB ? 2 : 1;
           rows.push([
             session.date,
             session.week,
             session.mesocycle,
             plan.name,
-            exName,
+            exName + (isDB ? ' (DB)' : ''),
             i + 1,
             set.weight,
             set.reps,
-            set.weight * set.reps,
+            set.weight * volMultiplier * set.reps,
             session.feeling || ''
           ]);
         });
