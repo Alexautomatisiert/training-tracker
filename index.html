@@ -1023,17 +1023,15 @@ function getDefaultState() {
   return {
     settings: {
       bodyWeight: 82.5,
-      weightHistory: [
-        { date: '2026-05-01', weight: 84.0 },
-        { date: '2026-05-15', weight: 83.2 },
-        { date: '2026-06-01', weight: 82.5 }
-      ],
-      mesocycle: { number: 2, currentWeek: 4, weeksHard: 5, weeksDeload: 1 },
-      goals: { weeklyVolume: 13500, ruecken: 5500, brust: 3400, quads: 3000, hams: 2800 }
+      weightHistory: [],
+      mesocycle: { number: 1, currentWeek: 1, weeksHard: 5, weeksDeload: 1 },
+      goals: { weeklyVolume: 0, ruecken: 0, brust: 0, quads: 0, hams: 0 },
+      goalsAutoSet: false
     },
     sessions: [],
     activeWorkout: null,
-    prs: []
+    prs: [],
+    customWeights: {} // user overrides for default exercise weights
   };
 }
 
@@ -1049,7 +1047,7 @@ function loadState() {
   } catch (e) {
     console.error('Failed to load state:', e);
   }
-  return generateSampleData();
+  return getDefaultState();
 }
 
 function saveState() {
@@ -1528,7 +1526,8 @@ function renderHomePage() {
     <div class="section-title">Diese Woche</div>
     <div class="card">${workoutRows}</div>
 
-    <!-- Volume Last Week -->
+    <!-- Volume Section -->
+    ${APP_STATE.sessions.length > 0 ? `
     <div class="section-title">Volumen W${lastWeek}</div>
     <div class="card">
       <div class="expandable-header" onclick="toggleExpand(this)">
@@ -1539,6 +1538,13 @@ function renderHomePage() {
         ${volumeBars}
       </div>
     </div>
+    ` : `
+    <div class="card" style="text-align:center;padding:24px 16px">
+      <div style="font-size:32px;margin-bottom:8px">${ICONS.flame || '🔥'}</div>
+      <div style="font-size:15px;font-weight:600;margin-bottom:4px">Bereit fuer Mesozyklus ${meso.number}!</div>
+      <div style="font-size:13px;color:var(--text-sec)">Starte dein erstes Training. Nach W1 werden automatisch progressive Ziele berechnet (+15% ueber 5 Wochen).</div>
+    </div>
+    `}
 
     ${prHtml}
   `;
@@ -2191,10 +2197,88 @@ function finishWorkout() {
   }
 
   stopTimer();
+
+  // Check if auto-goals should be set after W1 completion
+  checkAutoGoals();
+
   saveState();
 
   activeSubTab = 'done';
   renderWorkoutDetail();
+}
+
+// =============================================
+// AUTO-GOAL ENGINE
+// Progressive Overload: +15% over 5 weeks (~3% per week)
+// Based on Renaissance Periodization / Eric Helms research
+// =============================================
+
+function checkAutoGoals() {
+  const meso = APP_STATE.settings.mesocycle;
+
+  // Only auto-set goals once, after W1 is complete
+  if (APP_STATE.settings.goalsAutoSet) return;
+
+  // Check if all 4 W1 workouts exist
+  const w1Sessions = APP_STATE.sessions.filter(
+    s => s.week === 1 && s.mesocycle === meso.number
+  );
+  const w1WorkoutIds = new Set(w1Sessions.map(s => s.workoutId));
+  const allW1Done = WEEK_SCHEDULE.every(wid => w1WorkoutIds.has(wid));
+
+  if (!allW1Done) return;
+
+  // Calculate W1 baseline volumes
+  const baseTotal = w1Sessions.reduce((sum, s) => sum + calcSessionVolume(s), 0);
+  const muscles = ['ruecken', 'brust', 'quads', 'hams'];
+  const baseMuscle = {};
+  muscles.forEach(m => {
+    baseMuscle[m] = w1Sessions.reduce((sum, s) => sum + calcMuscleVolume(s, m), 0);
+  });
+
+  // Set W5 targets: baseline + 15% (challenging but sustainable)
+  // Weekly progression: ~3% per week linear ramp
+  const TARGET_INCREASE = 0.15; // 15% over 5 weeks
+  APP_STATE.settings.goals.weeklyVolume = Math.round(baseTotal * (1 + TARGET_INCREASE));
+  muscles.forEach(m => {
+    APP_STATE.settings.goals[m] = Math.round(baseMuscle[m] * (1 + TARGET_INCREASE));
+  });
+
+  APP_STATE.settings.goalsAutoSet = true;
+  APP_STATE.settings.goalsBaseline = {
+    weeklyVolume: baseTotal,
+    ruecken: baseMuscle.ruecken,
+    brust: baseMuscle.brust,
+    quads: baseMuscle.quads,
+    hams: baseMuscle.hams
+  };
+
+  console.log('Auto-Goals gesetzt! Baseline:', baseTotal, '→ Ziel W5:', APP_STATE.settings.goals.weeklyVolume);
+}
+
+// Get the progressive target for a specific week (linear ramp from baseline to W5 goal)
+function getWeekTarget(week, muscle) {
+  const baseline = APP_STATE.settings.goalsBaseline;
+  const goals = APP_STATE.settings.goals;
+  if (!baseline || !goals) return 0;
+
+  const key = muscle || 'weeklyVolume';
+  const base = baseline[key] || 0;
+  const target = goals[key] || 0;
+
+  if (base === 0 || target === 0) return 0;
+
+  const meso = APP_STATE.settings.mesocycle;
+  const totalWeeks = meso.weeksHard;
+
+  if (week >= totalWeeks + 1) {
+    // Deload week: -40% from peak
+    return Math.round(target * 0.6);
+  }
+
+  // Linear interpolation: W1 = base, W5 = target
+  const progress = (week - 1) / (totalWeeks - 1);
+  return Math.round(base + (target - base) * progress);
 }
 
 // =============================================
@@ -2587,17 +2671,70 @@ function renderSettingsPage() {
     </div>`;
   });
 
-  // Workout plan rows
+  // Workout plan rows with expandable exercise editor
   let planRows = '';
   WEEK_SCHEDULE.forEach(wid => {
     const plan = WORKOUT_PLANS[wid];
+    let exerciseList = '';
+
+    // Strength exercises
+    plan.strength.forEach(ex => {
+      const cw = (APP_STATE.customWeights || {})[ex.id];
+      const w = cw !== undefined ? cw : ex.weight;
+      exerciseList += `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+          <div style="font-size:13px;flex:1">${ex.name} <span style="color:var(--text-ter);font-size:11px">${ex.sets}x${ex.reps}</span></div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <input type="number" inputmode="decimal" class="input-field" style="width:60px;text-align:right;font-size:12px;padding:4px 6px" value="${w}" onchange="updateExWeight('${ex.id}',this.value)">
+            <span style="color:var(--text-sec);font-size:11px">kg</span>
+          </div>
+        </div>`;
+    });
+
+    // Circuit exercises
+    plan.circuits.forEach(circuit => {
+      circuit.exercises.forEach(ex => {
+        if (ex.bodyweight) return;
+        const cw = (APP_STATE.customWeights || {})[ex.id];
+        const w = cw !== undefined ? cw : ex.weight;
+        exerciseList += `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+            <div style="font-size:13px;flex:1">${ex.name} <span style="color:var(--text-ter);font-size:11px">${ex.reps}</span></div>
+            <div style="display:flex;align-items:center;gap:4px">
+              <input type="number" inputmode="decimal" class="input-field" style="width:60px;text-align:right;font-size:12px;padding:4px 6px" value="${w}" onchange="updateExWeight('${ex.id}',this.value)">
+              <span style="color:var(--text-sec);font-size:11px">kg</span>
+            </div>
+          </div>`;
+      });
+    });
+
+    // Accessories
+    plan.accessories.forEach(ex => {
+      if (ex.bodyweight) return;
+      const cw = (APP_STATE.customWeights || {})[ex.id];
+      const w = cw !== undefined ? cw : ex.weight;
+      exerciseList += `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+          <div style="font-size:13px;flex:1">${ex.name} <span style="color:var(--text-ter);font-size:11px">${ex.sets}x${ex.reps}</span></div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <input type="number" inputmode="decimal" class="input-field" style="width:60px;text-align:right;font-size:12px;padding:4px 6px" value="${w}" onchange="updateExWeight('${ex.id}',this.value)">
+            <span style="color:var(--text-sec);font-size:11px">kg</span>
+          </div>
+        </div>`;
+    });
+
     planRows += `
-      <div class="settings-row">
-        <div>
-          <div class="settings-label">${plan.name}</div>
-          <div style="font-size:12px;color:var(--text-sec)">${plan.subtitle}</div>
+      <div class="settings-row" style="flex-direction:column;align-items:stretch">
+        <div class="expandable-header" onclick="toggleExpand(this)" style="width:100%">
+          <div>
+            <div class="settings-label">${plan.name}</div>
+            <div style="font-size:12px;color:var(--text-sec)">${plan.subtitle} - ${plan.day}</div>
+          </div>
+          <span class="chevron">${ICONS.chevDown}</span>
         </div>
-        <div class="settings-value">${plan.day}</div>
+        <div class="expandable-content">
+          <div style="margin-top:8px">${exerciseList}</div>
+        </div>
       </div>`;
   });
 
@@ -2651,7 +2788,10 @@ function renderSettingsPage() {
         </div>
       </div>
       <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:8px">
-        <div class="settings-label">Ziele definieren</div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="settings-label">Ziele (W5 Targets)</div>
+          ${s.goalsAutoSet ? '<span style="font-size:11px;color:var(--green)">Auto-gesetzt nach W1</span>' : '<span style="font-size:11px;color:var(--text-ter)">Werden nach W1 automatisch gesetzt</span>'}
+        </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
           <div>
             <div style="font-size:11px;color:var(--text-sec);margin-bottom:4px">Wochen-Vol.</div>
@@ -2682,17 +2822,25 @@ function renderSettingsPage() {
     <div class="section-title">App</div>
     <div class="card">
       <div class="settings-row" onclick="exportData()" style="cursor:pointer">
-        <div class="settings-label">Daten exportieren</div>
+        <div class="settings-label">JSON Export</div>
         <span style="color:var(--text-sec);font-size:18px">&rarr;</span>
       </div>
+      <div class="settings-row" onclick="exportCSV()" style="cursor:pointer">
+        <div class="settings-label">CSV Export (Google Sheets)</div>
+        <span style="color:var(--text-sec);font-size:18px">&rarr;</span>
+      </div>
+      <div class="settings-row" onclick="startNewMesocycle()" style="cursor:pointer">
+        <div class="settings-label" style="color:var(--orange)">Neuen Mesozyklus starten</div>
+        <span style="color:var(--orange);font-size:18px">&rarr;</span>
+      </div>
       <div class="settings-row" onclick="confirmDeleteData()" style="cursor:pointer">
-        <div class="settings-label" style="color:var(--red)">Daten loeschen</div>
+        <div class="settings-label" style="color:var(--red)">Alle Daten loeschen</div>
         <span style="color:var(--red);font-size:18px">&rarr;</span>
       </div>
     </div>
 
     <div style="text-align:center;padding:20px 0;color:var(--text-ter);font-size:12px">
-      Training Tracker v1.0
+      Training Tracker v2.0
     </div>
   `;
 }
@@ -2729,6 +2877,38 @@ function saveGoals() {
   renderSettingsPage();
 }
 
+function updateExWeight(exId, value) {
+  const w = parseFloat(value);
+  if (!APP_STATE.customWeights) APP_STATE.customWeights = {};
+  if (!isNaN(w) && w >= 0) {
+    APP_STATE.customWeights[exId] = w;
+    // Also update the WORKOUT_PLANS in memory for this session
+    for (const plan of Object.values(WORKOUT_PLANS)) {
+      for (const ex of plan.strength) { if (ex.id === exId) ex.weight = w; }
+      for (const circuit of plan.circuits) {
+        for (const ex of circuit.exercises) { if (ex.id === exId) ex.weight = w; }
+      }
+      for (const ex of plan.accessories) { if (ex.id === exId) ex.weight = w; }
+    }
+    saveState();
+  }
+}
+
+// Apply custom weights on load
+function applyCustomWeights() {
+  const cw = APP_STATE.customWeights || {};
+  for (const [exId, w] of Object.entries(cw)) {
+    for (const plan of Object.values(WORKOUT_PLANS)) {
+      for (const ex of plan.strength) { if (ex.id === exId) ex.weight = w; }
+      for (const circuit of plan.circuits) {
+        for (const ex of circuit.exercises) { if (ex.id === exId) ex.weight = w; }
+      }
+      for (const ex of plan.accessories) { if (ex.id === exId) ex.weight = w; }
+    }
+  }
+}
+applyCustomWeights();
+
 function exportData() {
   const dataStr = JSON.stringify(APP_STATE, null, 2);
   const blob = new Blob([dataStr], { type: 'application/json' });
@@ -2740,13 +2920,82 @@ function exportData() {
   URL.revokeObjectURL(url);
 }
 
+function exportCSV() {
+  // Build CSV with all sessions and sets for Google Sheets
+  const rows = [['Datum', 'Woche', 'Meso', 'Workout', 'Uebung', 'Set', 'Gewicht (kg)', 'Reps', 'Volumen', 'Gefuehl']];
+
+  APP_STATE.sessions
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .forEach(session => {
+      const plan = WORKOUT_PLANS[session.workoutId];
+      if (!plan) return;
+
+      Object.entries(session.sets || {}).forEach(([exId, sets]) => {
+        const exName = getExerciseName(exId);
+        sets.forEach((set, i) => {
+          rows.push([
+            session.date,
+            session.week,
+            session.mesocycle,
+            plan.name,
+            exName,
+            i + 1,
+            set.weight,
+            set.reps,
+            set.weight * set.reps,
+            session.feeling || ''
+          ]);
+        });
+      });
+    });
+
+  // Add summary rows
+  rows.push([]);
+  rows.push(['--- WOCHEN-ZUSAMMENFASSUNG ---']);
+  rows.push(['Woche', 'Meso', 'Total Vol.', 'Ruecken', 'Brust', 'Quads', 'Hams']);
+
+  const meso = APP_STATE.settings.mesocycle;
+  for (let w = 1; w <= meso.currentWeek; w++) {
+    rows.push([
+      'W' + w,
+      meso.number,
+      calcWeekVolume(w, meso.number),
+      calcWeekMuscleVolume(w, 'ruecken', meso.number),
+      calcWeekMuscleVolume(w, 'brust', meso.number),
+      calcWeekMuscleVolume(w, 'quads', meso.number),
+      calcWeekMuscleVolume(w, 'hams', meso.number)
+    ]);
+  }
+
+  const csvContent = rows.map(r => r.join(',')).join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `training-export-${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function confirmDeleteData() {
   if (confirm('Alle Trainingsdaten wirklich loeschen? Das kann nicht rueckgaengig gemacht werden.')) {
     localStorage.removeItem(STORAGE_KEY);
-    APP_STATE = generateSampleData();
+    APP_STATE = getDefaultState();
     saveState();
-    navigateTo('settings');
+    navigateTo('home');
   }
+}
+
+function startNewMesocycle() {
+  if (!confirm('Neuen Mesozyklus starten? Bestehende Daten bleiben erhalten, aber Ziele werden zurueckgesetzt.')) return;
+  const meso = APP_STATE.settings.mesocycle;
+  meso.number += 1;
+  meso.currentWeek = 1;
+  APP_STATE.settings.goals = { weeklyVolume: 0, ruecken: 0, brust: 0, quads: 0, hams: 0 };
+  APP_STATE.settings.goalsAutoSet = false;
+  delete APP_STATE.settings.goalsBaseline;
+  saveState();
+  navigateTo('home');
 }
 
 // =============================================
