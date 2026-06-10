@@ -767,6 +767,7 @@ h3 { font-size: 15px; font-weight: 600; }
 
 /* SWIPE TO DELETE */
 .swipe-wrapper { position: relative; overflow: hidden; border-radius: var(--radius); margin-bottom: 8px; }
+.swipe-wrapper .set-card { margin-bottom: 0; border-radius: 0; }
 .swipe-delete-bg { position: absolute; right: 0; top: 0; bottom: 0; width: 80px; background: var(--red); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; font-size: 13px; z-index: 0; opacity: 0; transition: opacity 0.15s ease; }
 .swipe-wrapper.swiping .swipe-delete-bg { opacity: 1; }
 .swipe-content { position: relative; z-index: 1; background: var(--card); transition: transform 0.2s ease; }
@@ -933,7 +934,8 @@ const WORKOUT_PLANS = {
         restSeconds: 150,
         exercises: [
           { id: 'ra-c1-e1', name: 'Snatches', reps: '6-8', weight: 30, unit: 'kg', bodyweight: false },
-          { id: 'ra-c1-e2', name: 'DB Y-Raises + Trap Laterals', reps: '10+10', weight: 5, unit: 'kg', bodyweight: false, dumbbell: true, note: 'SuperSet 5kg + 10kg', supersetWeights: [5, 10] }
+          { id: 'ra-c1-e2', name: 'DB Y-Raises', reps: '10-12', weight: 5, unit: 'kg', bodyweight: false, dumbbell: true },
+          { id: 'ra-c1-e3', name: 'DB Rev. Flys', reps: '10-12', weight: 5, unit: 'kg', bodyweight: false, dumbbell: true }
         ]
       },
       {
@@ -946,13 +948,16 @@ const WORKOUT_PLANS = {
         note: 'Double Rounds: jede Runde = 2x durch',
         exercises: [
           { id: 'ra-c2-e1', name: 'Pull Ups', reps: '6-8', weight: 0, unit: 'kg', bodyweight: true },
-          { id: 'ra-c2-e2', name: 'Farmers Carries + Shrugs', reps: '75m+5', weight: 64, unit: 'kg', bodyweight: false, note: '2x32kg' }
+          { id: 'ra-c2-e2', name: 'Farmers Carries', reps: '75m', weight: 64, unit: 'kg', bodyweight: false, note: '2x32kg' },
+          { id: 'ra-c2-e3', name: 'Shrugs', reps: '5-8', weight: 32, unit: 'kg', bodyweight: false, dumbbell: true }
         ]
       }
     ],
     accessories: [
-      { id: 'ra-a1', name: 'Weighted GHD Hypers + BW GHD Hypers', sets: 3, reps: '10-12', weight: 10, unit: 'kg', bodyweight: false, group: null, note: 'DropSet 10kg + BW' },
-      { id: 'ra-a2', name: 'TTB + GHD Situps', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, group: null },
+      { id: 'ra-a1', name: 'Weighted GHD Hypers', sets: 3, reps: '10-12', weight: 10, unit: 'kg', bodyweight: false, group: 'ss-ra-ghd' },
+      { id: 'ra-a1b', name: 'BW GHD Hypers', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, group: 'ss-ra-ghd' },
+      { id: 'ra-a2', name: 'TTB', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, group: 'ss-ra-core' },
+      { id: 'ra-a2b', name: 'GHD Situps', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, group: 'ss-ra-core' },
       { id: 'ra-a3', name: 'African Curls', sets: 3, reps: '10-12', weight: 12.5, unit: 'kg', bodyweight: false, group: null, dropWeight: 7.5, note: 'DropSet 12.5+7.5kg' }
     ]
   },
@@ -1046,8 +1051,10 @@ const WORKOUT_PLANS = {
       }
     ],
     accessories: [
-      { id: 'rb-a1', name: 'SL GHD Hypers + GHD Hypers', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, group: null, note: 'BW only' },
-      { id: 'rb-a2', name: 'TTB + GHD Situps', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, group: null },
+      { id: 'rb-a1', name: 'SL GHD Hypers', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, group: 'ss-rb-ghd' },
+      { id: 'rb-a1b', name: 'GHD Hypers', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, group: 'ss-rb-ghd' },
+      { id: 'rb-a2', name: 'TTB', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, group: 'ss-rb-core' },
+      { id: 'rb-a2b', name: 'GHD Situps', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, group: 'ss-rb-core' },
       { id: 'rb-a3', name: 'Hammer Curls', sets: 3, reps: '10-12', weight: 15, unit: 'kg', bodyweight: false, dumbbell: true, group: null, dropWeight: 10, note: 'DropSet 15+10kg' }
     ]
   }
@@ -1067,11 +1074,15 @@ const EXERCISE_MUSCLE = {
   // Rueckseite A
   'ra-s1': 'ruecken',     // BB Seal Rows
   'ra-c1-e1': 'ruecken',  // Snatches
-  'ra-c1-e2': 'ruecken',  // DB Y-Raises + Trap Laterals
+  'ra-c1-e2': 'ruecken',  // DB Y-Raises
+  'ra-c1-e3': 'ruecken',  // DB Rev. Flys
   'ra-c2-e1': 'ruecken',  // Pull Ups
-  'ra-c2-e2': 'ruecken',  // Farmers Carries + Shrugs
+  'ra-c2-e2': 'ruecken',  // Farmers Carries
+  'ra-c2-e3': 'ruecken',  // Shrugs
   'ra-a1': 'hams',        // Weighted GHD Hypers
-  'ra-a2': 'core',        // TTB + GHD Situps
+  'ra-a1b': 'hams',       // BW GHD Hypers
+  'ra-a2': 'core',        // TTB
+  'ra-a2b': 'core',       // GHD Situps
   'ra-a3': 'bizeps',      // African Curls
   // Vorderseite B
   'vb-s1': 'quads',       // Bulgarian Split Squats
@@ -1088,8 +1099,10 @@ const EXERCISE_MUSCLE = {
   'rb-c1-e2': 'hams',     // DB SL RDLs + Row
   'rb-c2-e1': 'ruecken',  // Ring Rev Fly
   'rb-c2-e2': 'ruecken',  // Banded Rev Fly
-  'rb-a1': 'hams',        // SL GHD Hypers + GHD Hypers
-  'rb-a2': 'core',        // TTB + GHD Situps
+  'rb-a1': 'hams',        // SL GHD Hypers
+  'rb-a1b': 'hams',       // GHD Hypers
+  'rb-a2': 'core',        // TTB
+  'rb-a2b': 'core',       // GHD Situps
   'rb-a3': 'bizeps'       // Hammer Curls
 };
 
@@ -1114,7 +1127,8 @@ function getDefaultState() {
     sessions: [],
     activeWorkout: null,
     prs: [],
-    customWeights: {} // user overrides for default exercise weights
+    customWeights: {}, // user overrides for default exercise weights
+    learnings: [] // { id, date, workoutId, text, mesocycle, week }
   };
 }
 
@@ -1397,6 +1411,7 @@ function checkWarmupAutoComplete() {
     if (navigator.vibrate) navigator.vibrate(100);
     if (activeSession) activeSession.warmupDone = plan.warmup.every(ex => warmupChecked[ex.id]);
     renderWorkoutDetail();
+    setTimeout(autoScrollWarmup, 50);
   }
 }
 
@@ -1441,11 +1456,12 @@ function startDisplayUpdate() {
     updateAllTimerDisplays();
     checkCountdownCompletion();
     checkWarmupAutoComplete();
+    checkEmomTimer();
   }, 250);
 }
 
 function stopDisplayUpdate() {
-  if (restTimer.mode === 'stopped' && !sessionTimer.running) {
+  if (restTimer.mode === 'stopped' && !sessionTimer.running && !emomTimer.running) {
     if (displayInterval) { clearInterval(displayInterval); displayInterval = null; }
   }
 }
@@ -1557,6 +1573,134 @@ function resetSessionTimer() {
   sessionTimer.pausedElapsed = 0;
 }
 
+// EMOM Timer (separate from rest timer - runs independently)
+let emomTimer = {
+  running: false,
+  startTime: null,
+  prepSeconds: 10,
+  totalRounds: 0,
+  exerciseId: null,
+  lastAnnouncedRound: 0,
+  finished: false
+};
+
+function startEmomTimer(exId, rounds, prepSec) {
+  emomTimer.running = true;
+  emomTimer.startTime = Date.now();
+  emomTimer.prepSeconds = prepSec || 10;
+  emomTimer.totalRounds = rounds;
+  emomTimer.exerciseId = exId;
+  emomTimer.lastAnnouncedRound = 0;
+  emomTimer.finished = false;
+  // Also start session timer if not running
+  if (!sessionTimer.running && !sessionTimer.startTime) startSessionTimer();
+  startDisplayUpdate();
+  renderWorkoutDetail();
+}
+
+function stopEmomTimer() {
+  emomTimer.running = false;
+  emomTimer.finished = true;
+}
+
+function resetEmomTimer() {
+  emomTimer.running = false;
+  emomTimer.startTime = null;
+  emomTimer.lastAnnouncedRound = 0;
+  emomTimer.finished = false;
+  emomTimer.exerciseId = null;
+}
+
+function getEmomElapsed() {
+  if (!emomTimer.startTime) return 0;
+  return (Date.now() - emomTimer.startTime) / 1000;
+}
+
+function getEmomTotalSeconds() {
+  return emomTimer.prepSeconds + emomTimer.totalRounds * 60;
+}
+
+function getEmomRemaining() {
+  return Math.max(0, getEmomTotalSeconds() - getEmomElapsed());
+}
+
+function getEmomCurrentRound() {
+  var elapsed = getEmomElapsed();
+  if (elapsed < emomTimer.prepSeconds) return 0; // prep phase
+  var roundElapsed = elapsed - emomTimer.prepSeconds;
+  return Math.min(Math.floor(roundElapsed / 60) + 1, emomTimer.totalRounds);
+}
+
+function checkEmomTimer() {
+  if (!emomTimer.running) return;
+  var remaining = getEmomRemaining();
+  var currentRound = getEmomCurrentRound();
+
+  // Beep at round transitions
+  if (currentRound > emomTimer.lastAnnouncedRound && currentRound > 0) {
+    emomTimer.lastAnnouncedRound = currentRound;
+    playEmomBeep(currentRound === emomTimer.totalRounds);
+    if (navigator.vibrate) navigator.vibrate(200);
+  }
+
+  // Beep at prep→round1 transition
+  if (currentRound === 1 && emomTimer.lastAnnouncedRound === 0) {
+    emomTimer.lastAnnouncedRound = 1;
+    playEmomBeep(false);
+    if (navigator.vibrate) navigator.vibrate(200);
+  }
+
+  // Timer finished
+  if (remaining <= 0) {
+    stopEmomTimer();
+    playBeep(); // final alert
+    if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
+    renderWorkoutDetail();
+  }
+}
+
+function playEmomBeep(isFinal) {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var freq = isFinal ? 880 : 660;
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.frequency.value = freq;
+    gain.gain.value = 0.4;
+    osc.start(audioCtx.currentTime);
+    osc.stop(audioCtx.currentTime + 0.15);
+    if (!isFinal) {
+      var osc2 = audioCtx.createOscillator();
+      var gain2 = audioCtx.createGain();
+      osc2.connect(gain2);
+      gain2.connect(audioCtx.destination);
+      osc2.frequency.value = freq + 100;
+      gain2.gain.value = 0.3;
+      osc2.start(audioCtx.currentTime + 0.2);
+      osc2.stop(audioCtx.currentTime + 0.35);
+    }
+  } catch(e) {}
+}
+
+function confirmEmomRound(exId, roundNum) {
+  var wEl = document.getElementById('emom-w-' + exId + '-' + roundNum);
+  var rEl = document.getElementById('emom-r-' + exId + '-' + roundNum);
+  if (!wEl || !rEl) return;
+  var weight = parseFloat(wEl.value.replace(',', '.')) || 0;
+  var reps = parseInt(rEl.value) || 0;
+  if (!activeSession.sets[exId]) activeSession.sets[exId] = [];
+  // Set or update the round's data
+  while (activeSession.sets[exId].length < roundNum) {
+    activeSession.sets[exId].push({ weight: 0, reps: 0, type: 'working' });
+  }
+  activeSession.sets[exId][roundNum - 1] = { weight: weight, reps: reps, type: 'working' };
+  checkPR(exId, weight, reps);
+  saveState();
+  renderWorkoutDetail();
+}
+
 // Audio beep
 let audioCtx = null;
 function playBeep() {
@@ -1604,10 +1748,17 @@ function formatTime(totalSeconds) {
 }
 
 function updateAllTimerDisplays() {
-  // Update all timer-display elements
-  var els = document.querySelectorAll('.rest-timer-display');
+  // Update all timer-display elements (skip EMOM displays - they use class emom-timer-display)
+  var els = document.querySelectorAll('.rest-timer-display:not(.emom-timer-display)');
   var sec = getTimerSeconds();
   els.forEach(function(el) { el.textContent = formatTime(sec); });
+
+  // EMOM timer display
+  if (emomTimer.running) {
+    var emomEls = document.querySelectorAll('.emom-timer-display');
+    var emomSec = Math.ceil(getEmomRemaining());
+    emomEls.forEach(function(el) { el.textContent = formatTime(emomSec); });
+  }
 
   // Session timer
   var sessionEls = document.querySelectorAll('.session-timer-value');
@@ -2025,7 +2176,7 @@ function openWorkout(workoutId) {
       _circuitDone: {}
     };
     resetSessionTimer();
-    startSessionTimer();
+    // Timer starts when warmup timer is clicked, not immediately
   }
 
   navigateTo('training');
@@ -2082,6 +2233,10 @@ function renderWorkoutDetail() {
     case 'done': content = renderDoneTab(plan); break;
   }
 
+  const learningBtn = activeSession && !activeSession._completed
+    ? '<button onclick="openLearningModal()" style="position:fixed;bottom:calc(var(--nav-height) + var(--safe-bottom) + 16px);right:16px;width:48px;height:48px;border-radius:50%;background:var(--card);border:1px solid var(--border);font-size:20px;z-index:100;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.3)" id="learning-fab">💡</button>'
+    : '';
+
   document.getElementById('training-content').innerHTML = `
     <button class="back-btn" onclick="backToWeekOverview()">${ICONS.back} Woche ${week}</button>
     <h2>${plan.name}</h2>
@@ -2089,6 +2244,7 @@ function renderWorkoutDetail() {
     <div class="sub-tabs">${tabsHtml}</div>
     ${sessionTimerHtml}
     ${content}
+    ${learningBtn}
   `;
 }
 
@@ -2109,15 +2265,19 @@ function renderWarmupTab(plan) {
   const elapsed = getCountupSeconds();
 
   let items = '';
+  let currentWarmupIdx = -1;
   plan.warmup.forEach((ex, i) => {
     const checked = warmupChecked[ex.id] ? 'checked' : '';
     const threshold = thresholdMap[ex.id];
+    const isActive = threshold !== undefined && elapsed >= threshold && !warmupChecked[ex.id];
+    // Track first unchecked item as "current"
+    if (currentWarmupIdx === -1 && !warmupChecked[ex.id]) currentWarmupIdx = i;
     // Show cumulative time as "@ 1:30" next to the duration
     const autoLabel = threshold !== undefined
       ? `<span style="color:${elapsed >= threshold ? 'var(--green)' : 'var(--text-ter)'};font-size:11px;margin-left:4px">@ ${formatTime(threshold)}</span>`
       : (ex.duration ? '' : '<span style="color:var(--text-ter);font-size:11px;margin-left:4px">manuell</span>');
     items += `
-      <div class="warmup-item">
+      <div class="warmup-item" id="warmup-ex-${i}" style="${currentWarmupIdx === i ? 'background:rgba(232,114,12,0.1);border-radius:8px' : ''}">
         <div class="warmup-check ${checked}" onclick="toggleWarmup('${ex.id}')">
           ${warmupChecked[ex.id] ? ICONS.check : ''}
         </div>
@@ -2141,9 +2301,22 @@ function renderWarmupTab(plan) {
         <button class="timer-btn" onclick="resetWarmupTimer()">${ICONS.reset}</button>
       </div>
     </div>
-    <div class="card">${items}</div>
+    <div class="card" id="warmup-scroll-container" style="max-height:45vh;overflow-y:auto;-webkit-overflow-scrolling:touch">${items}</div>
     ${allDone ? '<button class="btn btn-orange" onclick="warmupToStrength()">Weiter: Strength</button>' : ''}
   `;
+}
+
+function autoScrollWarmup() {
+  var container = document.getElementById('warmup-scroll-container');
+  if (!container) return;
+  // Find first item with highlight background (current exercise)
+  var items = container.querySelectorAll('.warmup-item');
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].style.background && items[i].style.background !== '') {
+      items[i].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      break;
+    }
+  }
 }
 
 function toggleWarmup(id) {
@@ -2221,20 +2394,84 @@ function renderStrengthTab(plan) {
 
     // Timer section - different for EMOM vs regular
     if (isEMOM) {
-      // EMOM: show a big 1-minute countdown that auto-restarts
-      const emomRound = sessionSets.length + 1;
-      const emomDone = sessionSets.length >= ex.sets;
-      html += `
-        <div style="text-align:center;margin:12px 0;padding:12px;border-radius:12px;background:rgba(232,114,12,0.1)">
+      // EMOM: continuous countdown timer
+      const emomActive = emomTimer.running && emomTimer.exerciseId === ex.id;
+      const emomDone = emomTimer.finished && emomTimer.exerciseId === ex.id;
+      const emomRound = emomActive ? getEmomCurrentRound() : 0;
+      const emomRemaining = emomActive ? getEmomRemaining() : getEmomTotalSeconds() || (ex.emomMinutes * 60 + 10);
+      const isPrep = emomActive && emomRound === 0;
+
+      if (!emomActive && !emomDone) {
+        // Not started yet - show start button
+        html += `
+        <div style="text-align:center;margin:12px 0;padding:16px;border-radius:12px;background:rgba(232,114,12,0.1)">
           <div style="font-size:12px;color:var(--orange);font-weight:600;margin-bottom:4px">EMOM ${ex.emomMinutes} MIN</div>
-          <div style="font-size:11px;color:var(--text-sec);margin-bottom:8px">Minute ${Math.min(emomRound, ex.sets)} / ${ex.sets}</div>
-          <div class="rest-timer-display" style="font-family:'SF Mono','Menlo',monospace;font-size:48px;font-weight:700;padding:4px 0;color:var(--orange)">${formatTime(getTimerSeconds())}</div>
-          <div class="timer-controls" style="margin-top:8px">
-            <button class="timer-preset" onclick="startCountdown(60)" style="font-size:14px;padding:8px 16px">60s Start</button>
-            <button class="timer-btn" onclick="toggleRestTimer(60)">${isRestTimerRunning() ? ICONS.pause : ICONS.play}</button>
-            <button class="timer-btn" onclick="resetRestTimer(); renderWorkoutDetail();">${ICONS.reset}</button>
-          </div>
+          <div style="font-size:11px;color:var(--text-sec);margin-bottom:12px">${ex.sets} Runden × 60s + 10s Vorbereitung</div>
+          <button class="btn btn-orange" style="font-size:16px;padding:12px 32px" onclick="startEmomTimer('${ex.id}', ${ex.sets}, 10)">EMOM Starten</button>
         </div>`;
+      } else {
+        // Timer running or finished
+        const timerColor = isPrep ? 'var(--blue)' : (emomDone ? 'var(--green)' : 'var(--orange)');
+        const statusText = isPrep ? 'Vorbereitung...' : (emomDone ? 'Fertig!' : 'Runde ' + emomRound + ' / ' + ex.sets);
+        html += `
+        <div style="text-align:center;margin:12px 0;padding:16px;border-radius:12px;background:rgba(232,114,12,0.1)">
+          <div style="font-size:12px;color:${timerColor};font-weight:600;margin-bottom:4px">${statusText}</div>
+          <div class="rest-timer-display emom-timer-display" style="font-family:'SF Mono','Menlo',monospace;font-size:48px;font-weight:700;padding:4px 0;color:${timerColor}">${formatTime(Math.ceil(emomRemaining))}</div>
+          ${emomDone ? '<button class="btn btn-sm btn-outline" style="margin-top:8px" onclick="resetEmomTimer(); renderWorkoutDetail();">Reset</button>' : ''}
+        </div>`;
+      }
+
+      // Show all rounds as input rows
+      const toBeat = getToBeat(ex.id);
+      for (var ri = 1; ri <= ex.sets; ri++) {
+        var savedSet = sessionSets[ri - 1];
+        var isCurrent = emomActive && emomRound === ri;
+        var isPast = emomActive ? ri < emomRound : (emomDone || savedSet);
+        var isConfirmed = !!savedSet;
+        var lastEmomSets = getToBeat(ex.id);
+        var lastRoundWeight = lastEmomSets && lastEmomSets[ri - 1] ? lastEmomSets[ri - 1].weight : ex.weight;
+        var roundWeight = savedSet ? savedSet.weight : lastRoundWeight;
+        var roundReps = savedSet ? savedSet.reps : parseInt(ex.reps.split('-')[1] || ex.reps) || 0;
+        var toBeatSet = toBeat && toBeat[ri - 1] ? toBeat[ri - 1] : null;
+        var toBeatHint = toBeatSet ? ' <span style="color:var(--text-ter);font-size:10px">To Beat: ' + toBeatSet.weight + 'kg×' + toBeatSet.reps + '</span>' : '';
+
+        if (isConfirmed) {
+          var isPR = checkPR(ex.id, savedSet.weight, savedSet.reps);
+          html += `
+          <div class="swipe-wrapper" data-ex-id="${ex.id}" data-set-index="${ri - 1}">
+            <div class="swipe-delete-bg">Löschen</div>
+            <div class="swipe-content set-card done" onclick="startEditSet('${ex.id}', ${ri - 1})">
+              <div class="set-header">
+                <span class="set-number">Min ${ri} ${ICONS.check}</span>
+                <span class="set-type">EMOM ${isPR ? ICONS.trophy : ''}</span>
+              </div>
+              <div style="display:flex;gap:12px;font-size:14px;color:var(--text-sec)">
+                <span>${savedSet.weight}kg${dbLabel}</span>
+                <span>${savedSet.reps} Reps</span>
+              </div>
+            </div>
+          </div>`;
+        } else {
+          var borderColor = isCurrent ? 'var(--orange)' : (isPast ? 'var(--text-ter)' : 'var(--border)');
+          var opacity = (!emomActive && !emomDone && ri > 1) ? '0.4' : '1';
+          html += `
+          <div class="set-card" style="border-color:${borderColor};opacity:${opacity}">
+            <div class="set-header">
+              <span class="set-number">Min ${ri}${toBeatHint}</span>
+              <span class="set-type">EMOM</span>
+            </div>
+            <div class="input-row" style="margin-top:4px">
+              ${ex.bodyweight ? '<div class="input-group"><div style="text-align:center;padding:8px;font-size:14px">BW</div></div>' :
+              '<div class="input-group"><div class="input-label">kg' + dbLabel + '</div><input type="number" inputmode="decimal" class="input-field" id="emom-w-' + ex.id + '-' + ri + '" value="' + roundWeight + '" step="0.5"></div>'}
+              <div class="input-group">
+                <div class="input-label">Reps</div>
+                <input type="number" inputmode="numeric" class="input-field" id="emom-r-${ex.id}-${ri}" value="${roundReps}">
+              </div>
+              <button class="btn btn-sm btn-green" style="align-self:flex-end;padding:8px 12px;margin-bottom:2px" onclick="confirmEmomRound('${ex.id}', ${ri})">✓</button>
+            </div>
+          </div>`;
+        }
+      }
     } else {
       // Regular rest timer
       const restDefault = ex.restSeconds || 120;
@@ -2252,8 +2489,8 @@ function renderStrengthTab(plan) {
         </div>`;
     }
 
-    // Completed sets with swipe-to-delete + tap-to-edit
-    sessionSets.forEach((set, i) => {
+    // Completed sets with swipe-to-delete + tap-to-edit (skip for EMOM - handled above)
+    if (!isEMOM) sessionSets.forEach((set, i) => {
       const isPR = checkPR(ex.id, set.weight, set.reps);
       const isEditing = editingSet && editingSet.exId === ex.id && editingSet.index === i;
 
@@ -2297,23 +2534,28 @@ function renderStrengthTab(plan) {
       }
     });
 
-    // Current set input
+    // Current set input (skip for EMOM - handled above)
     const totalSets = ex.sets;
-    if (currentSetIndex < totalSets || !activeSession._completed) {
+    const toBeatSets = getToBeat(ex.id);
+    if (!isEMOM && (currentSetIndex < totalSets || !activeSession._completed)) {
       const setNum = sessionSets.length + 1;
       const bw = ex.bodyweight;
-      // For pyramid: use the weight for this specific set
+      // Weight priority: last session actual > pyramid config > plan default
+      const lastSets = getLastSessionSets(ex.id);
+      const lastWeight = lastSets && lastSets[sessionSets.length] ? lastSets[sessionSets.length].weight : null;
       const defaultWeight = hasPyramid && ex.pyramidWeights[sessionSets.length] !== undefined
-        ? ex.pyramidWeights[sessionSets.length]
-        : (ex.pyramidWeights && ex.pyramidWeights[sessionSets.length] !== undefined ? ex.pyramidWeights[sessionSets.length] : ex.weight);
+        ? (lastWeight !== null ? lastWeight : ex.pyramidWeights[sessionSets.length])
+        : (lastWeight !== null ? lastWeight : ex.weight);
       const setLabel = isEMOM ? 'EMOM'
         : (ex.pyramid && hasPyramid) ? (sessionSets.length < Math.ceil(ex.sets / 2) ? 'Aufsteigend' : 'Absteigend')
         : (hasPyramid && !ex.pyramid) ? (sessionSets.length < ex.sets - 1 ? 'Top Set' : 'Backoff')
         : 'Working';
+      const currentToBeat = toBeatSets && toBeatSets[sessionSets.length] ? toBeatSets[sessionSets.length] : null;
+      const toBeatHintCurrent = currentToBeat ? `<span style="color:var(--text-ter);font-size:10px;margin-left:6px">To Beat: ${currentToBeat.weight}kg×${currentToBeat.reps}</span>` : '';
       html += `
         <div class="set-card current">
           <div class="set-header">
-            <span class="set-number">${isEMOM ? 'Min ' + setNum : 'Satz ' + setNum}</span>
+            <span class="set-number">Satz ${setNum}${toBeatHintCurrent}</span>
             <span class="set-type">${setLabel}</span>
           </div>
           <div class="input-row">
@@ -2334,15 +2576,15 @@ function renderStrengthTab(plan) {
         </div>`;
     }
 
-    // Upcoming sets (dimmed) - show planned pyramid weight or EMOM minutes
-    for (let i = sessionSets.length + 1; i < totalSets; i++) {
+    // Upcoming sets (dimmed) - skip for EMOM
+    if (!isEMOM) for (let i = sessionSets.length + 1; i < totalSets; i++) {
       const upcomingWeight = hasPyramid && ex.pyramidWeights[i] !== undefined
         ? ` @ ${ex.pyramidWeights[i]}kg`
         : (ex.pyramidWeights && ex.pyramidWeights[i] !== undefined ? ` @ ${ex.pyramidWeights[i]}kg` : '');
-      const upcomingLabel = isEMOM ? `Min ${i + 1}`
-        : `Satz ${i + 1}${upcomingWeight}`;
-      const upcomingType = isEMOM ? 'EMOM'
-        : (ex.pyramid && hasPyramid) ? (i < Math.ceil(ex.sets / 2) ? 'Aufsteigend' : 'Absteigend')
+      const upcomingToBeat = toBeatSets && toBeatSets[i] ? toBeatSets[i] : null;
+      const upcomingToBeatHint = upcomingToBeat ? ` <span style="color:var(--text-ter);font-size:10px">To Beat: ${upcomingToBeat.weight}kg×${upcomingToBeat.reps}</span>` : '';
+      const upcomingLabel = `Satz ${i + 1}${upcomingWeight}${upcomingToBeatHint}`;
+      const upcomingType = (ex.pyramid && hasPyramid) ? (i < Math.ceil(ex.sets / 2) ? 'Aufsteigend' : 'Absteigend')
         : (hasPyramid && !ex.pyramid) ? (i < ex.sets - 1 ? 'Top Set' : 'Backoff')
         : 'Working';
       html += `
@@ -2550,7 +2792,7 @@ function renderZirkelTab(plan) {
             (bw ? '<div class="input-group"><div class="input-label">Gewicht</div><div style="text-align:center;padding:8px;font-size:14px">BW</div></div>' :
             '<div class="input-group">' +
               '<div class="input-label">Gewicht (kg)' + dbLbl + '</div>' +
-              '<input type="number" inputmode="decimal" class="input-field" id="cw-' + ex.id + '" value="' + ex.weight + '" step="0.5">' +
+              '<input type="number" inputmode="decimal" class="input-field" id="cw-' + ex.id + '" value="' + (function(){ var ls = getLastSessionSets(ex.id); var rd = activeSession.circuitRounds[circuit.id] || 0; return ls && ls[rd] ? ls[rd].weight : ex.weight; })() + '" step="0.5">' +
             '</div>') +
             '<div class="input-group">' +
               '<div class="input-label">Reps</div>' +
@@ -2832,20 +3074,22 @@ function renderAccExercise(ex) {
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-size:13px;width:50px">Satz ${sessionSets.length + 1}</span>
           ${bw ? '<span style="font-size:13px;flex:1;text-align:center">BW</span>' :
-          `<input type="number" inputmode="decimal" class="input-field" style="flex:1;padding:6px" id="aw-${ex.id}" value="${ex.weight || 10}" step="0.5">`}
+          `<input type="number" inputmode="decimal" class="input-field" style="flex:1;padding:6px" id="aw-${ex.id}" value="${(function(){ var ls = getLastSessionSets(ex.id); var si = sessionSets.length; var lw = ls && ls[si] && ls[si].type !== 'drop' ? ls[si].weight : null; return lw !== null ? lw : (ex.weight || 10); })()}" step="0.5">`}
           <input type="number" inputmode="decimal" class="input-field" style="width:60px;padding:6px" id="ar-${ex.id}" value="${parseInt(ex.reps.split('-')[1] || ex.reps)}">
           <button class="btn btn-orange btn-sm" style="width:auto;padding:6px 12px;min-height:32px" onclick="finishAccSet('${ex.id}', ${bw})">OK</button>
         </div>`;
 
-    // Drop set input row
-    if (ex.dropWeight) {
-      setsHtml += `
-        <div class="drop-input-row">
-          <div class="drop-label">Drop</div>
-          <input type="number" inputmode="decimal" class="input-field" style="flex:1;padding:6px" id="adw-${ex.id}" value="${ex.dropWeight}" step="0.5">
-          <input type="number" inputmode="decimal" class="input-field" style="width:60px;padding:6px" id="adr-${ex.id}" value="${parseInt(ex.reps.split('-')[1] || ex.reps)}">
-        </div>`;
-    }
+    // Drop set toggle - always available
+    const dropDefault = ex.dropWeight || Math.round((ex.weight || 10) * 0.7 * 2) / 2;
+    setsHtml += `
+      <div id="acc-drop-toggle-${ex.id}" style="margin-top:4px">
+        <button class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px;opacity:0.7" onclick="document.getElementById('acc-drop-row-${ex.id}').style.display='flex'; this.style.display='none'">+ Drop Set</button>
+      </div>
+      <div id="acc-drop-row-${ex.id}" class="drop-input-row" style="display:${ex.dropWeight ? 'flex' : 'none'}">
+        <div class="drop-label">Drop</div>
+        <input type="number" inputmode="decimal" class="input-field" style="flex:1;padding:6px" id="adw-${ex.id}" value="${dropDefault}" step="0.5">
+        <input type="number" inputmode="decimal" class="input-field" style="width:60px;padding:6px" id="adr-${ex.id}" value="${parseInt(ex.reps.split('-')[1] || ex.reps)}">
+      </div>`;
 
     setsHtml += '</div>';
   }
@@ -3139,12 +3383,100 @@ function setFeeling(feeling) {
 }
 
 // =============================================
+// LEARNINGS
+// =============================================
+
+let learningModalOpen = false;
+
+function addLearning(text) {
+  if (!text || !text.trim()) return;
+  if (!APP_STATE.learnings) APP_STATE.learnings = [];
+  APP_STATE.learnings.push({
+    id: Date.now(),
+    date: new Date().toISOString().split('T')[0],
+    workoutId: activeWorkoutId || null,
+    text: text.trim(),
+    mesocycle: APP_STATE.settings.mesocycle.number,
+    week: APP_STATE.settings.mesocycle.currentWeek
+  });
+  saveState();
+}
+
+function deleteLearning(id) {
+  if (!confirm('Learning löschen?')) return;
+  APP_STATE.learnings = (APP_STATE.learnings || []).filter(l => l.id !== id);
+  saveState();
+  renderStatsPage();
+}
+
+function openLearningModal() {
+  learningModalOpen = true;
+  var overlay = document.createElement('div');
+  overlay.id = 'learning-modal';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px';
+  overlay.innerHTML = '<div style="background:var(--card);border-radius:16px;padding:20px;width:100%;max-width:360px">' +
+    '<div style="font-size:16px;font-weight:600;margin-bottom:12px">💡 Learning notieren</div>' +
+    '<textarea id="learning-text" style="width:100%;height:100px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:14px;resize:none" placeholder="Was hast du gelernt?"></textarea>' +
+    '<div style="display:flex;gap:8px;margin-top:12px">' +
+      '<button class="btn btn-orange" style="flex:1" onclick="submitLearning()">Speichern</button>' +
+      '<button class="btn btn-outline" style="flex:1" onclick="closeLearningModal()">Abbrechen</button>' +
+    '</div></div>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) closeLearningModal(); });
+  setTimeout(function() { document.getElementById('learning-text').focus(); }, 100);
+}
+
+function submitLearning() {
+  var text = document.getElementById('learning-text').value;
+  if (text && text.trim()) {
+    addLearning(text);
+  }
+  closeLearningModal();
+}
+
+function closeLearningModal() {
+  learningModalOpen = false;
+  var modal = document.getElementById('learning-modal');
+  if (modal) modal.remove();
+}
+
+function renderLearningsTab() {
+  const learnings = (APP_STATE.learnings || []).slice().reverse();
+  if (learnings.length === 0) {
+    return '<div class="card"><p style="color:var(--text-sec);font-size:14px;text-align:center;padding:24px">Noch keine Learnings. Nutze den 💡 Button während des Trainings!</p></div>';
+  }
+
+  let html = '';
+  let currentMonth = '';
+  learnings.forEach(l => {
+    const month = l.date.substring(0, 7);
+    if (month !== currentMonth) {
+      currentMonth = month;
+      const [y, m] = month.split('-');
+      const monthNames = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+      html += '<div style="font-size:12px;color:var(--text-ter);font-weight:600;margin:16px 0 8px;text-transform:uppercase">' + monthNames[parseInt(m) - 1] + ' ' + y + '</div>';
+    }
+    const workoutName = l.workoutId && WORKOUT_PLANS[l.workoutId] ? WORKOUT_PLANS[l.workoutId].name : '';
+    html += '<div class="card" style="margin-bottom:8px;padding:12px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
+        '<div style="flex:1">' +
+          '<div style="font-size:14px;line-height:1.4">' + l.text + '</div>' +
+          '<div style="font-size:11px;color:var(--text-ter);margin-top:6px">' + l.date + (workoutName ? ' · ' + workoutName : '') + ' · W' + (l.week || '?') + '</div>' +
+        '</div>' +
+        '<button style="color:var(--text-ter);font-size:16px;padding:4px 8px;background:none;border:none" onclick="deleteLearning(' + l.id + ')">×</button>' +
+      '</div>' +
+    '</div>';
+  });
+  return html;
+}
+
+// =============================================
 // STATS PAGE RENDER
 // =============================================
 
 function renderStatsPage() {
-  const allTabs = ['alle', 'ruecken', 'brust', 'quads', 'hams', 'bizeps', 'trizeps'];
-  const tabLabels = { alle: 'Alle', ruecken: 'Ruecken', brust: 'Brust', quads: 'Quads', hams: 'Hams', bizeps: 'Bizeps', trizeps: 'Trizeps' };
+  const allTabs = ['alle', 'ruecken', 'brust', 'quads', 'hams', 'bizeps', 'trizeps', 'learnings'];
+  const tabLabels = { alle: 'Alle', ruecken: 'Ruecken', brust: 'Brust', quads: 'Quads', hams: 'Hams', bizeps: 'Bizeps', trizeps: 'Trizeps', learnings: '💡' };
 
   let tabsHtml = allTabs.map(t =>
     `<button class="sub-tab ${statsTab === t ? 'active' : ''}" onclick="switchStatsTab('${t}')">${tabLabels[t]}</button>`
@@ -3153,6 +3485,8 @@ function renderStatsPage() {
   let content = '';
   if (statsTab === 'alle') {
     content = renderStatsAll();
+  } else if (statsTab === 'learnings') {
+    content = renderLearningsTab();
   } else {
     content = renderStatsMuscle(statsTab);
   }
