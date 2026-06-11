@@ -991,9 +991,10 @@ const WORKOUT_PLANS = {
         rounds: 4,
         restSeconds: 150,
         exercises: [
-          { id: 'vb-c1-e1', name: 'Incline DB Press', reps: '10-12', weight: 25, unit: 'kg', bodyweight: false, dumbbell: true },
-          { id: 'vb-c1-e2', name: 'DB Squats', reps: '8-10', weight: 20, unit: 'kg', bodyweight: false, dumbbell: true },
           { id: 'vb-c1-e3', name: 'Ring Push Ups', reps: '10-12', weight: 0, unit: 'kg', bodyweight: true },
+          { id: 'vb-c1-e2', name: 'DB Squats', reps: '8-10', weight: 20, unit: 'kg', bodyweight: false, dumbbell: true },
+          { id: 'vb-c1-e1', name: 'Incline DB Press', reps: '10-12', weight: 25, unit: 'kg', bodyweight: false, dumbbell: true },
+          { id: 'vb-c1-e5', name: 'DB Incline Flys', reps: '8-12', weight: 7.5, unit: 'kg', bodyweight: false, dumbbell: true },
           { id: 'vb-c1-e4', name: 'Walking Lunges', reps: '12-15', weight: 20, unit: 'kg', bodyweight: false, dumbbell: true }
         ]
       }
@@ -1090,6 +1091,7 @@ const EXERCISE_MUSCLE = {
   'vb-c1-e2': 'quads',    // DB Squats
   'vb-c1-e3': 'brust',    // Ring Push Ups
   'vb-c1-e4': 'quads',    // Walking Lunges
+  'vb-c1-e5': 'brust',    // DB Incline Flys
   'vb-a1': 'trizeps',     // Tricep KB Extensions
   'vb-a2': 'schultern',   // DB Lou Raises + Lateral Raise
   'vb-a3': 'core',        // TTB + KTC
@@ -1354,6 +1356,11 @@ function getTargetRounds(baseRounds, week) {
   if (baseRounds <= 3) {
     if (week <= 2) return 3;
     return 4;
+  }
+  // 4->4->5->5->5 progression (weeks 1-5)
+  if (baseRounds === 4) {
+    if (week <= 2) return 4;
+    return 5;
   }
   return baseRounds;
 }
@@ -2904,7 +2911,10 @@ function renderZirkelTab(plan) {
 
     // If circuit is ended
     if (isDone) {
-      html += '<div style="text-align:center;padding:12px;color:var(--green);font-size:14px;font-weight:600">✓ Zirkel abgeschlossen (' + completedRounds + ' Runden)</div>';
+      html += '<div style="text-align:center;padding:12px">' +
+        '<div style="color:var(--green);font-size:14px;font-weight:600;margin-bottom:8px">✓ Zirkel abgeschlossen (' + completedRounds + ' Runden)</div>' +
+        '<button class="btn btn-sm btn-outline" style="border-color:var(--orange);color:var(--orange)" onclick="reopenCircuit(\'' + circuit.id + '\')">Zirkel wieder öffnen</button>' +
+      '</div>';
     }
 
     html += '</div>'; // close zirkel-round-area
@@ -2944,6 +2954,18 @@ function clearViewingRound(circuitId) {
 function endCircuit(circuitId) {
   if (!activeSession._circuitDone) activeSession._circuitDone = {};
   activeSession._circuitDone[circuitId] = true;
+  saveState();
+  renderWorkoutDetail();
+}
+
+function reopenCircuit(circuitId) {
+  if (activeSession._circuitDone) {
+    delete activeSession._circuitDone[circuitId];
+  }
+  // Also un-complete the workout if it was completed
+  if (activeSession._completed) {
+    activeSession._completed = false;
+  }
   saveState();
   renderWorkoutDetail();
 }
@@ -3865,41 +3887,56 @@ function renderStatsMuscle(muscle) {
   const currentVol = calcWeekMuscleVolume(cw, muscle);
   const progressPct = goal > 0 ? Math.min(100, (currentVol / goal * 100)) : 0;
 
-  // Exercises for this muscle (filtered by EXERCISE_MUSCLE map)
-  const exercises = [];
+  // Exercises for this muscle (filtered by EXERCISE_MUSCLE map), grouped by source
+  const exercisesBySource = { strength: [], zirkel: [], acc: [] };
   Object.values(WORKOUT_PLANS).forEach(plan => {
-    const allExercises = [...plan.strength, ...plan.circuits.flatMap(c => c.exercises), ...plan.accessories];
-    allExercises.forEach(ex => {
-      if (EXERCISE_MUSCLE[ex.id] !== muscle) return;
-      if (exercises.find(e => e.id === ex.id)) return;
-      let best1RM = 0, first1RM = 0;
-      APP_STATE.sessions.forEach((s, si) => {
-        (s.sets[ex.id] || []).forEach(set => {
-          const est = set.weight * (1 + set.reps / 30);
-          if (si < 4 && !first1RM) first1RM = est;
-          if (est > best1RM) best1RM = est;
+    const sources = [
+      { list: plan.strength, key: 'strength' },
+      { list: plan.circuits.flatMap(c => c.exercises), key: 'zirkel' },
+      { list: plan.accessories, key: 'acc' }
+    ];
+    sources.forEach(src => {
+      src.list.forEach(ex => {
+        if (EXERCISE_MUSCLE[ex.id] !== muscle) return;
+        if (exercisesBySource[src.key].find(e => e.id === ex.id)) return;
+        let best1RM = 0, first1RM = 0;
+        APP_STATE.sessions.forEach((s, si) => {
+          (s.sets[ex.id] || []).forEach(set => {
+            const est = set.weight * (1 + set.reps / 30);
+            if (si < 4 && !first1RM) first1RM = est;
+            if (est > best1RM) best1RM = est;
+          });
         });
+        if (best1RM > 0) {
+          const change = first1RM > 0 ? Math.round((best1RM - first1RM) / first1RM * 100) : 0;
+          exercisesBySource[src.key].push({ id: ex.id, name: ex.name, rm: Math.round(best1RM * 10) / 10, change });
+        }
       });
-      if (best1RM > 0) {
-        const change = first1RM > 0 ? Math.round((best1RM - first1RM) / first1RM * 100) : 0;
-        exercises.push({ id: ex.id, name: ex.name, rm: Math.round(best1RM * 10) / 10, change });
-      }
     });
   });
 
   let exHtml = '';
-  exercises.forEach(ex => {
-    const cls = ex.change >= 0 ? 'up' : 'down';
-    const sign = ex.change >= 0 ? '+' : '';
-    exHtml += `
-      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
-        <span style="font-size:14px">${ex.name}</span>
-        <div style="display:flex;gap:12px;align-items:center">
-          <span style="font-size:14px;font-weight:600">${ex.rm}kg</span>
-          <span class="volume-change ${cls}">${sign}${ex.change}%</span>
-        </div>
-      </div>`;
+  const sourceLabels = { strength: 'Strength', zirkel: 'Zirkel', acc: 'Accessories' };
+  const sourceColors = { strength: 'var(--orange)', zirkel: 'var(--blue)', acc: 'var(--text-ter)' };
+  Object.keys(exercisesBySource).forEach(src => {
+    const exList = exercisesBySource[src];
+    if (exList.length === 0) return;
+    exHtml += '<div style="font-size:11px;font-weight:600;color:' + sourceColors[src] + ';text-transform:uppercase;letter-spacing:0.5px;margin:12px 0 4px;padding-bottom:4px;border-bottom:1px solid ' + sourceColors[src] + '30">' + sourceLabels[src] + '</div>';
+    exList.forEach(ex => {
+      const cls = ex.change >= 0 ? 'up' : 'down';
+      const sign = ex.change >= 0 ? '+' : '';
+      exHtml += '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">' +
+        '<span style="font-size:14px">' + ex.name + '</span>' +
+        '<div style="display:flex;gap:12px;align-items:center">' +
+          '<span style="font-size:14px;font-weight:600">' + ex.rm + 'kg</span>' +
+          '<span class="volume-change ' + cls + '">' + sign + ex.change + '%</span>' +
+        '</div>' +
+      '</div>';
+    });
   });
+
+  // Flatten for PR lookup
+  const exercises = [...exercisesBySource.strength, ...exercisesBySource.zirkel, ...exercisesBySource.acc];
 
   // PRs for this muscle
   const musclePRs = APP_STATE.prs.filter(pr => {
@@ -4198,7 +4235,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '3.1';
+const APP_VERSION = '3.3';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
