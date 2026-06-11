@@ -4222,13 +4222,15 @@ function getLiftStatus(exId) {
   mesoSessions.forEach(function(s) {
     var sets = s.sets[exId] || [];
     if (sets.length === 0) return;
-    // Find best set by effective volume (weight × reps)
-    var bestSet = null, bestVol = 0;
+    // Find best set by estimated 1RM (consistent with progression bars)
+    // This correctly picks heavier-weight sets over high-rep-low-weight sets
+    var bestSet = null, best1RM = 0;
     sets.forEach(function(set) {
       var w = Number(set.weight) || 0;
       var r = Number(set.reps) || 0;
-      var vol = getVolumeWeight(exId, w) * r;
-      if (vol > bestVol || (vol === bestVol && r > (bestSet ? bestSet.reps : 0))) { bestVol = vol; bestSet = set; }
+      if (r <= 0 || w <= 0) return;
+      var est = estimate1RM(set, ex);
+      if (est > best1RM || (est === best1RM && w > (bestSet ? Number(bestSet.weight) : 0))) { best1RM = est; bestSet = set; }
     });
     if (!bestSet) return;
     if (!firstSet) firstSet = { weight: bestSet.weight, reps: bestSet.reps };
@@ -4237,14 +4239,14 @@ function getLiftStatus(exId) {
 
   if (!latestSet) return null;
 
-  // % change based on effective volume per set
+  // % change based on estimated 1RM
   var changePct = 0;
   var hasChange = false;
   if (firstSet && (firstSet.weight !== latestSet.weight || firstSet.reps !== latestSet.reps)) {
-    var firstVol = getVolumeWeight(exId, Number(firstSet.weight) || 0) * (Number(firstSet.reps) || 0);
-    var latestVol = getVolumeWeight(exId, Number(latestSet.weight) || 0) * (Number(latestSet.reps) || 0);
-    if (firstVol > 0) {
-      changePct = Math.round((latestVol - firstVol) / firstVol * 100);
+    var first1RM = estimate1RM(firstSet, ex);
+    var latest1RM = estimate1RM(latestSet, ex);
+    if (first1RM > 0) {
+      changePct = Math.round((latest1RM - first1RM) / first1RM * 100);
       hasChange = true;
     }
   }
@@ -4496,10 +4498,10 @@ function renderHistoryPeek(exId) {
   var html = '<div style="padding:6px 0">';
   sessions.forEach(function(s, i) {
     var sets = s.sets[exId];
-    var bestSet = null, bestVol = 0;
+    var bestSet = null, best1RM = 0;
     sets.forEach(function(set) {
-      var v = (Number(set.weight) || 0) * (Number(set.reps) || 0);
-      if (v > bestVol) { bestVol = v; bestSet = set; }
+      var est = estimate1RM(set, ex);
+      if (est > best1RM) { best1RM = est; bestSet = set; }
     });
     if (!bestSet) return;
     var wLabel = isBW ? 'BW' : isDbl ? bestSet.weight + 'kg/DB' : isWBW ? '+' + bestSet.weight + 'kg' : bestSet.weight + 'kg';
@@ -4668,20 +4670,19 @@ function getMesoLiftComparison(exId) {
   var currentMeso = APP_STATE.settings.mesocycle.number;
   if (currentMeso <= 1) return null;
   var prevMeso = currentMeso - 1;
+  var ex = getExerciseInfo(exId);
 
-  // Get best set from end of previous meso
+  // Get best set from end of previous meso (by estimated 1RM)
   var prevSessions = APP_STATE.sessions
     .filter(function(s) { return s.mesocycle === prevMeso; })
     .sort(function(a, b) { return b.date.localeCompare(a.date); });
 
-  var prevBest = null, prevBestVol = 0;
+  var prevBest = null, prevBest1RM = 0;
   // Look at last 2 sessions of prev meso for this exercise
   prevSessions.slice(0, 4).forEach(function(s) {
     (s.sets[exId] || []).forEach(function(set) {
-      var w = Number(set.weight) || 0;
-      var r = Number(set.reps) || 0;
-      var vol = getVolumeWeight(exId, w) * r;
-      if (vol > prevBestVol) { prevBestVol = vol; prevBest = { weight: w, reps: r }; }
+      var est = estimate1RM(set, ex);
+      if (est > prevBest1RM) { prevBest1RM = est; prevBest = { weight: Number(set.weight) || 0, reps: Number(set.reps) || 0 }; }
     });
   });
 
@@ -4691,9 +4692,9 @@ function getMesoLiftComparison(exId) {
   var currentStatus = getLiftStatus(exId);
   if (!currentStatus) return null;
 
-  var currentVol = getVolumeWeight(exId, Number(currentStatus.weight) || 0) * (Number(currentStatus.reps) || 0);
-  if (prevBestVol > 0 && currentVol > 0) {
-    var changePct = Math.round((currentVol - prevBestVol) / prevBestVol * 100);
+  var current1RM = estimate1RM({ weight: currentStatus.weight, reps: currentStatus.reps }, ex);
+  if (prevBest1RM > 0 && current1RM > 0) {
+    var changePct = Math.round((current1RM - prevBest1RM) / prevBest1RM * 100);
     return { prevWeight: prevBest.weight, prevReps: prevBest.reps, changePct: changePct };
   }
   return null;
@@ -5413,7 +5414,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '5.1';
+const APP_VERSION = '5.2';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
