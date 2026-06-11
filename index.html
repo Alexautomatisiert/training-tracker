@@ -1989,6 +1989,54 @@ function renderHomePage() {
     prHtml += '</div></div>';
   }
 
+  // 1RM Summary for home screen
+  let rmSummary = '';
+  if (APP_STATE.sessions.length > 0) {
+    const rmItems = [];
+    Object.values(WORKOUT_PLANS).forEach(function(plan) {
+      plan.strength.forEach(function(ex) {
+        let best1RM = 0;
+        APP_STATE.sessions.forEach(function(s) {
+          (s.sets[ex.id] || []).forEach(function(set) {
+            const est = set.weight * (1 + set.reps / 30);
+            if (est > best1RM) best1RM = est;
+          });
+        });
+        if (best1RM > 0) rmItems.push({ name: ex.name, rm: Math.round(best1RM * 10) / 10 });
+      });
+    });
+    if (rmItems.length > 0) {
+      rmSummary = '<div style="margin-top:8px">';
+      rmItems.forEach(function(item) {
+        rmSummary += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px"><span style="color:var(--text-sec)">' + item.name + '</span><span style="font-weight:600">' + item.rm + 'kg</span></div>';
+      });
+      rmSummary += '</div>';
+    }
+  }
+
+  // Current week volume
+  let currentWeekVol = 0;
+  if (APP_STATE.sessions.length > 0) {
+    currentWeekVol = calcWeekVolume(cw);
+  }
+  const weekVolGoal = APP_STATE.settings.goals.weeklyVolume || 0;
+  const weekVolPct = weekVolGoal > 0 ? Math.min(100, Math.round(currentWeekVol / weekVolGoal * 100)) : 0;
+
+  // Learnings widget
+  const recentLearnings = (APP_STATE.learnings || []).slice(-3).reverse();
+  let learningsHtml = '';
+  if (recentLearnings.length > 0) {
+    recentLearnings.forEach(function(l) {
+      const workoutName = l.workoutId && WORKOUT_PLANS[l.workoutId] ? WORKOUT_PLANS[l.workoutId].name : '';
+      learningsHtml += '<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;line-height:1.4">' +
+        '<div>' + l.text + '</div>' +
+        '<div style="font-size:11px;color:var(--text-ter);margin-top:2px">' + l.date + (workoutName ? ' · ' + workoutName : '') + '</div>' +
+      '</div>';
+    });
+  } else {
+    learningsHtml = '<div style="text-align:center;padding:12px;color:var(--text-ter);font-size:13px">Noch keine Learnings</div>';
+  }
+
   document.getElementById('home-content').innerHTML = `
     <h1>Training</h1>
     <p style="color:var(--text-sec);margin-bottom:20px">Dein Fortschritt</p>
@@ -2035,7 +2083,45 @@ function renderHomePage() {
     `}
 
     ${prHtml}
+
+    <!-- Stats Quick View -->
+    ${APP_STATE.sessions.length > 0 ? `
+    <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>Statistiken</span>
+      <button style="background:none;border:none;color:var(--orange);font-size:12px;font-weight:600;cursor:pointer" onclick="goToStatsAll()">Alle anzeigen →</button>
+    </div>
+    <div class="card" onclick="goToStatsAll()" style="cursor:pointer">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-size:13px;color:var(--text-sec)">Wochen-Volumen W${cw}</span>
+        <span style="font-size:14px;font-weight:600">${(currentWeekVol/1000).toFixed(1)}t / ${(weekVolGoal/1000).toFixed(1)}t</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${weekVolPct}%"></div></div>
+      ${rmSummary ? '<div style="margin-top:8px"><div style="font-size:12px;color:var(--text-sec);font-weight:600;margin-bottom:4px">1RM Schätzungen</div>' + rmSummary + '</div>' : ''}
+    </div>
+    ` : ''}
+
+    <!-- Learnings Widget -->
+    <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>Learnings</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button style="background:var(--orange);border:none;color:#fff;width:28px;height:28px;border-radius:50%;font-size:18px;line-height:28px;text-align:center;cursor:pointer" onclick="openLearningModal()">+</button>
+        <button style="background:none;border:none;color:var(--orange);font-size:12px;font-weight:600;cursor:pointer" onclick="goToLearnings()">Alle →</button>
+      </div>
+    </div>
+    <div class="card">
+      ${learningsHtml}
+    </div>
   `;
+}
+
+function goToStatsAll() {
+  statsTab = 'alle';
+  navigateTo('stats');
+}
+
+function goToLearnings() {
+  statsTab = 'learnings';
+  navigateTo('stats');
 }
 
 function toggleExpand(el) {
@@ -2969,38 +3055,25 @@ function finishCircuitRound(circuitId, circuitIndex) {
 
 function renderAccTab(plan) {
   let html = '';
-  let currentGroup = null;
-  let groupHtml = '';
+  let i = 0;
 
-  plan.accessories.forEach((ex, i) => {
-    // Handle grouped exercises
-    if (ex.group && ex.groupName) {
-      if (currentGroup !== ex.groupName) {
-        if (currentGroup) html += groupHtml + '</div>';
-        currentGroup = ex.groupName;
-        const typeLabel = ex.group === 'triple' ? 'Triple Set' : 'Superset';
-        groupHtml = `<div class="superset-group"><div class="superset-header">${typeLabel}: ${ex.groupName}</div>`;
-      }
-      groupHtml += renderAccExercise(ex);
+  while (i < plan.accessories.length) {
+    const ex = plan.accessories[i];
 
-      // Check if next is same group
-      const next = plan.accessories[i + 1];
-      if (!next || next.groupName !== ex.groupName) {
-        html += groupHtml + '</div>';
-        currentGroup = null;
-        groupHtml = '';
+    if (ex.group) {
+      // Collect all exercises in this superset group
+      const groupExercises = [];
+      const groupId = ex.group;
+      while (i < plan.accessories.length && plan.accessories[i].group === groupId) {
+        groupExercises.push(plan.accessories[i]);
+        i++;
       }
+      html += renderAccSuperset(groupExercises);
     } else {
-      if (currentGroup) {
-        html += groupHtml + '</div>';
-        currentGroup = null;
-        groupHtml = '';
-      }
       html += renderAccExercise(ex);
+      i++;
     }
-  });
-
-  if (currentGroup) html += groupHtml + '</div>';
+  }
 
   html += '<button class="btn btn-green" style="margin-top:20px" onclick="finishWorkout()">Training abschliessen</button>';
 
@@ -3135,6 +3208,159 @@ function finishAccSet(exId, isBW) {
     });
   }
 
+  saveState();
+  renderWorkoutDetail();
+}
+
+// =============================================
+// ACC SUPERSET (grouped exercises in one card)
+// =============================================
+
+function renderAccSuperset(exercises) {
+  const mainEx = exercises[0];
+  const sets = mainEx.sets;
+  const names = exercises.map(function(e) { return e.name; }).join(' + ');
+  const sessionSets = activeSession.sets[mainEx.id] || [];
+  const completedCount = sessionSets.filter(function(s) { return s.type !== 'drop'; }).length;
+
+  // To Beat per sub-exercise
+  const toBeatParts = exercises.map(function(e) {
+    var tb = formatToBeat(e.id);
+    return tb ? e.name.split(' ')[0] + ': ' + tb : '';
+  }).filter(Boolean);
+  const toBeatStr = toBeatParts.join(' | ');
+
+  let setsHtml = '';
+
+  // Completed sets — one row per set showing all sub-exercises
+  for (let si = 0; si < completedCount; si++) {
+    const isEditing = editingSet && editingSet.exId === mainEx.id && editingSet.index === si;
+
+    if (isEditing) {
+      setsHtml += '<div class="set-card current" style="padding:8px 12px;border-color:var(--blue)">';
+      setsHtml += '<div style="font-size:12px;font-weight:600;color:var(--blue);margin-bottom:6px">Satz ' + (si + 1) + ' bearbeiten</div>';
+      exercises.forEach(function(e) {
+        var eData = (activeSession.sets[e.id] || [])[si];
+        if (!eData) return;
+        var dbLbl = e.dumbbell ? ' (DB)' : '';
+        setsHtml += '<div style="font-size:11px;color:var(--text-sec);margin-bottom:2px">' + e.name + '</div>';
+        setsHtml += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
+        if (e.bodyweight) {
+          setsHtml += '<span style="font-size:13px;flex:1;text-align:center">BW</span>';
+        } else {
+          setsHtml += '<div class="input-group" style="flex:1"><div class="input-label">kg' + dbLbl + '</div><input type="number" inputmode="decimal" class="input-field" style="padding:6px" id="edit-w-' + e.id + '-' + si + '" value="' + eData.weight + '" step="0.5"></div>';
+        }
+        setsHtml += '<div class="input-group" style="width:70px"><div class="input-label">Reps</div><input type="number" inputmode="numeric" class="input-field" style="padding:6px" id="edit-r-' + e.id + '-' + si + '" value="' + eData.reps + '"></div>';
+        setsHtml += '</div>';
+      });
+      var editExIds = exercises.map(function(e) { return "'" + e.id + "'"; }).join(',');
+      setsHtml += '<div style="display:flex;gap:8px;margin-top:8px">';
+      setsHtml += '<button class="btn btn-sm btn-orange" style="flex:1" onclick="saveEditSuperset(\'' + mainEx.id + '\', ' + si + ', [' + editExIds + '])">Speichern</button>';
+      setsHtml += '<button class="btn btn-sm btn-outline" style="flex:1" onclick="cancelEditSet()">Abbrechen</button>';
+      setsHtml += '</div></div>';
+    } else {
+      var summary = exercises.map(function(e) {
+        var eData = (activeSession.sets[e.id] || [])[si];
+        if (!eData) return '';
+        var dbLbl = e.dumbbell ? '(DB)' : '';
+        return e.bodyweight ? e.name.split(' ')[0] + ' x' + eData.reps : eData.weight + 'kg' + dbLbl + ' x' + eData.reps;
+      }).filter(Boolean).join(' | ');
+
+      setsHtml += '<div class="swipe-wrapper" data-ex-id="' + mainEx.id + '" data-set-index="' + si + '">';
+      setsHtml += '<div class="swipe-delete-bg">Löschen</div>';
+      setsHtml += '<div class="swipe-content set-card done" style="padding:8px 12px;margin-bottom:0" onclick="startEditSet(\'' + mainEx.id + '\', ' + si + ')">';
+      setsHtml += '<div style="display:flex;justify-content:space-between;align-items:center">';
+      setsHtml += '<span style="font-size:13px">Satz ' + (si + 1) + ' ' + ICONS.check + '</span>';
+      setsHtml += '<span style="font-size:11px;color:var(--text-sec)">' + summary + '</span>';
+      setsHtml += '</div></div></div>';
+    }
+  }
+
+  // Current set input — one row per sub-exercise, one OK button
+  if (completedCount < sets) {
+    setsHtml += '<div class="set-card current" style="padding:8px 12px">';
+    setsHtml += '<div style="font-size:12px;font-weight:600;margin-bottom:6px">Satz ' + (completedCount + 1) + '</div>';
+
+    exercises.forEach(function(e) {
+      var dbLbl = e.dumbbell ? ' (pro DB)' : '';
+      setsHtml += '<div style="font-size:11px;color:var(--text-sec);margin-bottom:2px">' + e.name + '</div>';
+      setsHtml += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
+      if (e.bodyweight) {
+        setsHtml += '<span style="font-size:13px;flex:1;text-align:center">BW</span>';
+      } else {
+        var autoWeight = (function(){ var ls = getLastSessionSets(e.id); var idx = completedCount; var lw = ls && ls[idx] && ls[idx].type !== 'drop' ? ls[idx].weight : null; return lw !== null ? lw : (e.weight || 10); })();
+        setsHtml += '<input type="number" inputmode="decimal" class="input-field" style="flex:1;padding:6px" id="ssw-' + e.id + '" value="' + autoWeight + '" step="0.5">';
+      }
+      setsHtml += '<input type="number" inputmode="decimal" class="input-field" style="width:60px;padding:6px" id="ssr-' + e.id + '" value="' + parseInt(e.reps.split('-')[1] || e.reps) + '">';
+      setsHtml += '</div>';
+    });
+
+    var okExIds = exercises.map(function(e) { return "'" + e.id + "'"; }).join(',');
+    setsHtml += '<button class="btn btn-orange btn-sm" style="width:100%;padding:8px;min-height:36px" onclick="finishAccSuperset([' + okExIds + '])">OK</button>';
+    setsHtml += '</div>';
+  }
+
+  var lastStrs = exercises.map(function(e) { return formatLastSession(e.id); }).filter(Boolean);
+  var lastInfo = lastStrs.length > 0 ? ' | ' + lastStrs[0] : '';
+
+  return '<div class="exercise-card">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center">' +
+      '<div>' +
+        '<div class="exercise-name" style="font-size:14px">' + names + '</div>' +
+        '<div class="exercise-last" style="font-size:11px">' + sets + 'x' + mainEx.reps + ' Superset' + lastInfo + '</div>' +
+      '</div>' +
+      '<span style="font-size:12px;color:var(--text-sec)">' + completedCount + '/' + sets + '</span>' +
+    '</div>' +
+    (toBeatStr ? '<div class="to-beat" style="margin-top:6px">' + toBeatStr + '</div>' : '') +
+    '<div style="margin-top:8px">' + setsHtml + '</div>' +
+  '</div>';
+}
+
+function finishAccSuperset(exIds) {
+  exIds.forEach(function(exId) {
+    var exInfo = getExerciseInfo(exId);
+    var bw = exInfo && exInfo.bodyweight;
+    var wEl = document.getElementById('ssw-' + exId);
+    var rEl = document.getElementById('ssr-' + exId);
+    var weight = bw ? APP_STATE.settings.bodyWeight : (wEl ? (parseFloat(wEl.value.replace(',', '.')) || 0) : 0);
+    var reps = rEl ? (parseInt(rEl.value) || 0) : 0;
+
+    if (!activeSession.sets[exId]) activeSession.sets[exId] = [];
+    activeSession.sets[exId].push({ weight: weight, reps: reps, type: 'working' });
+
+    if (checkPR(exId, weight, reps)) {
+      APP_STATE.prs.push({
+        exerciseId: exId, date: activeSession.date,
+        weight: weight, reps: reps, volume: weight * reps,
+        week: activeSession.week, mesocycle: activeSession.mesocycle
+      });
+    }
+  });
+
+  saveState();
+  renderWorkoutDetail();
+}
+
+function saveEditSuperset(mainExId, setIndex, exIds) {
+  exIds.forEach(function(exId) {
+    var exInfo = getExerciseInfo(exId);
+    var bw = exInfo && exInfo.bodyweight;
+    var wEl = document.getElementById('edit-w-' + exId + '-' + setIndex);
+    var rEl = document.getElementById('edit-r-' + exId + '-' + setIndex);
+    if (activeSession.sets[exId] && activeSession.sets[exId][setIndex]) {
+      if (!bw && wEl) activeSession.sets[exId][setIndex].weight = parseFloat(wEl.value.replace(',', '.')) || 0;
+      if (rEl) activeSession.sets[exId][setIndex].reps = parseInt(rEl.value) || 0;
+    }
+  });
+
+  if (activeSession._completed) {
+    var savedIdx = APP_STATE.sessions.findIndex(function(s) { return s.id === activeSession.id; });
+    if (savedIdx >= 0) {
+      APP_STATE.sessions[savedIdx].sets = JSON.parse(JSON.stringify(activeSession.sets));
+    }
+  }
+
+  editingSet = null;
   saveState();
   renderWorkoutDetail();
 }
@@ -3972,7 +4198,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '3.0';
+const APP_VERSION = '3.1';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
@@ -4129,7 +4355,22 @@ document.addEventListener('touchend', function(e) {
 
 function deleteSet(exId, setIndex) {
   if (!activeSession || !activeSession.sets[exId]) return;
-  activeSession.sets[exId].splice(setIndex, 1);
+
+  // Check if this exercise belongs to a superset group — delete from all members
+  var exInfo = getExerciseInfo(exId);
+  if (exInfo && exInfo.group && activeWorkoutId) {
+    var plan = WORKOUT_PLANS[activeWorkoutId];
+    if (plan) {
+      plan.accessories.forEach(function(acc) {
+        if (acc.group === exInfo.group && activeSession.sets[acc.id] && activeSession.sets[acc.id].length > setIndex) {
+          activeSession.sets[acc.id].splice(setIndex, 1);
+        }
+      });
+    }
+  } else {
+    activeSession.sets[exId].splice(setIndex, 1);
+  }
+
   saveState();
   renderWorkoutDetail();
 }
