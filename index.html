@@ -891,7 +891,7 @@ const WORKOUT_PLANS = {
         restSeconds: 150,
         exercises: [
           { id: 'va-c1-e1', name: 'DB Rev. Lunges', reps: '10-12', weight: 22.5, unit: 'kg', bodyweight: false, dumbbell: true },
-          { id: 'va-c1-e2', name: 'Weighted Ring Dips', reps: '8-10', weight: 5, unit: 'kg', bodyweight: false, note: 'BW+5kg' },
+          { id: 'va-c1-e2', name: 'Weighted Ring Dips', reps: '8-10', weight: 5, unit: 'kg', bodyweight: false, weightedBW: true, note: 'BW+5kg' },
           { id: 'va-c1-e3', name: 'DB OH Walking Lunges', reps: '10-12', weight: 17.5, unit: 'kg', bodyweight: false, dumbbell: true },
           { id: 'va-c1-e4', name: 'DB Incline Press', reps: '10-12', weight: 22.5, unit: 'kg', bodyweight: false, dumbbell: true }
         ]
@@ -900,7 +900,7 @@ const WORKOUT_PLANS = {
     accessories: [
       { id: 'va-a1', name: 'Tricep KB Extensions', sets: 3, reps: '10-12', weight: 16, unit: 'kg', bodyweight: false, group: null, dropWeight: 12, note: 'DropSet 16+12kg' },
       { id: 'va-a2', name: 'DB Lateral Raise', sets: 3, reps: '12-15', weight: 10, unit: 'kg', bodyweight: false, dumbbell: true, group: null, dropWeight: 5, note: 'DropSet 10+5kg' },
-      { id: 'va-a3', name: 'TTB + KTC', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, group: null }
+      { id: 'va-a3', name: 'TTB + KTC', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: null }
     ]
   },
   ra: {
@@ -947,7 +947,7 @@ const WORKOUT_PLANS = {
         doubleRounds: true,
         note: 'Double Rounds: jede Runde = 2x durch',
         exercises: [
-          { id: 'ra-c2-e1', name: 'Pull Ups', reps: '6-8', weight: 0, unit: 'kg', bodyweight: true },
+          { id: 'ra-c2-e1', name: 'Pull Ups', reps: '6-8', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 1.0 },
           { id: 'ra-c2-e2', name: 'Farmers Carries', reps: '75m', weight: 64, unit: 'kg', bodyweight: false, note: '2x32kg' },
           { id: 'ra-c2-e3', name: 'Shrugs', reps: '5-8', weight: 32, unit: 'kg', bodyweight: false, dumbbell: true }
         ]
@@ -955,9 +955,9 @@ const WORKOUT_PLANS = {
     ],
     accessories: [
       { id: 'ra-a1', name: 'Weighted GHD Hypers', sets: 3, reps: '10-12', weight: 10, unit: 'kg', bodyweight: false, group: 'ss-ra-ghd' },
-      { id: 'ra-a1b', name: 'BW GHD Hypers', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, group: 'ss-ra-ghd' },
-      { id: 'ra-a2', name: 'TTB', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, group: 'ss-ra-core' },
-      { id: 'ra-a2b', name: 'GHD Situps', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, group: 'ss-ra-core' },
+      { id: 'ra-a1b', name: 'BW GHD Hypers', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0.50, group: 'ss-ra-ghd' },
+      { id: 'ra-a2', name: 'TTB', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: 'ss-ra-core' },
+      { id: 'ra-a2b', name: 'GHD Situps', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: 'ss-ra-core' },
       { id: 'ra-a3', name: 'African Curls', sets: 3, reps: '10-12', weight: 12.5, unit: 'kg', bodyweight: false, group: null, dropWeight: 7.5, note: 'DropSet 12.5+7.5kg' }
     ]
   },
@@ -991,7 +991,7 @@ const WORKOUT_PLANS = {
         rounds: 4,
         restSeconds: 150,
         exercises: [
-          { id: 'vb-c1-e3', name: 'Ring Push Ups', reps: '10-12', weight: 0, unit: 'kg', bodyweight: true },
+          { id: 'vb-c1-e3', name: 'Ring Push Ups', reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0.70 },
           { id: 'vb-c1-e2', name: 'DB Squats', reps: '8-10', weight: 20, unit: 'kg', bodyweight: false, dumbbell: true },
           { id: 'vb-c1-e1', name: 'Incline DB Press', reps: '10-12', weight: 25, unit: 'kg', bodyweight: false, dumbbell: true },
           { id: 'vb-c1-e5', name: 'DB Incline Flys', reps: '8-12', weight: 7.5, unit: 'kg', bodyweight: false, dumbbell: true },
@@ -1002,7 +1002,7 @@ const WORKOUT_PLANS = {
     accessories: [
       { id: 'vb-a1', name: 'Tricep KB Extensions', sets: 3, reps: '10-12', weight: 16, unit: 'kg', bodyweight: false, group: null, dropWeight: 12, note: 'DropSet 16+12kg' },
       { id: 'vb-a2', name: 'DB Lou Raises + Lateral Raise', sets: 3, reps: '12-15', weight: 7.5, unit: 'kg', bodyweight: false, dumbbell: true, group: null, note: 'SuperSet 7.5kg' },
-      { id: 'vb-a3', name: 'TTB + KTC', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, group: null }
+      { id: 'vb-a3', name: 'TTB + KTC', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: null }
     ]
   },
   rb: {
@@ -1035,7 +1035,7 @@ const WORKOUT_PLANS = {
         rounds: 4,
         restSeconds: 90,
         exercises: [
-          { id: 'rb-c1-e1', name: 'Ring Pull Ups', reps: '6-8', weight: 0, unit: 'kg', bodyweight: true },
+          { id: 'rb-c1-e1', name: 'Ring Pull Ups', reps: '6-8', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 1.0 },
           { id: 'rb-c1-e2', name: 'DB SL RDLs + Row', reps: '8-10', weight: 10, unit: 'kg', bodyweight: false, dumbbell: true }
         ]
       },
@@ -1048,15 +1048,15 @@ const WORKOUT_PLANS = {
         exercises: [
           { id: 'rb-c2-e3', name: 'KB Deadlifts', reps: '8-10', weight: 24, unit: 'kg', bodyweight: false, note: '2x12kg' },
           { id: 'rb-c2-e4', name: 'DB Pullovers', reps: '10-12', weight: 15, unit: 'kg', bodyweight: false, dumbbell: false, note: '1x15kg DB' },
-          { id: 'rb-c2-e1', name: 'Ring Rev Fly', reps: '12-15', weight: 0, unit: 'kg', bodyweight: true }
+          { id: 'rb-c2-e1', name: 'Ring Rev Fly', reps: '12-15', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0.25 }
         ]
       }
     ],
     accessories: [
-      { id: 'rb-a1', name: 'SL GHD Hypers', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, group: 'ss-rb-ghd' },
-      { id: 'rb-a1b', name: 'GHD Hypers', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, group: 'ss-rb-ghd' },
-      { id: 'rb-a2', name: 'TTB', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, group: 'ss-rb-core' },
-      { id: 'rb-a2b', name: 'GHD Situps', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, group: 'ss-rb-core' },
+      { id: 'rb-a1', name: 'SL GHD Hypers', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0.50, group: 'ss-rb-ghd' },
+      { id: 'rb-a1b', name: 'GHD Hypers', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0.50, group: 'ss-rb-ghd' },
+      { id: 'rb-a2', name: 'TTB', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: 'ss-rb-core' },
+      { id: 'rb-a2b', name: 'GHD Situps', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: 'ss-rb-core' },
       { id: 'rb-a3', name: 'Hammer Curls', sets: 3, reps: '10-12', weight: 15, unit: 'kg', bodyweight: false, dumbbell: true, group: null, dropWeight: 10, note: 'DropSet 15+10kg' }
     ]
   }
@@ -1101,13 +1101,52 @@ const EXERCISE_MUSCLE = {
   'rb-c1-e1': 'ruecken',  // Ring Pull Ups
   'rb-c1-e2': 'hams',     // DB SL RDLs + Row
   'rb-c2-e1': 'ruecken',  // Ring Rev Fly
-  'rb-c2-e3': 'hams',     // KB Deadlifts (posterior chain)
+  'rb-c2-e3': 'ruecken',  // KB Deadlifts (compound posterior chain)
   'rb-c2-e4': 'ruecken',  // DB Pullovers (lats)
   'rb-a1': 'hams',        // SL GHD Hypers
   'rb-a1b': 'hams',       // GHD Hypers
   'rb-a2': 'core',        // TTB
   'rb-a2b': 'core',       // GHD Situps
   'rb-a3': 'bizeps'       // Hammer Curls
+};
+
+// Sub-muscle group mapping for detailed breakdown (brust + ruecken)
+// 'beide_brust' = counts in both obere + untere; 'beide_ruecken' = counts in both lats + oberer
+const EXERCISE_SUB_MUSCLE = {
+  // Brust sub-groups
+  'va-s1': 'obere_brust',       // DB Incline Press (Strength)
+  'va-c1-e2': 'untere_brust',   // Weighted Ring Dips
+  'va-c1-e4': 'obere_brust',    // DB Incline Press (Zirkel)
+  'vb-c1-e1': 'obere_brust',    // Incline DB Press
+  'vb-c1-e3': 'beide_brust',    // Ring Push Ups (flat → both)
+  'vb-c1-e5': 'obere_brust',    // DB Incline Flys
+  // Ruecken sub-groups
+  'ra-s1': 'beide_ruecken',      // BB Seal Rows (flat on boxes → full back compound)
+  'ra-c1-e1': 'oberer_ruecken', // Snatches (explosive pull → Traps)
+  'ra-c1-e2': 'oberer_ruecken', // DB Y-Raises (lower Traps)
+  'ra-c1-e3': 'oberer_ruecken', // DB Rev. Flys (Rear Delts/Rhomboids)
+  'ra-c2-e1': 'lats',           // Pull Ups
+  'ra-c2-e2': 'oberer_ruecken', // Farmers Carries (Traps)
+  'ra-c2-e3': 'oberer_ruecken', // Shrugs (Traps)
+  'rb-s1': 'oberer_ruecken',    // DB Seal Rows (Traps/Rhomboids)
+  'rb-c1-e1': 'lats',           // Ring Pull Ups
+  'rb-c2-e1': 'oberer_ruecken', // Ring Rev Fly (Rear Delts/Rhomboids)
+  'rb-c2-e3': 'beide_ruecken',  // KB Deadlifts (compound → both)
+  'rb-c2-e4': 'lats'            // DB Pullovers (Lats)
+};
+
+// Sub-muscle config: which sub-groups exist for each muscle, and what 'beide' resolves to
+const SUB_MUSCLE_CONFIG = {
+  brust: {
+    subs: ['obere_brust', 'untere_brust'],
+    labels: { obere_brust: 'Obere Brust', untere_brust: 'Untere Brust' },
+    both: 'beide_brust'
+  },
+  ruecken: {
+    subs: ['lats', 'oberer_ruecken'],
+    labels: { lats: 'Lats', oberer_ruecken: 'Oberer Ruecken' },
+    both: 'beide_ruecken'
+  }
 };
 
 // Weekly schedule order
@@ -1122,7 +1161,7 @@ const STORAGE_KEY = 'training-app';
 function getDefaultState() {
   return {
     settings: {
-      bodyWeight: 82.5,
+      bodyWeight: 77.5,
       weightHistory: [],
       mesocycle: { number: 1, currentWeek: 1, weeksHard: 5, weeksDeload: 1 },
       goals: { weeklyVolume: 0, ruecken: 0, brust: 0, quads: 0, hams: 0 },
@@ -1328,9 +1367,21 @@ function isDumbbellExercise(exId) {
   return ex ? !!ex.dumbbell : false;
 }
 
-// Get effective weight for volume calculation (doubles for DB exercises)
+function isWeightedBWExercise(exId) {
+  const ex = getExerciseInfo(exId);
+  return ex ? !!ex.weightedBW : false;
+}
+
+// Get effective weight for volume calculation (doubles for DB exercises, adds BW for weightedBW)
 function getVolumeWeight(exId, trackedWeight) {
-  return isDumbbellExercise(exId) ? trackedWeight * 2 : trackedWeight;
+  if (isDumbbellExercise(exId)) return trackedWeight * 2;
+  if (isWeightedBWExercise(exId)) return trackedWeight + APP_STATE.settings.bodyWeight;
+  // BW exercises: apply bwFraction if defined (e.g. Ring Push Ups=0.70, Ring Rev Fly=0.25, Core=0)
+  const ex = getExerciseInfo(exId);
+  if (ex && ex.bodyweight && ex.bwFraction !== undefined) {
+    return trackedWeight * ex.bwFraction;
+  }
+  return trackedWeight;
 }
 
 // Circuit round viewing state
@@ -1924,22 +1975,49 @@ function updateAllTimerDisplays() {
 function calcSessionVolume(session) {
   let total = 0;
   Object.entries(session.sets || {}).forEach(([exId, sets]) => {
-    const multiplier = isDumbbellExercise(exId) ? 2 : 1;
     sets.forEach(set => {
       const w = Number(set.weight) || 0;
       const r = Number(set.reps) || 0;
-      total += w * multiplier * r;
+      total += getVolumeWeight(exId, w) * r;
     });
   });
   return total;
 }
 
 function calcMuscleVolume(session, muscle) {
-  const plan = WORKOUT_PLANS[session.workoutId];
-  if (!plan) return 0;
-  const totalVolume = calcSessionVolume(session);
-  const pct = plan.muscleSplit[muscle] || 0;
-  return Math.round(totalVolume * pct / 100);
+  let total = 0;
+  Object.entries(session.sets || {}).forEach(([exId, sets]) => {
+    if (EXERCISE_MUSCLE[exId] !== muscle) return;
+    sets.forEach(set => {
+      const w = Number(set.weight) || 0;
+      const r = Number(set.reps) || 0;
+      total += getVolumeWeight(exId, w) * r;
+    });
+  });
+  return total;
+}
+
+// Calculate sub-muscle volume for a week (e.g. 'obere_brust', 'lats')
+// 'beide_X' exercises count for BOTH sub-groups
+function calcWeekSubMuscleVolume(week, muscle, subMuscle, mesocycle) {
+  const config = SUB_MUSCLE_CONFIG[muscle];
+  if (!config) return 0;
+  return APP_STATE.sessions
+    .filter(s => s.week === week && s.mesocycle === (mesocycle || APP_STATE.settings.mesocycle.number))
+    .reduce((sum, s) => {
+      let vol = 0;
+      Object.entries(s.sets || {}).forEach(([exId, sets]) => {
+        if (EXERCISE_MUSCLE[exId] !== muscle) return;
+        const sub = EXERCISE_SUB_MUSCLE[exId];
+        if (sub !== subMuscle && sub !== config.both) return;
+        sets.forEach(set => {
+          const w = Number(set.weight) || 0;
+          const r = Number(set.reps) || 0;
+          vol += getVolumeWeight(exId, w) * r;
+        });
+      });
+      return sum + vol;
+    }, 0);
 }
 
 function calcWeekVolume(week, mesocycle) {
@@ -3670,20 +3748,28 @@ function renderDoneTab(plan) {
   const duration = session.duration || (sessionTimer.running ? getSessionSeconds() : 0);
   const durationMin = Math.round(duration / 60);
 
-  // Muscle volume boxes
-  const split = plan.muscleSplit;
+  // Muscle volume boxes (per-exercise based, not percentage split)
   const muscleLabels = { ruecken: 'Ruecken', brust: 'Brust', quads: 'Quads', hams: 'Hams', bizeps: 'Bizeps', core: 'Core', trizeps: 'Trizeps', schultern: 'Schultern' };
+  const sessionMuscles = {};
+  Object.entries(session.sets || {}).forEach(([exId, sets]) => {
+    const muscle = EXERCISE_MUSCLE[exId];
+    if (!muscle) return;
+    if (!sessionMuscles[muscle]) sessionMuscles[muscle] = { vol: 0, reps: 0 };
+    sets.forEach(set => {
+      const w = Number(set.weight) || 0;
+      const r = Number(set.reps) || 0;
+      sessionMuscles[muscle].vol += getVolumeWeight(exId, w) * r;
+      sessionMuscles[muscle].reps += r;
+    });
+  });
 
   let statsBoxes = '';
-  Object.entries(split).forEach(([muscle, pct]) => {
-    const vol = Math.round(totalVol * pct / 100);
-    const totalReps = Object.entries(session.sets || {}).reduce((sum, [_, sets]) => sum + calcTotalReps(sets), 0);
-    const muscleReps = Math.round(totalReps * pct / 100);
+  Object.entries(sessionMuscles).forEach(([muscle, data]) => {
     statsBoxes += `
       <div class="done-stat-box">
         <div class="done-stat-label">${muscleLabels[muscle] || muscle}</div>
-        <div class="done-stat-value">${(vol / 1000).toFixed(1)}t</div>
-        <div class="done-stat-sub">${muscleReps} Reps</div>
+        <div class="done-stat-value">${(data.vol / 1000).toFixed(1)}t</div>
+        <div class="done-stat-sub">${data.reps} Reps</div>
       </div>`;
   });
 
@@ -3869,21 +3955,42 @@ function renderLearningsTab() {
 }
 
 // =============================================
-// 1RM ESTIMATION (Epley formula, with fixes)
+// 1RM ESTIMATION (Brzycki formula)
 // =============================================
 
 function estimate1RM(set, exerciseDef) {
   // Skip sets with 0 or missing reps
   if (!set.reps || set.reps <= 0) return 0;
-  // Skip sets with 0 weight (unless bodyweight)
-  if (!set.weight || set.weight <= 0) return 0;
+  // Skip sets with 0 weight (unless weightedBW where added weight can be valid)
+  if ((!set.weight || set.weight <= 0) && !(exerciseDef && exerciseDef.weightedBW)) return 0;
+  // Skip core BW exercises (bwFraction = 0) — 1RM not meaningful
+  if (exerciseDef && exerciseDef.bodyweight && exerciseDef.bwFraction === 0) return 0;
   // Brzycki breaks at 37+ reps — cap at 36
   if (set.reps >= 37) return 0;
-  // For dumbbell exercises, multiply weight by 2 (total load)
-  var w = set.weight;
+  // Calculate total load
+  var w = set.weight || 0;
   if (exerciseDef && exerciseDef.dumbbell) w = w * 2;
+  if (exerciseDef && exerciseDef.weightedBW) w = w + APP_STATE.settings.bodyWeight;
+  // Apply bwFraction for partial-BW exercises (Ring Push Ups=0.70, Ring Rev Fly=0.25, GHD=0.50)
+  if (exerciseDef && exerciseDef.bodyweight && exerciseDef.bwFraction !== undefined && exerciseDef.bwFraction > 0 && exerciseDef.bwFraction < 1) {
+    w = w * exerciseDef.bwFraction;
+  }
+  if (w <= 0) return 0;
   // Brzycki formula: 1RM = weight * 36 / (37 - reps)
   return w * 36 / (37 - set.reps);
+}
+
+// Format 1RM for display — DB: per-DB value, weightedBW: added weight only
+function format1RMDisplay(est1RM, exDef) {
+  if (!est1RM || est1RM <= 0) return '0kg';
+  if (exDef && exDef.dumbbell) {
+    return Math.round(est1RM / 2 * 10) / 10 + 'kg/DB';
+  }
+  if (exDef && exDef.weightedBW) {
+    var added = est1RM - APP_STATE.settings.bodyWeight;
+    return '+' + Math.round(added * 10) / 10 + 'kg';
+  }
+  return Math.round(est1RM * 10) / 10 + 'kg';
 }
 
 // Lookup exercise definition by ID across all plans
@@ -3946,8 +4053,9 @@ function renderProgressionBars(progression, exDef) {
   var last = progression[progression.length - 1];
   if (progression.length > 1) {
     var isDbl = exDef && exDef.dumbbell;
-    var fw = isDbl ? first.weight + 'kg/DB' : first.weight + 'kg';
-    var lw = isDbl ? last.weight + 'kg/DB' : last.weight + 'kg';
+    var isWBW = exDef && exDef.weightedBW;
+    var fw = isDbl ? first.weight + 'kg/DB' : (isWBW ? '+' + first.weight + 'kg' : first.weight + 'kg');
+    var lw = isDbl ? last.weight + 'kg/DB' : (isWBW ? '+' + last.weight + 'kg' : last.weight + 'kg');
     html += '<div style="font-size:12px;color:var(--orange);font-weight:600;margin-bottom:6px">' +
       fw + ' x' + first.reps + '  →  ' + lw + ' x' + last.reps + '</div>';
   }
@@ -3955,7 +4063,8 @@ function renderProgressionBars(progression, exDef) {
     var pct = maxEst > 0 ? Math.round(p.est1RM / maxEst * 100) : 0;
     var dateStr = p.date ? p.date.substring(5).replace('-', '.') : '?';
     var isDbl = exDef && exDef.dumbbell;
-    var wLabel = isDbl ? p.weight + 'kg/DB' : p.weight + 'kg';
+    var isWBW = exDef && exDef.weightedBW;
+    var wLabel = isDbl ? p.weight + 'kg/DB' : (isWBW ? '+' + p.weight + 'kg' : p.weight + 'kg');
     var isLast = i === progression.length - 1;
     html += '<div style="display:flex;align-items:center;gap:6px;margin:2px 0">' +
       '<span style="font-size:10px;color:var(--text-ter);min-width:38px">' + dateStr + '</span>' +
@@ -4147,7 +4256,7 @@ function renderStatsAll() {
       <div onclick="toggleProgression('${ex.id}')" style="cursor:pointer;display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
         <span style="font-size:14px">${ex.name} <span id="arrow-${ex.id}" style="font-size:9px;color:var(--text-ter)">▼</span></span>
         <div style="display:flex;gap:12px;align-items:center">
-          <span style="font-size:14px;font-weight:600">${ex.rm}kg</span>
+          <span style="font-size:14px;font-weight:600">${format1RMDisplay(ex.rm, ex.def)}</span>
           <span class="volume-change ${cls}" style="font-size:12px">${sign}${ex.change}%</span>
         </div>
       </div>
@@ -4254,7 +4363,7 @@ function renderStatsMuscle(muscle) {
         });
         if (best1RM > 0) {
           const change = first1RM > 0 ? Math.round((best1RM - first1RM) / first1RM * 100) : 0;
-          exercisesBySource[src.key].push({ id: ex.id, name: ex.name, rm: Math.round(best1RM * 10) / 10, change });
+          exercisesBySource[src.key].push({ id: ex.id, name: ex.name, rm: Math.round(best1RM * 10) / 10, change, def: ex });
         }
       });
     });
@@ -4270,13 +4379,13 @@ function renderStatsMuscle(muscle) {
     exList.forEach(ex => {
       const cls = ex.change >= 0 ? 'up' : 'down';
       const sign = ex.change >= 0 ? '+' : '';
-      const exDef = findExerciseDef(ex.id);
+      const exDef = ex.def || findExerciseDef(ex.id);
       const prog = getExerciseProgression(ex.id, exDef);
       const progHtml = renderProgressionBars(prog, exDef);
       exHtml += '<div onclick="toggleProgression(\'' + ex.id + '\')" style="cursor:pointer;display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">' +
         '<span style="font-size:14px">' + ex.name + ' <span id="arrow-' + ex.id + '" style="font-size:9px;color:var(--text-ter)">▼</span></span>' +
         '<div style="display:flex;gap:12px;align-items:center">' +
-          '<span style="font-size:14px;font-weight:600">' + ex.rm + 'kg</span>' +
+          '<span style="font-size:14px;font-weight:600">' + format1RMDisplay(ex.rm, exDef) + '</span>' +
           '<span class="volume-change ' + cls + '">' + sign + ex.change + '%</span>' +
         '</div>' +
       '</div>' +
@@ -4326,6 +4435,7 @@ function renderStatsMuscle(muscle) {
         <span>Ziel: ${(goal/1000).toFixed(1)}t</span>
       </div>
       <div class="progress-bar"><div class="progress-fill" style="width:${progressPct}%;background:${barColor}"></div></div>
+      ${renderSubMuscleBreakdown(muscle)}
     </div>
 
     <div class="card">
@@ -4335,6 +4445,57 @@ function renderStatsMuscle(muscle) {
 
     ${prHtml ? '<div class="card"><h3 style="margin-bottom:8px">PRs</h3><div style="display:flex;flex-wrap:wrap;gap:4px">' + prHtml + '</div></div>' : ''}
   `;
+}
+
+// Sub-muscle group breakdown for brust + ruecken
+function renderSubMuscleBreakdown(muscle) {
+  const config = SUB_MUSCLE_CONFIG[muscle];
+  if (!config) return '';
+  const cw = APP_STATE.settings.mesocycle.currentWeek;
+  const muscleColors = { brust: 'var(--orange)', ruecken: 'var(--blue)' };
+  const baseColor = muscleColors[muscle] || 'var(--orange)';
+
+  // Calculate current week sub-volumes
+  let subData = [];
+  let maxSub = 0;
+  config.subs.forEach(function(sub) {
+    let vol = 0;
+    for (let w = 1; w <= cw; w++) {
+      vol += calcWeekSubMuscleVolume(w, muscle, sub);
+    }
+    subData.push({ key: sub, label: config.labels[sub], vol: vol });
+    if (vol > maxSub) maxSub = vol;
+  });
+
+  if (maxSub === 0) return '';
+
+  let html = '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">';
+  html += '<div style="font-size:11px;font-weight:600;color:var(--text-ter);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Aufschluesselung</div>';
+
+  subData.forEach(function(d) {
+    const pct = maxSub > 0 ? Math.round(d.vol / maxSub * 100) : 0;
+    const volStr = (d.vol / 1000).toFixed(1) + 't';
+    html += '<div style="margin-bottom:6px">' +
+      '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">' +
+        '<span style="color:var(--text-sec)">' + d.label + '</span>' +
+        '<span style="font-weight:600">' + volStr + '</span>' +
+      '</div>' +
+      '<div style="height:8px;background:var(--bg);border-radius:4px;overflow:hidden">' +
+        '<div style="height:100%;width:' + pct + '%;background:' + baseColor + ';border-radius:4px;opacity:' + (pct === 100 ? '1' : '0.6') + '"></div>' +
+      '</div>' +
+    '</div>';
+  });
+
+  // Show ratio
+  if (subData.length === 2 && subData[0].vol > 0 && subData[1].vol > 0) {
+    const ratio1 = Math.round(subData[0].vol / (subData[0].vol + subData[1].vol) * 100);
+    const ratio2 = 100 - ratio1;
+    html += '<div style="font-size:11px;color:var(--text-ter);text-align:center;margin-top:4px">' +
+      subData[0].label + ' ' + ratio1 + '% / ' + subData[1].label + ' ' + ratio2 + '%</div>';
+  }
+
+  html += '</div>';
+  return html;
 }
 
 // =============================================
@@ -4590,7 +4751,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '3.6';
+const APP_VERSION = '3.9';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
