@@ -1732,6 +1732,148 @@ function playBeep() {
   } catch(e) { console.log('Audio not available'); }
 }
 
+// =============================================
+// KADENZ / TEMPO GUIDE
+// =============================================
+
+var cadenceState = {
+  active: false,
+  tempo: [2, 1, 1, 1], // [eccentric, hold-bottom, concentric, hold-top] in seconds
+  phase: 0,             // 0=ecc, 1=hold-bot, 2=con, 3=hold-top
+  phaseStart: 0,
+  repCount: 0,
+  intervalId: null,
+  oscillator: null
+};
+
+var CADENCE_PHASES = [
+  { name: 'DOWN', color: '#3266ad', freq: 220, icon: '↓' },
+  { name: 'HOLD', color: '#D85A30', freq: 0,   icon: '◆' },
+  { name: 'UP',   color: '#1D9E75', freq: 380, icon: '↑' },
+  { name: 'TOP',  color: '#534AB7', freq: 0,   icon: '●' }
+];
+
+function startCadence() {
+  if (cadenceState.active) { stopCadence(); return; }
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  } catch(e) {}
+  cadenceState.active = true;
+  cadenceState.phase = 0;
+  cadenceState.phaseStart = Date.now();
+  cadenceState.repCount = 0;
+  cadencePlayPhase(0);
+  cadenceState.intervalId = setInterval(cadenceTick, 50);
+  renderCadenceOverlay();
+}
+
+function stopCadence() {
+  cadenceState.active = false;
+  if (cadenceState.intervalId) { clearInterval(cadenceState.intervalId); cadenceState.intervalId = null; }
+  cadenceStopTone();
+  var overlay = document.getElementById('cadence-overlay');
+  if (overlay) overlay.remove();
+}
+
+function cadenceTick() {
+  if (!cadenceState.active) return;
+  var elapsed = (Date.now() - cadenceState.phaseStart) / 1000;
+  var phaseDuration = cadenceState.tempo[cadenceState.phase];
+
+  // Update visual
+  var progEl = document.getElementById('cadence-progress');
+  var timeEl = document.getElementById('cadence-time');
+  var phaseEl = document.getElementById('cadence-phase');
+  var repEl = document.getElementById('cadence-reps');
+  if (progEl) {
+    var pct = Math.min(100, (elapsed / phaseDuration) * 100);
+    progEl.style.width = pct + '%';
+    progEl.style.background = CADENCE_PHASES[cadenceState.phase].color;
+  }
+  if (timeEl) timeEl.textContent = Math.max(0, (phaseDuration - elapsed)).toFixed(1) + 's';
+  if (phaseEl) {
+    phaseEl.textContent = CADENCE_PHASES[cadenceState.phase].icon + ' ' + CADENCE_PHASES[cadenceState.phase].name;
+    phaseEl.style.color = CADENCE_PHASES[cadenceState.phase].color;
+  }
+  if (repEl) repEl.textContent = cadenceState.repCount;
+
+  // Phase transition
+  if (elapsed >= phaseDuration) {
+    var nextPhase = (cadenceState.phase + 1) % 4;
+    if (nextPhase === 0) cadenceState.repCount++;
+    cadenceState.phase = nextPhase;
+    cadenceState.phaseStart = Date.now();
+    cadencePlayPhase(nextPhase);
+  }
+}
+
+function cadencePlayPhase(phase) {
+  cadenceStopTone();
+  if (!audioCtx) return;
+  var p = CADENCE_PHASES[phase];
+  var dur = cadenceState.tempo[phase];
+  try {
+    // Transition beep
+    var beepOsc = audioCtx.createOscillator();
+    var beepGain = audioCtx.createGain();
+    beepOsc.connect(beepGain);
+    beepGain.connect(audioCtx.destination);
+    beepOsc.frequency.value = phase === 0 ? 330 : phase === 1 ? 440 : phase === 2 ? 550 : 660;
+    beepGain.gain.value = 0.35;
+    beepOsc.start(audioCtx.currentTime);
+    beepOsc.stop(audioCtx.currentTime + 0.08);
+
+    // Sustained tone for eccentric/concentric
+    if (p.freq > 0) {
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = p.freq;
+      gain.gain.setValueAtTime(0.15, audioCtx.currentTime + 0.1);
+      gain.gain.linearRampToValueAtTime(0.0, audioCtx.currentTime + dur);
+      osc.start(audioCtx.currentTime + 0.1);
+      osc.stop(audioCtx.currentTime + dur);
+      cadenceState.oscillator = osc;
+    }
+  } catch(e) {}
+}
+
+function cadenceStopTone() {
+  if (cadenceState.oscillator) {
+    try { cadenceState.oscillator.stop(); } catch(e) {}
+    cadenceState.oscillator = null;
+  }
+}
+
+function renderCadenceOverlay() {
+  var existing = document.getElementById('cadence-overlay');
+  if (existing) existing.remove();
+  var overlay = document.createElement('div');
+  overlay.id = 'cadence-overlay';
+  overlay.innerHTML =
+    '<div style="position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:9999;' +
+    'background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px 24px;' +
+    'box-shadow:0 4px 20px rgba(0,0,0,0.4);min-width:220px;text-align:center">' +
+      '<div style="font-size:11px;color:var(--text-ter);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Kadenz 2-1-1-1</div>' +
+      '<div id="cadence-phase" style="font-size:28px;font-weight:700;margin:4px 0;transition:color 0.15s">' +
+        CADENCE_PHASES[0].icon + ' ' + CADENCE_PHASES[0].name +
+      '</div>' +
+      '<div id="cadence-time" style="font-size:16px;font-weight:600;color:var(--text-sec);margin-bottom:8px">2.0s</div>' +
+      '<div style="height:6px;background:var(--bg);border-radius:3px;overflow:hidden;margin-bottom:8px">' +
+        '<div id="cadence-progress" style="height:100%;width:0%;border-radius:3px;transition:width 0.05s linear"></div>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center">' +
+        '<div style="font-size:12px;color:var(--text-ter)">Reps: <span id="cadence-reps" style="font-weight:600;color:var(--text)">0</span></div>' +
+        '<button onclick="stopCadence()" style="background:var(--orange);color:#fff;border:none;border-radius:8px;' +
+        'padding:6px 16px;font-size:13px;font-weight:600;cursor:pointer">Stop</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+}
+
 function checkCountdownCompletion() {
   if (restTimer.mode === 'countdown' && !restTimer.completed && restTimer.pausedRemaining === null) {
     if (Date.now() >= restTimer.endTime) {
@@ -1919,6 +2061,7 @@ let warmupChecked = {};
 let warmupTimerRunning = false;
 
 function navigateTo(page) {
+  if (cadenceState.active) stopCadence();
   currentPage = page;
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(`page-${page}`).classList.add('active');
@@ -2332,6 +2475,10 @@ function renderWorkoutDetail() {
     ? '<button onclick="openLearningModal()" style="position:fixed;bottom:calc(var(--nav-height) + var(--safe-bottom) + 16px);right:16px;width:48px;height:48px;border-radius:50%;background:var(--card);border:1px solid var(--border);font-size:20px;z-index:100;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.3)" id="learning-fab">💡</button>'
     : '';
 
+  const cadenceBtn = activeSession && !activeSession._completed && (activeSubTab === 'strength' || activeSubTab === 'zirkel' || activeSubTab === 'acc')
+    ? '<button onclick="startCadence()" style="position:fixed;bottom:calc(var(--nav-height) + var(--safe-bottom) + 16px);left:16px;height:40px;border-radius:20px;background:' + (cadenceState.active ? 'var(--orange)' : 'var(--card)') + ';border:1px solid var(--border);font-size:12px;font-weight:600;color:' + (cadenceState.active ? '#fff' : 'var(--text-sec)') + ';z-index:100;display:flex;align-items:center;justify-content:center;padding:0 14px;gap:6px;box-shadow:0 2px 8px rgba(0,0,0,0.3)">♫ Kadenz</button>'
+    : '';
+
   document.getElementById('training-content').innerHTML = `
     <button class="back-btn" onclick="backToWeekOverview()">${ICONS.back} Woche ${week}</button>
     <h2>${plan.name}</h2>
@@ -2340,6 +2487,7 @@ function renderWorkoutDetail() {
     ${sessionTimerHtml}
     ${content}
     ${learningBtn}
+    ${cadenceBtn}
   `;
 }
 
@@ -4442,7 +4590,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '3.5';
+const APP_VERSION = '3.6';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
