@@ -1286,6 +1286,22 @@ function generateSampleData() {
         session.sets[ex.id] = sets;
       });
 
+      // RPE per section (increases with weeks = progressive fatigue)
+      session.rpe = { strength: Math.min(10, 5 + week) };
+      plan.circuits.forEach(c => { session.rpe[c.id] = Math.min(10, 6 + week); });
+      session.rpe.acc = Math.min(10, 5 + week);
+
+      // Readiness data (sample: decreases slightly over weeks = accumulating fatigue)
+      var baseSleep = Math.max(2, 5 - Math.floor(week / 3));
+      var baseSoreness = Math.max(2, 5 - Math.floor(week / 2));
+      var baseMotivation = Math.max(2, 5 - Math.floor((week - 1) / 3));
+      session.readiness = {
+        sleep: baseSleep,
+        soreness: baseSoreness,
+        motivation: baseMotivation,
+        score: Math.round((baseSleep + baseSoreness + baseMotivation) / 3 * 10) / 10
+      };
+
       state.sessions.push(session);
     });
   }
@@ -2174,12 +2190,14 @@ function renderHomePage() {
     const status = getCurrentWeekWorkoutStatus(wid);
     const statusClass = status;
     const checkHtml = status === 'done' ? ICONS.check : '';
+    const estDur = getEstimatedDuration(wid);
+    const durHint = estDur > 0 ? ' · ~' + estDur + 'min' : '';
     workoutRows += `
       <div class="workout-row" onclick="openWorkout('${wid}')">
         <div class="workout-status ${statusClass}">${checkHtml}</div>
         <div class="workout-info">
           <div class="workout-name">${plan.name}</div>
-          <div class="workout-sub">${plan.subtitle}</div>
+          <div class="workout-sub">${plan.subtitle}${durHint}</div>
         </div>
         <div class="workout-day">${plan.day}</div>
       </div>`;
@@ -2219,12 +2237,14 @@ function renderHomePage() {
     prHtml += '</div></div>';
   }
 
-  // 1RM Summary for home screen
+  // Lift Status Summary for home screen (strength exercises with current stand + % + 1RM)
   let rmSummary = '';
   if (APP_STATE.sessions.length > 0) {
-    const rmItems = [];
+    const liftItems = [];
     Object.values(WORKOUT_PLANS).forEach(function(plan) {
       plan.strength.forEach(function(ex) {
+        const status = getLiftStatus(ex.id);
+        if (!status) return;
         let best1RM = 0;
         APP_STATE.sessions.forEach(function(s) {
           (s.sets[ex.id] || []).forEach(function(set) {
@@ -2232,13 +2252,25 @@ function renderHomePage() {
             if (est > best1RM) best1RM = est;
           });
         });
-        if (best1RM > 0) rmItems.push({ name: ex.name, rm: Math.round(best1RM * 10) / 10 });
+        liftItems.push({ name: ex.name, status: status, rm: Math.round(best1RM * 10) / 10, def: ex });
       });
     });
-    if (rmItems.length > 0) {
+    if (liftItems.length > 0) {
       rmSummary = '<div style="margin-top:8px">';
-      rmItems.forEach(function(item) {
-        rmSummary += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px"><span style="color:var(--text-sec)">' + item.name + '</span><span style="font-weight:600">' + item.rm + 'kg</span></div>';
+      liftItems.forEach(function(item) {
+        var s = item.status;
+        var liftLabel = s.weightLabel ? s.weightLabel + ' × ' + s.reps : s.reps + ' reps';
+        var changeStr = s.hasChange ? ((s.changePct >= 0 ? '+' : '') + s.changePct + '%') : '';
+        var changeColor = s.changePct >= 0 ? 'var(--green)' : 'var(--red)';
+        rmSummary += '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)">' +
+          '<div>' +
+            '<div style="font-size:12px;color:var(--text-sec)">' + item.name + '</div>' +
+            '<div style="font-size:14px;font-weight:700;margin-top:1px">' + liftLabel +
+              (changeStr ? ' <span style="font-size:11px;color:' + changeColor + ';font-weight:600">' + changeStr + '</span>' : '') +
+            '</div>' +
+          '</div>' +
+          (item.rm > 0 ? '<div style="text-align:right"><div style="font-size:11px;color:var(--text-ter)">1RM</div><div style="font-size:13px;font-weight:600">' + format1RMDisplay(item.rm, item.def) + '</div></div>' : '') +
+        '</div>';
       });
       rmSummary += '</div>';
     }
@@ -2288,6 +2320,36 @@ function renderHomePage() {
       <div class="progress-bar"><div class="progress-fill" style="width:${progressPct}%"></div></div>
     </div>
 
+    <!-- Streak + Deload Banner -->
+    ${(function() {
+      var streak = getTrainingStreak();
+      var totalSess = getTotalSessions();
+      var deload = shouldSuggestDeload();
+      var html = '';
+      if (streak > 0 || totalSess > 0) {
+        html += '<div style="display:flex;gap:8px;margin-bottom:12px">';
+        if (streak > 0) {
+          html += '<div style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;text-align:center">' +
+            '<div style="font-size:20px;font-weight:700;color:var(--orange)">' + streak + '</div>' +
+            '<div style="font-size:10px;color:var(--text-ter);text-transform:uppercase;letter-spacing:0.5px">Wochen Streak</div></div>';
+        }
+        html += '<div style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;text-align:center">' +
+          '<div style="font-size:20px;font-weight:700;color:var(--text)">' + totalSess + '</div>' +
+          '<div style="font-size:10px;color:var(--text-ter);text-transform:uppercase;letter-spacing:0.5px">Sessions Total</div></div>';
+        html += '</div>';
+      }
+      if (deload) {
+        var reason = deload.reason === 'volume_and_rpe' ? 'Volumen sinkt + RPE Ø ' + deload.avgRPE
+          : deload.reason === 'high_rpe' ? 'RPE Durchschnitt ' + deload.avgRPE + '/10'
+          : 'Volumen sinkt seit 2 Wochen';
+        html += '<div style="background:var(--red);color:#fff;padding:12px 14px;border-radius:10px;margin-bottom:12px;display:flex;align-items:center;gap:10px">' +
+          '<span style="font-size:20px">⚠</span>' +
+          '<div style="flex:1"><div style="font-size:13px;font-weight:700">Deload empfohlen</div>' +
+          '<div style="font-size:11px;opacity:0.85">' + reason + '</div></div></div>';
+      }
+      return html;
+    })()}
+
     <!-- This Week -->
     <div class="section-title">Diese Woche</div>
     <div class="card">${workoutRows}</div>
@@ -2326,7 +2388,7 @@ function renderHomePage() {
         <span style="font-size:14px;font-weight:600">${(currentWeekVol/1000).toFixed(1)}t / ${(weekVolGoal/1000).toFixed(1)}t</span>
       </div>
       <div class="progress-bar"><div class="progress-fill" style="width:${weekVolPct}%"></div></div>
-      ${rmSummary ? '<div style="margin-top:8px"><div style="font-size:12px;color:var(--text-sec);font-weight:600;margin-bottom:4px">1RM Schätzungen</div>' + rmSummary + '</div>' : ''}
+      ${rmSummary ? '<div style="margin-top:8px"><div style="font-size:12px;color:var(--text-sec);font-weight:600;margin-bottom:4px">Lift Status</div>' + rmSummary + '</div>' : ''}
     </div>
     ` : ''}
 
@@ -2481,6 +2543,7 @@ function openWorkout(workoutId) {
       mesocycle: APP_STATE.settings.mesocycle.number,
       duration: 0,
       feeling: null,
+      readiness: null,
       sets: {},
       warmupDone: false,
       circuitRounds: {},
@@ -2489,7 +2552,8 @@ function openWorkout(workoutId) {
       _currentStrengthSet: {},
       _currentCircuitRound: {},
       _completed: false,
-      _circuitDone: {}
+      _circuitDone: {},
+      _readinessDone: false
     };
     resetSessionTimer();
     // Timer starts when warmup timer is clicked, not immediately
@@ -2578,6 +2642,73 @@ function switchSubTab(tab) {
 // WARMUP TAB
 // =============================================
 
+function renderReadinessCheck() {
+  if (!activeSession || activeSession._readinessDone || activeSession._completed) return '';
+  var rd = activeSession.readiness || {};
+  var hasAll = rd.sleep > 0 && rd.soreness > 0 && rd.motivation > 0;
+  var html = '<div class="card" style="margin-bottom:16px;border:1px solid var(--orange)">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
+  html += '<div style="font-size:14px;font-weight:700;color:var(--text)">Recovery Check</div>';
+  if (hasAll) {
+    var score = Math.round((rd.sleep + rd.soreness + rd.motivation) / 3 * 10) / 10;
+    var scoreColor = score >= 4 ? 'var(--green)' : score >= 2.5 ? 'var(--orange)' : 'var(--red)';
+    html += '<span style="font-size:14px;font-weight:700;color:' + scoreColor + '">' + score + '/5</span>';
+  }
+  html += '</div>';
+  html += '<div style="font-size:11px;color:var(--text-ter);margin-bottom:12px">Wie erholt bist du? (Daten werden gesammelt)</div>';
+
+  // Slider 1: Schlaf
+  html += renderReadinessSlider('sleep', 'Schlaf', rd.sleep || 0, ['😴', '😐', '😊', '😄', '🌟']);
+  // Slider 2: Muskelerschöpfung (inverted: 1=sehr erschöpft, 5=frisch)
+  html += renderReadinessSlider('soreness', 'Muskeln', rd.soreness || 0, ['🔥', '😣', '😐', '💪', '🦾']);
+  // Slider 3: Motivation
+  html += renderReadinessSlider('motivation', 'Motivation', rd.motivation || 0, ['😩', '😕', '😐', '😤', '🔥']);
+
+  if (hasAll) {
+    html += '<button class="btn btn-sm btn-orange" style="width:100%;margin-top:8px" onclick="confirmReadiness()">Bereit — los gehts!</button>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderReadinessSlider(key, label, value, emojis) {
+  var html = '<div style="margin-bottom:10px">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
+  html += '<span style="font-size:12px;font-weight:600;color:var(--text-sec)">' + label + '</span>';
+  if (value > 0) html += '<span style="font-size:14px">' + emojis[value - 1] + '</span>';
+  html += '</div>';
+  html += '<div style="display:flex;gap:4px">';
+  for (var i = 1; i <= 5; i++) {
+    var isSelected = value === i;
+    var bg = isSelected ? (i <= 2 ? 'var(--red)' : i <= 3 ? 'var(--orange)' : 'var(--green)') : 'var(--bg)';
+    var color = isSelected ? '#fff' : 'var(--text-sec)';
+    html += '<button onclick="setReadiness(\'' + key + '\',' + i + ')" style="flex:1;padding:8px 0;font-size:13px;font-weight:' + (isSelected ? '700' : '400') + ';background:' + bg + ';color:' + color + ';border:1px solid ' + (isSelected ? 'transparent' : 'var(--border)') + ';border-radius:6px;cursor:pointer">' + i + '</button>';
+  }
+  html += '</div></div>';
+  return html;
+}
+
+function setReadiness(key, value) {
+  if (!activeSession) return;
+  if (!activeSession.readiness) activeSession.readiness = {};
+  activeSession.readiness[key] = value;
+  saveState();
+  renderWorkoutDetail();
+}
+
+function confirmReadiness() {
+  if (!activeSession) return;
+  activeSession._readinessDone = true;
+  // Calculate score
+  var rd = activeSession.readiness;
+  if (rd) rd.score = Math.round((rd.sleep + rd.soreness + rd.motivation) / 3 * 10) / 10;
+  // Save to stored session
+  var idx = APP_STATE.sessions.findIndex(function(s) { return s.id === activeSession.id; });
+  if (idx >= 0) APP_STATE.sessions[idx].readiness = activeSession.readiness;
+  saveState();
+  renderWorkoutDetail();
+}
+
 function renderWarmupTab(plan) {
   // Build cumulative time thresholds for display
   const thresholds = getWarmupThresholds(plan);
@@ -2612,6 +2743,7 @@ function renderWarmupTab(plan) {
   const totalWarmupTime = thresholds.length > 0 ? thresholds[thresholds.length - 1].at : 0;
 
   return `
+    ${renderReadinessCheck()}
     <div class="card" style="text-align:center;padding:24px">
       <div class="rest-timer-display timer-display">${formatTime(getTimerSeconds())}</div>
       ${totalWarmupTime > 0 ? `<div style="font-size:11px;color:var(--text-ter);margin-top:4px">Auto-Check bis ${formatTime(totalWarmupTime)}</div>` : ''}
@@ -2704,14 +2836,20 @@ function renderStrengthTab(plan) {
     if (ex.note && !isEMOM && !hasPyramid) subtitleText += ` (${ex.note})`;
 
     html += `<div class="exercise-card">
-      <div class="exercise-name">${ex.name}</div>
-      <div class="exercise-last">${subtitleText}${lastStr ? ' | Letztes Mal: ' + lastStr : ''}</div>`;
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="exercise-name">${ex.name}</div>
+        <button id="peek-icon-${ex.id}" onclick="event.stopPropagation();toggleHistoryPeek('${ex.id}')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 6px;font-size:12px;color:var(--text-ter);cursor:pointer">📊</button>
+      </div>
+      <div class="exercise-last">${subtitleText}${lastStr ? ' | Letztes Mal: ' + lastStr : ''}</div>
+      <div id="peek-${ex.id}" style="display:none">${renderHistoryPeek(ex.id)}</div>`;
 
     // To Beat display
     const toBeatStr = formatToBeat(ex.id);
     if (toBeatStr) {
       html += `<div class="to-beat">${toBeatStr}</div>`;
     }
+    // RPE Coaching tip for strength section
+    html += renderCoachingTip('strength', activeWorkoutId);
 
     // Timer section - different for EMOM vs regular
     if (isEMOM) {
@@ -2927,6 +3065,7 @@ function renderStrengthTab(plan) {
   });
 
   if (allDone) {
+    html += renderRPESelector('strength');
     html += '<button class="btn btn-green" style="margin-top:12px" onclick="switchSubTab(\'zirkel\')">Weiter: Zirkel</button>';
   }
 
@@ -3106,9 +3245,14 @@ function renderZirkelTab(plan) {
         var toBeatStr = formatToBeat(ex.id);
 
         html += '<div class="exercise-card">' +
-          '<div class="exercise-name">' + ex.name + '</div>' +
+          '<div style="display:flex;justify-content:space-between;align-items:center">' +
+            '<div class="exercise-name">' + ex.name + '</div>' +
+            '<button id="peek-icon-' + ex.id + '" onclick="event.stopPropagation();toggleHistoryPeek(\'' + ex.id + '\')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 6px;font-size:12px;color:var(--text-ter);cursor:pointer">📊</button>' +
+          '</div>' +
           '<div class="exercise-last">' + ex.reps + ' ' + weightLabel + (ex.note ? ' (' + ex.note + ')' : '') + '</div>' +
+          '<div id="peek-' + ex.id + '" style="display:none">' + renderHistoryPeek(ex.id) + '</div>' +
           (toBeatStr ? '<div class="to-beat">' + toBeatStr + '</div>' : '') +
+          renderCoachingTip(circuit.id, activeWorkoutId) +
           '<div class="input-row" style="margin-top:8px">' +
             (bw ? '<div class="input-group"><div class="input-label">Gewicht</div><div style="text-align:center;padding:8px;font-size:14px">BW</div></div>' :
             '<div class="input-group">' +
@@ -3143,6 +3287,7 @@ function renderZirkelTab(plan) {
         '<div style="color:var(--green);font-size:14px;font-weight:600;margin-bottom:8px">✓ Zirkel abgeschlossen (' + completedRounds + ' Runden)</div>' +
         '<button class="btn btn-sm btn-outline" style="border-color:var(--orange);color:var(--orange)" onclick="reopenCircuit(\'' + circuit.id + '\')">Zirkel wieder öffnen</button>' +
       '</div>';
+      html += renderRPESelector(circuit.id);
     }
 
     html += '</div>'; // close zirkel-round-area
@@ -3325,6 +3470,7 @@ function renderAccTab(plan) {
     }
   }
 
+  html += renderRPESelector('acc');
   html += '<button class="btn btn-green" style="margin-top:20px" onclick="finishWorkout()">Training abschliessen</button>';
 
   return html;
@@ -3637,6 +3783,7 @@ function finishWorkout() {
   delete toSave._currentStrengthSet;
   delete toSave._currentCircuitRound;
   delete toSave._completed;
+  delete toSave._readinessDone;
   // Keep _circuitDone and _extraRounds for round viewing after completion
   // delete toSave._circuitDone;
 
@@ -3840,6 +3987,52 @@ function renderDoneTab(plan) {
       <div class="motivation-text">${motivText}</div>
     </div>
 
+    ${(function() {
+      var rpe = session.rpe || {};
+      var rpeEntries = [];
+      var wplan = WORKOUT_PLANS[session.workoutId];
+      if (rpe.strength) rpeEntries.push({ label: 'Strength', val: rpe.strength });
+      if (wplan) wplan.circuits.forEach(function(c) {
+        if (rpe[c.id]) rpeEntries.push({ label: c.name, val: rpe[c.id] });
+      });
+      if (rpe.acc) rpeEntries.push({ label: 'Accessories', val: rpe.acc });
+      if (rpeEntries.length === 0) return '';
+      var avgRPE = Math.round(rpeEntries.reduce(function(s,e){ return s+e.val; }, 0) / rpeEntries.length * 10) / 10;
+      var avgColor = avgRPE <= 5 ? 'var(--green)' : avgRPE <= 7 ? 'var(--orange)' : 'var(--red)';
+      return '<div class="card"><h3 style="margin-bottom:8px">RPE Uebersicht</h3>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+        '<span style="font-size:13px;color:var(--text-sec)">Durchschnitt</span>' +
+        '<span style="font-size:18px;font-weight:700;color:' + avgColor + '">' + avgRPE + '/10</span></div>' +
+        '<div style="display:flex;gap:8px">' +
+        rpeEntries.map(function(e) {
+          var c = e.val <= 5 ? 'var(--green)' : e.val <= 7 ? 'var(--orange)' : 'var(--red)';
+          return '<div style="flex:1;text-align:center;padding:8px;background:var(--bg);border-radius:8px">' +
+            '<div style="font-size:11px;color:var(--text-ter)">' + e.label + '</div>' +
+            '<div style="font-size:16px;font-weight:700;color:' + c + ';margin-top:2px">' + e.val + '</div></div>';
+        }).join('') +
+        '</div></div>';
+    })()}
+
+    ${(function() {
+      var rd = session.readiness;
+      if (!rd || !rd.score) return '';
+      var scoreColor = rd.score >= 4 ? 'var(--green)' : rd.score >= 2.5 ? 'var(--orange)' : 'var(--red)';
+      var labels = { sleep: 'Schlaf', soreness: 'Muskeln', motivation: 'Motivation' };
+      return '<div class="card"><h3 style="margin-bottom:8px">Readiness</h3>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+        '<span style="font-size:13px;color:var(--text-sec)">Score</span>' +
+        '<span style="font-size:18px;font-weight:700;color:' + scoreColor + '">' + rd.score + '/5</span></div>' +
+        '<div style="display:flex;gap:8px">' +
+        ['sleep', 'soreness', 'motivation'].map(function(k) {
+          var v = rd[k] || 0;
+          var c = v <= 2 ? 'var(--red)' : v <= 3 ? 'var(--orange)' : 'var(--green)';
+          return '<div style="flex:1;text-align:center;padding:8px;background:var(--bg);border-radius:8px">' +
+            '<div style="font-size:11px;color:var(--text-ter)">' + labels[k] + '</div>' +
+            '<div style="font-size:16px;font-weight:700;color:' + c + ';margin-top:2px">' + v + '/5</div></div>';
+        }).join('') +
+        '</div></div>';
+    })()}
+
     <div class="card">
       <h3 style="margin-bottom:12px">Wie hat es sich angefuehlt?</h3>
       <div class="feeling-selector">
@@ -4016,6 +4209,80 @@ function findExerciseDef(exId) {
 // LIFT PROGRESSION HELPERS
 // =============================================
 
+// Get current lift status: latest weight×reps + % change vs mesocycle start
+function getLiftStatus(exId) {
+  var ex = getExerciseInfo(exId);
+  if (!ex) return null;
+  var mesoNumber = APP_STATE.settings.mesocycle.number;
+  var mesoSessions = APP_STATE.sessions
+    .filter(function(s) { return s.mesocycle === mesoNumber; })
+    .sort(function(a, b) { return a.date.localeCompare(b.date); });
+
+  var firstSet = null, latestSet = null;
+  mesoSessions.forEach(function(s) {
+    var sets = s.sets[exId] || [];
+    if (sets.length === 0) return;
+    // Find best set by effective volume (weight × reps)
+    var bestSet = null, bestVol = 0;
+    sets.forEach(function(set) {
+      var w = Number(set.weight) || 0;
+      var r = Number(set.reps) || 0;
+      var vol = getVolumeWeight(exId, w) * r;
+      if (vol > bestVol || (vol === bestVol && r > (bestSet ? bestSet.reps : 0))) { bestVol = vol; bestSet = set; }
+    });
+    if (!bestSet) return;
+    if (!firstSet) firstSet = { weight: bestSet.weight, reps: bestSet.reps };
+    latestSet = { weight: bestSet.weight, reps: bestSet.reps };
+  });
+
+  if (!latestSet) return null;
+
+  // % change based on effective volume per set
+  var changePct = 0;
+  var hasChange = false;
+  if (firstSet && (firstSet.weight !== latestSet.weight || firstSet.reps !== latestSet.reps)) {
+    var firstVol = getVolumeWeight(exId, Number(firstSet.weight) || 0) * (Number(firstSet.reps) || 0);
+    var latestVol = getVolumeWeight(exId, Number(latestSet.weight) || 0) * (Number(latestSet.reps) || 0);
+    if (firstVol > 0) {
+      changePct = Math.round((latestVol - firstVol) / firstVol * 100);
+      hasChange = true;
+    }
+  }
+
+  // Format weight label in training unit
+  var weightLabel;
+  if (ex.dumbbell) {
+    weightLabel = latestSet.weight + 'kg/DB';
+  } else if (ex.weightedBW) {
+    weightLabel = '+' + latestSet.weight + 'kg';
+  } else if (ex.bodyweight && ex.bwFraction !== 0) {
+    weightLabel = 'BW';
+  } else if (ex.bodyweight && ex.bwFraction === 0) {
+    weightLabel = '';
+  } else {
+    weightLabel = latestSet.weight + 'kg';
+  }
+
+  return {
+    weightLabel: weightLabel,
+    weight: latestSet.weight,
+    reps: latestSet.reps,
+    changePct: changePct,
+    hasChange: hasChange
+  };
+}
+
+// Check if exercise is a strength exercise (not circuit or accessory)
+function isStrengthExercise(exId) {
+  for (var key in WORKOUT_PLANS) {
+    var plan = WORKOUT_PLANS[key];
+    for (var i = 0; i < plan.strength.length; i++) {
+      if (plan.strength[i].id === exId) return true;
+    }
+  }
+  return false;
+}
+
 function getExerciseProgression(exId, exDef) {
   var progression = [];
   APP_STATE.sessions.forEach(function(s) {
@@ -4086,6 +4353,366 @@ function toggleProgression(exId) {
     var arrow = document.getElementById('arrow-' + exId);
     if (arrow) arrow.textContent = isHidden ? '▲' : '▼';
   }
+}
+
+// =============================================
+// RPE TRACKING (per section: strength, each circuit, acc)
+// =============================================
+
+function renderRPESelector(sectionKey) {
+  var currentRPE = activeSession && activeSession.rpe ? (activeSession.rpe[sectionKey] || 0) : 0;
+  var html = '<div style="margin-top:12px;padding:12px;background:var(--card);border-radius:10px;border:1px solid var(--border)">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+  html += '<div style="display:flex;align-items:center;gap:6px"><span style="font-size:12px;font-weight:600;color:var(--text-sec)">RPE (Anstrengung)</span>' +
+    '<button onclick="toggleRPEGuide()" style="background:none;border:1px solid var(--border);border-radius:50%;width:18px;height:18px;font-size:10px;color:var(--text-ter);cursor:pointer;display:flex;align-items:center;justify-content:center">?</button></div>';
+  if (currentRPE > 0) {
+    var rpeColor = currentRPE <= 5 ? 'var(--green)' : currentRPE <= 7 ? 'var(--orange)' : 'var(--red)';
+    html += '<span style="font-size:14px;font-weight:700;color:' + rpeColor + '">' + currentRPE + '/10</span>';
+  }
+  html += '</div>';
+  html += '<div style="display:flex;gap:4px">';
+  for (var i = 1; i <= 10; i++) {
+    var isSelected = currentRPE === i;
+    var bg = isSelected ? (i <= 5 ? 'var(--green)' : i <= 7 ? 'var(--orange)' : 'var(--red)') : 'var(--bg)';
+    var color = isSelected ? '#fff' : 'var(--text-sec)';
+    html += '<button onclick="setRPE(\'' + sectionKey + '\',' + i + ')" style="flex:1;padding:6px 0;font-size:12px;font-weight:' + (isSelected ? '700' : '400') + ';background:' + bg + ';color:' + color + ';border:1px solid ' + (isSelected ? 'transparent' : 'var(--border)') + ';border-radius:6px;cursor:pointer">' + i + '</button>';
+  }
+  html += '</div>';
+  html += '</div>';
+  return html;
+}
+
+function setRPE(sectionKey, value) {
+  if (!activeSession) return;
+  if (!activeSession.rpe) activeSession.rpe = {};
+  activeSession.rpe[sectionKey] = value;
+  // Also update saved session
+  var idx = APP_STATE.sessions.findIndex(function(s) { return s.id === activeSession.id; });
+  if (idx >= 0) {
+    if (!APP_STATE.sessions[idx].rpe) APP_STATE.sessions[idx].rpe = {};
+    APP_STATE.sessions[idx].rpe[sectionKey] = value;
+  }
+  saveState();
+  renderWorkoutDetail();
+}
+
+function toggleRPEGuide() {
+  var existing = document.getElementById('rpe-guide-overlay');
+  if (existing) { existing.remove(); return; }
+  var overlay = document.createElement('div');
+  overlay.id = 'rpe-guide-overlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.innerHTML = '<div style="background:var(--card);border-radius:16px;padding:20px;width:100%;max-width:360px;max-height:80vh;overflow-y:auto">' +
+    '<div style="font-size:16px;font-weight:700;margin-bottom:12px;color:var(--text)">RPE Skala — Referenz</div>' +
+    '<div style="font-size:11px;color:var(--text-sec);margin-bottom:12px">Rate wie anstrengend die Sektion war. Entscheidend: Wie viele Wiederholungen hattest du noch in Reserve?</div>' +
+    '<div style="display:flex;flex-direction:column;gap:4px">' +
+    rpeGuideRow(10, 'Maximale Anstrengung', '0 Reps in Reserve — technisches Versagen', 'var(--red)') +
+    rpeGuideRow(9, 'Sehr hart', '1 Rep in Reserve — war alles', 'var(--red)') +
+    rpeGuideRow(8, 'Hart', '2 Reps in Reserve — gut gefordert', 'var(--red)') +
+    rpeGuideRow(7, 'Anspruchsvoll', '3 Reps in Reserve — solide', 'var(--orange)') +
+    rpeGuideRow(6, 'Moderat', '4 Reps in Reserve — kontrolliert', 'var(--orange)') +
+    rpeGuideRow(5, 'Mittel', '5+ Reps in Reserve — Aufwaermcharakter', 'var(--green)') +
+    rpeGuideRow(4, 'Leicht', 'Kaum Anstrengung', 'var(--green)') +
+    rpeGuideRow(3, 'Sehr leicht', 'Nur Bewegung', 'var(--green)') +
+    '</div>' +
+    '<div style="margin-top:12px;padding:10px;background:rgba(232,114,12,0.1);border-radius:8px;font-size:11px;color:var(--orange)">' +
+    '<b>Tipp:</b> Ziel-RPE im Mesozyklus: W1-2: RPE 6-7 | W3-4: RPE 7-8 | W5: RPE 8-9. Deload: RPE 4-5.</div>' +
+    '<button class="btn btn-outline" style="width:100%;margin-top:12px" onclick="document.getElementById(\'rpe-guide-overlay\').remove()">Verstanden</button>' +
+  '</div>';
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+function rpeGuideRow(num, label, desc, color) {
+  return '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg);border-radius:6px">' +
+    '<div style="min-width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:' + color + ';border-radius:6px;font-size:13px;font-weight:700;color:#fff">' + num + '</div>' +
+    '<div><div style="font-size:12px;font-weight:600;color:var(--text)">' + label + '</div>' +
+    '<div style="font-size:10px;color:var(--text-ter)">' + desc + '</div></div></div>';
+}
+
+function getSessionAvgRPE(session) {
+  if (!session || !session.rpe) return 0;
+  var vals = Object.values(session.rpe).filter(function(v) { return v > 0; });
+  if (vals.length === 0) return 0;
+  return Math.round(vals.reduce(function(a, b) { return a + b; }, 0) / vals.length * 10) / 10;
+}
+
+// RPE Coaching: analyze recent RPE trend for a section and return a coaching tip
+function getRPECoachingTip(sectionKey, workoutId) {
+  // Get recent sessions for this workout with RPE data for this section
+  var recentSessions = APP_STATE.sessions
+    .filter(function(s) { return s.workoutId === workoutId && s.rpe && s.rpe[sectionKey] > 0; })
+    .sort(function(a, b) { return b.date.localeCompare(a.date); })
+    .slice(0, 3);
+  if (recentSessions.length < 2) return null;
+
+  var rpeValues = recentSessions.map(function(s) { return s.rpe[sectionKey]; });
+  var avgRPE = Math.round(rpeValues.reduce(function(a, b) { return a + b; }, 0) / rpeValues.length * 10) / 10;
+  var currentWeek = APP_STATE.settings.mesocycle.currentWeek;
+  var totalHard = APP_STATE.settings.mesocycle.weeksHard;
+
+  // Determine coaching tip based on RPE trend + week position
+  if (avgRPE <= 5.5) {
+    return { text: 'Letzte ' + rpeValues.length + 'x Ø RPE ' + avgRPE + ' — heute Gewicht oder Reps steigern!', color: 'var(--green)', icon: '🔥' };
+  } else if (avgRPE <= 7) {
+    if (currentWeek >= totalHard - 1) {
+      return { text: 'Ø RPE ' + avgRPE + ' — letzte Wochen: Push ans Limit!', color: 'var(--orange)', icon: '💪' };
+    }
+    return { text: 'Ø RPE ' + avgRPE + ' — guter Sweet Spot, weiter so', color: 'var(--green)', icon: '✅' };
+  } else if (avgRPE <= 8.5) {
+    if (currentWeek <= 2) {
+      return { text: 'Ø RPE ' + avgRPE + ' in W' + currentWeek + ' — frueh schon hoch, Pacing beachten', color: 'var(--orange)', icon: '⚡' };
+    }
+    return { text: 'Ø RPE ' + avgRPE + ' — gut gefordert, Technik sauber halten', color: 'var(--orange)', icon: '💪' };
+  } else {
+    return { text: 'Ø RPE ' + avgRPE + ' — sehr hoch! Heute kontrolliert trainieren', color: 'var(--red)', icon: '⚠️' };
+  }
+}
+
+function renderCoachingTip(sectionKey, workoutId) {
+  var tip = getRPECoachingTip(sectionKey, workoutId);
+  if (!tip) return '';
+  return '<div style="margin-top:4px;padding:6px 8px;background:rgba(' +
+    (tip.color === 'var(--green)' ? '40,180,99' : tip.color === 'var(--orange)' ? '232,114,12' : '226,75,74') +
+    ',0.1);border-radius:6px;font-size:11px;color:' + tip.color + '">' +
+    tip.icon + ' ' + tip.text + '</div>';
+}
+
+// =============================================
+// EXERCISE HISTORY PEEK (mini progression in training view)
+// =============================================
+
+function renderHistoryPeek(exId) {
+  var ex = getExerciseInfo(exId);
+  if (!ex) return '';
+  var sessions = APP_STATE.sessions
+    .filter(function(s) { return s.sets[exId] && s.sets[exId].length > 0; })
+    .sort(function(a, b) { return a.date.localeCompare(b.date); })
+    .slice(-6);
+  if (sessions.length === 0) return '<div style="font-size:12px;color:var(--text-ter);padding:4px 0">Noch keine History</div>';
+  var isDbl = !!ex.dumbbell;
+  var isWBW = !!ex.weightedBW;
+  var isBW = !!ex.bodyweight;
+  var html = '<div style="padding:6px 0">';
+  sessions.forEach(function(s, i) {
+    var sets = s.sets[exId];
+    var bestSet = null, bestVol = 0;
+    sets.forEach(function(set) {
+      var v = (Number(set.weight) || 0) * (Number(set.reps) || 0);
+      if (v > bestVol) { bestVol = v; bestSet = set; }
+    });
+    if (!bestSet) return;
+    var wLabel = isBW ? 'BW' : isDbl ? bestSet.weight + 'kg/DB' : isWBW ? '+' + bestSet.weight + 'kg' : bestSet.weight + 'kg';
+    var dateStr = s.date ? s.date.substring(5).replace('-', '.') : '?';
+    var isLast = i === sessions.length - 1;
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;font-size:11px;color:' + (isLast ? 'var(--orange)' : 'var(--text-ter)') + ';font-weight:' + (isLast ? '600' : '400') + '">' +
+      '<span>' + dateStr + ' · W' + (s.week || '?') + '</span>' +
+      '<span>' + wLabel + ' × ' + bestSet.reps + ' (' + sets.length + ' sets)</span></div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function toggleHistoryPeek(exId) {
+  var el = document.getElementById('peek-' + exId);
+  if (el) {
+    var isHidden = el.style.display === 'none';
+    el.style.display = isHidden ? 'block' : 'none';
+    var icon = document.getElementById('peek-icon-' + exId);
+    if (icon) icon.textContent = isHidden ? '▲' : '📊';
+  }
+}
+
+// =============================================
+// ESTIMATED WORKOUT DURATION
+// =============================================
+
+function getEstimatedDuration(workoutId) {
+  var sessions = APP_STATE.sessions
+    .filter(function(s) { return s.workoutId === workoutId && s.duration > 0; })
+    .sort(function(a, b) { return b.date.localeCompare(a.date); })
+    .slice(0, 3);
+  if (sessions.length === 0) return 0;
+
+  var plan = WORKOUT_PLANS[workoutId];
+  if (!plan) {
+    // Fallback: simple average
+    var avg = sessions.reduce(function(sum, s) { return sum + s.duration; }, 0) / sessions.length;
+    return Math.round(avg / 60);
+  }
+
+  // Calculate target circuit rounds for current week
+  var cw = APP_STATE.settings.mesocycle.currentWeek;
+  var targetTotalRounds = 0;
+  plan.circuits.forEach(function(c) {
+    var target = getTargetRounds(c.rounds, cw);
+    targetTotalRounds += c.doubleRounds ? target * 2 : target;
+  });
+
+  // Calculate avg duration and avg total rounds from historical sessions
+  var totalDur = 0;
+  var totalHistRounds = 0;
+  var validCount = 0;
+  sessions.forEach(function(s) {
+    var sRounds = 0;
+    plan.circuits.forEach(function(c) {
+      sRounds += (s.circuitRounds && s.circuitRounds[c.id]) || 0;
+    });
+    if (sRounds > 0) {
+      totalDur += s.duration;
+      totalHistRounds += sRounds;
+      validCount++;
+    }
+  });
+
+  if (validCount === 0 || totalHistRounds === 0) {
+    // No round data, fall back to simple average
+    var avgSimple = sessions.reduce(function(sum, s) { return sum + s.duration; }, 0) / sessions.length;
+    return Math.round(avgSimple / 60);
+  }
+
+  // Average: duration per round
+  var avgDurPerRound = totalDur / totalHistRounds;
+  var avgHistRounds = totalHistRounds / validCount;
+  var avgDur = totalDur / validCount;
+
+  // If target rounds differ from historical, scale proportionally
+  // estimated = avgDur * (targetRounds / avgHistRounds)
+  var estimated = avgDur * (targetTotalRounds / avgHistRounds);
+  return Math.round(estimated / 60);
+}
+
+// =============================================
+// TRAINING STREAK
+// =============================================
+
+function getTrainingStreak() {
+  var meso = APP_STATE.settings.mesocycle;
+  var streakWeeks = 0;
+  // Count backwards from current week
+  for (var w = meso.currentWeek; w >= 1; w--) {
+    var weekSessions = APP_STATE.sessions.filter(function(s) {
+      return s.week === w && s.mesocycle === meso.number;
+    });
+    var workoutIds = new Set(weekSessions.map(function(s) { return s.workoutId; }));
+    var allDone = WEEK_SCHEDULE.every(function(wid) { return workoutIds.has(wid); });
+    if (allDone) {
+      streakWeeks++;
+    } else if (w < meso.currentWeek) {
+      break; // Past incomplete week breaks streak
+    }
+    // Current week doesn't break streak if incomplete (still in progress)
+  }
+  // Also count from previous mesocycles
+  if (streakWeeks === meso.currentWeek || (streakWeeks === meso.currentWeek - 1 && meso.currentWeek > 1)) {
+    for (var m = meso.number - 1; m >= 1; m--) {
+      var mesoSessions = APP_STATE.sessions.filter(function(s) { return s.mesocycle === m; });
+      var maxWeek = 0;
+      mesoSessions.forEach(function(s) { if (s.week > maxWeek) maxWeek = s.week; });
+      for (var w2 = maxWeek; w2 >= 1; w2--) {
+        var ws = mesoSessions.filter(function(s) { return s.week === w2; });
+        var wids = new Set(ws.map(function(s) { return s.workoutId; }));
+        if (WEEK_SCHEDULE.every(function(wid) { return wids.has(wid); })) {
+          streakWeeks++;
+        } else {
+          return streakWeeks;
+        }
+      }
+    }
+  }
+  return streakWeeks;
+}
+
+function getTotalSessions() {
+  return APP_STATE.sessions.length;
+}
+
+// =============================================
+// DELOAD DETECTION
+// =============================================
+
+function shouldSuggestDeload() {
+  var cw = APP_STATE.settings.mesocycle.currentWeek;
+  if (cw < 3) return null; // Need at least 3 weeks of data
+
+  // Check 1: Volume declining for 2 consecutive weeks
+  var vol3 = calcWeekVolume(cw - 2);
+  var vol2 = calcWeekVolume(cw - 1);
+  var vol1 = calcWeekVolume(cw);
+  var volumeDecline = vol1 > 0 && vol2 > 0 && vol3 > 0 && vol2 < vol3 && vol1 < vol2;
+
+  // Check 2: Average RPE above 8.5 for last 2 weeks
+  var recentSessions = APP_STATE.sessions.filter(function(s) {
+    return s.mesocycle === APP_STATE.settings.mesocycle.number && s.week >= cw - 1;
+  });
+  var rpeValues = [];
+  recentSessions.forEach(function(s) {
+    if (s.rpe) {
+      Object.values(s.rpe).forEach(function(v) { if (v > 0) rpeValues.push(v); });
+    }
+  });
+  var avgRPE = rpeValues.length > 0 ? rpeValues.reduce(function(a, b) { return a + b; }, 0) / rpeValues.length : 0;
+  var highRPE = avgRPE >= 8.5;
+
+  if (volumeDecline && highRPE) return { reason: 'volume_and_rpe', avgRPE: Math.round(avgRPE * 10) / 10 };
+  if (volumeDecline) return { reason: 'volume_decline' };
+  if (highRPE && rpeValues.length >= 4) return { reason: 'high_rpe', avgRPE: Math.round(avgRPE * 10) / 10 };
+  return null;
+}
+
+// =============================================
+// MESOCYCLE COMPARISON
+// =============================================
+
+function getMesoLiftComparison(exId) {
+  var currentMeso = APP_STATE.settings.mesocycle.number;
+  if (currentMeso <= 1) return null;
+  var prevMeso = currentMeso - 1;
+
+  // Get best set from end of previous meso
+  var prevSessions = APP_STATE.sessions
+    .filter(function(s) { return s.mesocycle === prevMeso; })
+    .sort(function(a, b) { return b.date.localeCompare(a.date); });
+
+  var prevBest = null, prevBestVol = 0;
+  // Look at last 2 sessions of prev meso for this exercise
+  prevSessions.slice(0, 4).forEach(function(s) {
+    (s.sets[exId] || []).forEach(function(set) {
+      var w = Number(set.weight) || 0;
+      var r = Number(set.reps) || 0;
+      var vol = getVolumeWeight(exId, w) * r;
+      if (vol > prevBestVol) { prevBestVol = vol; prevBest = { weight: w, reps: r }; }
+    });
+  });
+
+  if (!prevBest) return null;
+
+  // Get current best
+  var currentStatus = getLiftStatus(exId);
+  if (!currentStatus) return null;
+
+  var currentVol = getVolumeWeight(exId, Number(currentStatus.weight) || 0) * (Number(currentStatus.reps) || 0);
+  if (prevBestVol > 0 && currentVol > 0) {
+    var changePct = Math.round((currentVol - prevBestVol) / prevBestVol * 100);
+    return { prevWeight: prevBest.weight, prevReps: prevBest.reps, changePct: changePct };
+  }
+  return null;
+}
+
+function getMesoVolumeComparison(muscle) {
+  var currentMeso = APP_STATE.settings.mesocycle.number;
+  if (currentMeso <= 1) return null;
+  var prevMeso = currentMeso - 1;
+  var cw = APP_STATE.settings.mesocycle.currentWeek;
+
+  // Same week comparison: current meso week N vs prev meso week N
+  var currentVol = muscle ? calcWeekMuscleVolume(cw, muscle) : calcWeekVolume(cw);
+  var prevVol = muscle ? calcWeekMuscleVolume(cw, muscle, prevMeso) : calcWeekVolume(cw, prevMeso);
+
+  if (prevVol > 0 && currentVol > 0) {
+    return { changePct: Math.round((currentVol - prevVol) / prevVol * 100), prevVol: prevVol, currentVol: currentVol };
+  }
+  return null;
 }
 
 // =============================================
@@ -4225,43 +4852,59 @@ function renderStatsAll() {
   const currentVol = calcWeekVolume(cw);
   const progressPct = goal > 0 ? Math.min(100, (currentVol / goal * 100)) : 0;
 
-  // 1RM estimates (using central estimate1RM function)
+  // Strength exercises: lift status + 1RM
   const strengthExercises = [];
   Object.values(WORKOUT_PLANS).forEach(plan => {
     plan.strength.forEach(ex => {
+      const status = getLiftStatus(ex.id);
+      if (!status) return;
       let best1RM = 0;
-      let first1RM = 0;
-      APP_STATE.sessions.forEach((s, si) => {
-        (s.sets[ex.id] || []).forEach(set => {
+      APP_STATE.sessions.forEach(function(s) {
+        (s.sets[ex.id] || []).forEach(function(set) {
           const est = estimate1RM(set, ex);
-          if (est <= 0) return;
-          if (si < 4 && !first1RM) first1RM = est;
           if (est > best1RM) best1RM = est;
         });
       });
-      if (best1RM > 0) {
-        const change = first1RM > 0 ? Math.round((best1RM - first1RM) / first1RM * 100) : 0;
-        strengthExercises.push({ id: ex.id, name: ex.name, rm: Math.round(best1RM * 10) / 10, change, def: ex });
-      }
+      strengthExercises.push({
+        id: ex.id, name: ex.name, def: ex,
+        status: status,
+        rm: best1RM > 0 ? Math.round(best1RM * 10) / 10 : 0
+      });
     });
   });
 
   let rmHtml = '';
   strengthExercises.forEach(ex => {
-    const cls = ex.change >= 0 ? 'up' : 'down';
-    const sign = ex.change >= 0 ? '+' : '';
+    const s = ex.status;
+    const liftLabel = s.weightLabel ? s.weightLabel + ' × ' + s.reps : s.reps + ' reps';
+    const cls = s.changePct >= 0 ? 'up' : 'down';
+    const changeStr = s.hasChange ? ((s.changePct >= 0 ? '+' : '') + s.changePct + '%') : '—';
     const prog = getExerciseProgression(ex.id, ex.def);
     const progHtml = renderProgressionBars(prog, ex.def);
-    rmHtml += `
-      <div onclick="toggleProgression('${ex.id}')" style="cursor:pointer;display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
-        <span style="font-size:14px">${ex.name} <span id="arrow-${ex.id}" style="font-size:9px;color:var(--text-ter)">▼</span></span>
-        <div style="display:flex;gap:12px;align-items:center">
-          <span style="font-size:14px;font-weight:600">${format1RMDisplay(ex.rm, ex.def)}</span>
-          <span class="volume-change ${cls}" style="font-size:12px">${sign}${ex.change}%</span>
-        </div>
-      </div>
-      <div id="prog-${ex.id}" style="display:none">${progHtml}</div>`;
+    const mesoComp = getMesoLiftComparison(ex.id);
+    const mesoTag = mesoComp ? '<span style="font-size:10px;padding:1px 5px;border-radius:4px;margin-left:6px;background:' + (mesoComp.changePct >= 0 ? 'rgba(46,204,113,0.15);color:var(--green)' : 'rgba(231,76,60,0.15);color:var(--red)') + '">vs M' + (APP_STATE.settings.mesocycle.number - 1) + ' ' + (mesoComp.changePct >= 0 ? '+' : '') + mesoComp.changePct + '%</span>' : '';
+    rmHtml += '<div onclick="toggleProgression(\'' + ex.id + '\')" style="cursor:pointer;padding:8px 0;border-bottom:1px solid var(--border)">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center">' +
+        '<span style="font-size:14px">' + ex.name + mesoTag + ' <span id="arrow-' + ex.id + '" style="font-size:9px;color:var(--text-ter)">▼</span></span>' +
+        '<span class="volume-change ' + cls + '" style="font-size:13px">' + changeStr + '</span>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px">' +
+        '<span style="font-size:15px;font-weight:700;color:var(--text)">' + liftLabel + '</span>' +
+        (ex.rm > 0 ? '<span style="font-size:12px;color:var(--text-ter)">1RM ' + format1RMDisplay(ex.rm, ex.def) + '</span>' : '') +
+      '</div>' +
+    '</div>' +
+    '<div id="prog-' + ex.id + '" style="display:none">' + progHtml + '</div>';
   });
+
+  // Meso volume comparison
+  const mesoVolComp = getMesoVolumeComparison(null);
+  let mesoCompHtml = '';
+  if (mesoVolComp) {
+    const mcCls = mesoVolComp.changePct >= 0 ? 'up' : 'down';
+    mesoCompHtml = '<div style="margin-top:8px;padding:8px 12px;background:var(--bg);border-radius:8px;display:flex;justify-content:space-between;align-items:center">' +
+      '<span style="font-size:12px;color:var(--text-sec)">vs. Meso ' + (APP_STATE.settings.mesocycle.number - 1) + ' W' + cw + '</span>' +
+      '<span class="volume-change ' + mcCls + '" style="font-size:13px;font-weight:600">' + (mesoVolComp.changePct >= 0 ? '+' : '') + mesoVolComp.changePct + '%</span></div>';
+  }
 
   // Recent PRs
   const recentPRs = APP_STATE.prs.filter(pr => pr.mesocycle === APP_STATE.settings.mesocycle.number).slice(-8).reverse();
@@ -4297,6 +4940,7 @@ function renderStatsAll() {
         <span>Ziel: ${(goal/1000).toFixed(1)}t</span>
       </div>
       <div class="progress-bar"><div class="progress-fill" style="width:${progressPct}%"></div></div>
+      ${mesoCompHtml}
     </div>
 
     <div class="card">
@@ -4352,19 +4996,24 @@ function renderStatsMuscle(muscle) {
       src.list.forEach(ex => {
         if (EXERCISE_MUSCLE[ex.id] !== muscle) return;
         if (exercisesBySource[src.key].find(e => e.id === ex.id)) return;
-        let best1RM = 0, first1RM = 0;
-        APP_STATE.sessions.forEach((s, si) => {
-          (s.sets[ex.id] || []).forEach(set => {
-            const est = estimate1RM(set, ex);
-            if (est <= 0) return;
-            if (si < 4 && !first1RM) first1RM = est;
-            if (est > best1RM) best1RM = est;
+        const status = getLiftStatus(ex.id);
+        if (!status) return;
+        // For strength exercises, also calc 1RM
+        let best1RM = 0;
+        if (src.key === 'strength') {
+          APP_STATE.sessions.forEach(function(s) {
+            (s.sets[ex.id] || []).forEach(function(set) {
+              const est = estimate1RM(set, ex);
+              if (est > best1RM) best1RM = est;
+            });
           });
-        });
-        if (best1RM > 0) {
-          const change = first1RM > 0 ? Math.round((best1RM - first1RM) / first1RM * 100) : 0;
-          exercisesBySource[src.key].push({ id: ex.id, name: ex.name, rm: Math.round(best1RM * 10) / 10, change, def: ex });
         }
+        exercisesBySource[src.key].push({
+          id: ex.id, name: ex.name, def: ex,
+          status: status,
+          rm: best1RM > 0 ? Math.round(best1RM * 10) / 10 : 0,
+          isStrength: src.key === 'strength'
+        });
       });
     });
   });
@@ -4377,16 +5026,24 @@ function renderStatsMuscle(muscle) {
     if (exList.length === 0) return;
     exHtml += '<div style="font-size:11px;font-weight:600;color:' + sourceColors[src] + ';text-transform:uppercase;letter-spacing:0.5px;margin:12px 0 4px;padding-bottom:4px;border-bottom:1px solid ' + sourceColors[src] + '30">' + sourceLabels[src] + '</div>';
     exList.forEach(ex => {
-      const cls = ex.change >= 0 ? 'up' : 'down';
-      const sign = ex.change >= 0 ? '+' : '';
+      const s = ex.status;
+      const liftLabel = s.weightLabel ? s.weightLabel + ' × ' + s.reps : s.reps + ' reps';
+      const cls = s.changePct >= 0 ? 'up' : 'down';
+      const changeStr = s.hasChange ? ((s.changePct >= 0 ? '+' : '') + s.changePct + '%') : '—';
       const exDef = ex.def || findExerciseDef(ex.id);
       const prog = getExerciseProgression(ex.id, exDef);
       const progHtml = renderProgressionBars(prog, exDef);
-      exHtml += '<div onclick="toggleProgression(\'' + ex.id + '\')" style="cursor:pointer;display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">' +
-        '<span style="font-size:14px">' + ex.name + ' <span id="arrow-' + ex.id + '" style="font-size:9px;color:var(--text-ter)">▼</span></span>' +
-        '<div style="display:flex;gap:12px;align-items:center">' +
-          '<span style="font-size:14px;font-weight:600">' + format1RMDisplay(ex.rm, exDef) + '</span>' +
-          '<span class="volume-change ' + cls + '">' + sign + ex.change + '%</span>' +
+      const mc = getMesoLiftComparison(ex.id);
+      const mcTag = mc ? '<span style="font-size:10px;padding:1px 5px;border-radius:4px;margin-left:6px;background:' + (mc.changePct >= 0 ? 'rgba(46,204,113,0.15);color:var(--green)' : 'rgba(231,76,60,0.15);color:var(--red)') + '">vs M' + (APP_STATE.settings.mesocycle.number - 1) + ' ' + (mc.changePct >= 0 ? '+' : '') + mc.changePct + '%</span>' : '';
+      // Primary: current lift status + % change
+      exHtml += '<div onclick="toggleProgression(\'' + ex.id + '\')" style="cursor:pointer;padding:8px 0;border-bottom:1px solid var(--border)">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center">' +
+          '<span style="font-size:14px">' + ex.name + mcTag + ' <span id="arrow-' + ex.id + '" style="font-size:9px;color:var(--text-ter)">▼</span></span>' +
+          '<span class="volume-change ' + cls + '" style="font-size:13px">' + changeStr + '</span>' +
+        '</div>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px">' +
+          '<span style="font-size:15px;font-weight:700;color:var(--text)">' + liftLabel + '</span>' +
+          (ex.isStrength && ex.rm > 0 ? '<span style="font-size:12px;color:var(--text-ter)">1RM ' + format1RMDisplay(ex.rm, exDef) + '</span>' : '') +
         '</div>' +
       '</div>' +
       '<div id="prog-' + ex.id + '" style="display:none">' + progHtml + '</div>';
@@ -4435,6 +5092,14 @@ function renderStatsMuscle(muscle) {
         <span>Ziel: ${(goal/1000).toFixed(1)}t</span>
       </div>
       <div class="progress-bar"><div class="progress-fill" style="width:${progressPct}%;background:${barColor}"></div></div>
+      ${(function() {
+        var mvc = getMesoVolumeComparison(muscle);
+        if (!mvc) return '';
+        var mvcCls = mvc.changePct >= 0 ? 'up' : 'down';
+        return '<div style="margin-top:8px;padding:8px 12px;background:var(--bg);border-radius:8px;display:flex;justify-content:space-between;align-items:center">' +
+          '<span style="font-size:12px;color:var(--text-sec)">vs. Meso ' + (APP_STATE.settings.mesocycle.number - 1) + ' W' + cw + '</span>' +
+          '<span class="volume-change ' + mvcCls + '" style="font-size:13px;font-weight:600">' + (mvc.changePct >= 0 ? '+' : '') + mvc.changePct + '%</span></div>';
+      })()}
       ${renderSubMuscleBreakdown(muscle)}
     </div>
 
@@ -4455,14 +5120,11 @@ function renderSubMuscleBreakdown(muscle) {
   const muscleColors = { brust: 'var(--orange)', ruecken: 'var(--blue)' };
   const baseColor = muscleColors[muscle] || 'var(--orange)';
 
-  // Calculate current week sub-volumes
+  // Calculate CURRENT WEEK sub-volumes only (not cumulative)
   let subData = [];
   let maxSub = 0;
   config.subs.forEach(function(sub) {
-    let vol = 0;
-    for (let w = 1; w <= cw; w++) {
-      vol += calcWeekSubMuscleVolume(w, muscle, sub);
-    }
+    const vol = calcWeekSubMuscleVolume(cw, muscle, sub);
     subData.push({ key: sub, label: config.labels[sub], vol: vol });
     if (vol > maxSub) maxSub = vol;
   });
@@ -4751,7 +5413,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '3.9';
+const APP_VERSION = '5.1';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
