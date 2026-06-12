@@ -3413,23 +3413,21 @@ function renderZirkelTab(plan) {
           html += '</div>'; // close sets container
         }
 
-        // Inline add-set row (visible for 0-set exercises or when toggled)
-        if (sessionActive) {
-          if (showAddRow) {
-            var nextRound = exSets.length + 1;
-            var defaultWeight = exSets.length > 0 ? exSets[exSets.length - 1].weight : (ex.weight || 0);
-            var defaultReps = parseInt(ex.reps.toString().split('-')[1] || ex.reps.toString().split('+')[0] || ex.reps) || 10;
-            html += '<div style="display:flex;align-items:center;gap:8px;margin-top:8px">' +
-              '<span style="font-size:12px;width:24px;color:var(--text-sec)">' + nextRound + '</span>' +
-              (bw ? '<div style="flex:1;text-align:center;font-size:13px;padding:6px;color:var(--text-sec)">BW</div>' :
-              '<input type="number" inputmode="decimal" class="input-field" style="flex:1;padding:6px;font-size:13px" id="ci-w-' + ex.id + '" value="' + defaultWeight + '" step="0.5">') +
-              '<input type="number" inputmode="numeric" class="input-field" style="width:55px;padding:6px;font-size:13px" id="ci-r-' + ex.id + '" value="' + defaultReps + '">' +
-              '<button class="btn btn-orange btn-sm" style="width:auto;padding:6px 14px;min-height:32px;font-size:13px" onclick="addCircuitSetInline(\'' + circuit.id + '\', \'' + ex.id + '\')">OK</button>' +
-            '</div>';
-          } else {
-            // "+ Runde" button to reveal the input row
-            html += '<button class="btn btn-sm btn-outline" style="width:100%;margin-top:6px;font-size:12px;padding:6px" onclick="toggleAddCircuitSet(\'' + ex.id + '\')">+ Runde</button>';
-          }
+        // Inline add-set row (always visible — works in active AND completed sessions)
+        if (showAddRow) {
+          var nextRound = exSets.length + 1;
+          var defaultWeight = exSets.length > 0 ? exSets[exSets.length - 1].weight : (ex.weight || 0);
+          var defaultReps = parseInt(ex.reps.toString().split('-')[1] || ex.reps.toString().split('+')[0] || ex.reps) || 10;
+          html += '<div style="display:flex;align-items:center;gap:8px;margin-top:8px">' +
+            '<span style="font-size:12px;width:24px;color:var(--text-sec)">' + nextRound + '</span>' +
+            (bw ? '<div style="flex:1;text-align:center;font-size:13px;padding:6px;color:var(--text-sec)">BW</div>' :
+            '<input type="number" inputmode="decimal" class="input-field" style="flex:1;padding:6px;font-size:13px" id="ci-w-' + ex.id + '" value="' + defaultWeight + '" step="0.5">') +
+            '<input type="number" inputmode="numeric" class="input-field" style="width:55px;padding:6px;font-size:13px" id="ci-r-' + ex.id + '" value="' + defaultReps + '">' +
+            '<button class="btn btn-orange btn-sm" style="width:auto;padding:6px 14px;min-height:32px;font-size:13px" onclick="addCircuitSetInline(\'' + circuit.id + '\', \'' + ex.id + '\')">OK</button>' +
+          '</div>';
+        } else {
+          // "+ Runde" button to reveal the input row
+          html += '<button class="btn btn-sm btn-outline" style="width:100%;margin-top:6px;font-size:12px;padding:6px" onclick="toggleAddCircuitSet(\'' + ex.id + '\')">+ Runde</button>';
         }
 
         html += '</div>'; // close exercise-card
@@ -3619,6 +3617,15 @@ function addCircuitSetInline(circuitId, exId) {
       volume: weight * reps,
       week: activeSession.week, mesocycle: activeSession.mesocycle
     });
+  }
+
+  // Sync to saved session if workout already completed
+  if (activeSession._completed) {
+    var savedIdx = APP_STATE.sessions.findIndex(function(s) { return s.id === activeSession.id; });
+    if (savedIdx >= 0) {
+      APP_STATE.sessions[savedIdx].sets = JSON.parse(JSON.stringify(activeSession.sets));
+      APP_STATE.sessions[savedIdx].circuitRounds = JSON.parse(JSON.stringify(activeSession.circuitRounds));
+    }
   }
 
   // Clear the adding state
