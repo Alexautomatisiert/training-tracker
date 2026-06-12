@@ -3334,80 +3334,83 @@ function renderZirkelTab(plan) {
       '</div>' +
       (circuit.note ? '<div style="font-size:11px;color:var(--orange);margin-bottom:8px">' + circuit.note + '</div>' : '');
 
-    // Round pills - clickable for completed rounds
-    html += '<div class="round-pills">';
-    for (let r = 1; r <= Math.max(totalRounds, completedRounds); r++) {
-      const isDoneR = r <= completedRounds;
-      const isCurrent = r === completedRounds + 1 && !isDone;
-      const isViewing = viewing === r;
-      let cls = isDoneR ? 'done clickable' : isCurrent ? 'current' : '';
-      if (isViewing) cls = 'viewing clickable';
-      const onclick = isDoneR ? ' onclick="viewCircuitRound(\'' + circuit.id + '\', ' + r + ')"' : '';
-      html += '<div class="round-pill ' + cls + '"' + onclick + '>' + getDoubleLabel(r) + '</div>';
-    }
-    html += '</div>';
-
-    // Timer with reset button
+    // Timer — only when session active & circuit not done
+    const sessionActive = !activeSession._completed;
     const circuitRest = circuit.restSeconds || 90;
     const timerPresets = circuitRest >= 150 ? [120, 150, 180] : circuitRest >= 90 ? [60, 90, 120] : [45, 60, 90];
-    html += '<div style="text-align:center;margin:8px 0">' +
-        '<div class="rest-timer-display" style="font-family:\'SF Mono\',\'Menlo\',monospace;font-size:32px;font-weight:700;color:var(--orange);padding:4px 0">' + formatTime(getTimerSeconds()) + '</div>' +
-        '<div class="timer-presets">' +
-          timerPresets.map(function(s) { return '<button class="timer-preset" onclick="startCountdown(' + s + ')">' + formatTime(s) + '</button>'; }).join('') +
-        '</div>' +
-        '<div class="timer-controls" style="margin-top:8px">' +
-          '<button class="timer-btn" onclick="toggleRestTimer(' + circuitRest + ')">' + (isRestTimerRunning() ? ICONS.pause : ICONS.play) + '</button>' +
-          '<button class="timer-btn" onclick="resetRestTimer(); renderWorkoutDetail();">' + ICONS.reset + '</button>' +
-        '</div>' +
-      '</div>';
+    if (sessionActive && !isDone) {
+      html += '<div style="text-align:center;margin:4px 0 8px">' +
+          '<div class="timer-presets">' +
+            timerPresets.map(function(s) { return '<button class="timer-preset" onclick="startCountdown(' + s + ')">' + formatTime(s) + '</button>'; }).join('') +
+          '</div>' +
+          '<div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-top:4px">' +
+            '<button class="timer-btn" onclick="toggleRestTimer(' + circuitRest + ')">' + (isRestTimerRunning() ? ICONS.pause : ICONS.play) + '</button>' +
+            '<div class="rest-timer-display" style="font-family:\'SF Mono\',\'Menlo\',monospace;font-size:28px;font-weight:700;color:var(--orange)">' + formatTime(getTimerSeconds()) + '</div>' +
+            '<button class="timer-btn" onclick="resetRestTimer(); renderWorkoutDetail();">' + ICONS.reset + '</button>' +
+          '</div>' +
+        '</div>';
+    }
 
-    // Swipeable round content area
+    // Content area
     html += '<div class="zirkel-round-area" data-circuit-id="' + circuit.id + '" data-circuit-index="' + ci + '" data-completed="' + completedRounds + '" data-total="' + targetTotal + '">';
 
-    // VIEWING A PAST ROUND (with edit capability)
-    if (viewing !== null && viewing <= completedRounds) {
-      var isEditMode = editingCircuitRound;
-      var borderColor = isEditMode ? 'var(--orange)' : 'var(--blue)';
-      html += '<div style="margin:8px 0;padding:8px;border:1px solid ' + borderColor + ';border-radius:var(--radius)">' +
-        '<div style="font-size:13px;font-weight:600;color:' + borderColor + ';margin-bottom:8px">' +
-        'Runde ' + getDoubleLabel(viewing) + (isEditMode ? ' bearbeiten' : ' ansehen') + '</div>';
+    // COMPLETED CIRCUIT — Acc-style exercise cards with set chips
+    if (isDone) {
+      html += '<div style="color:var(--green);font-size:14px;font-weight:600;margin-bottom:12px;text-align:center">' +
+        ICONS.check + ' Zirkel abgeschlossen (' + completedRounds + ' Runden)</div>';
 
       circuit.exercises.forEach(function(ex) {
-        var sets = activeSession.sets[ex.id] || [];
-        var roundData = sets[viewing - 1]; // 0-indexed
-        if (roundData) {
-          var dbLbl = ex.dumbbell ? ' (DB)' : '';
-          if (isEditMode) {
-            html += '<div style="padding:6px 0;border-bottom:1px solid var(--border)">' +
-              '<div style="font-size:12px;margin-bottom:4px">' + ex.name + '</div>' +
-              '<div style="display:flex;gap:8px;align-items:center">' +
-                '<input type="number" inputmode="decimal" class="input-field" style="flex:1;padding:5px;font-size:13px" id="cedit-w-' + ex.id + '-' + viewing + '" value="' + roundData.weight + '" step="0.5">' +
+        var exSets = activeSession.sets[ex.id] || [];
+        var dbLbl = ex.dumbbell ? ' (DB)' : '';
+
+        html += '<div class="exercise-card">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center">' +
+            '<div class="exercise-name" style="font-size:14px">' + ex.name + '</div>' +
+            '<span style="font-size:12px;color:var(--text-sec)">' + exSets.length + ' Sets</span>' +
+          '</div>' +
+          '<div style="margin-top:6px">';
+
+        // Set chips — swipe-to-delete + tap-to-edit (same as Acc)
+        exSets.forEach(function(set, si) {
+          var isEditingThis = editingSet && editingSet.exId === ex.id && editingSet.index === si;
+
+          if (isEditingThis) {
+            html += '<div class="set-card current" style="padding:8px 12px;border-color:var(--blue)">' +
+              '<div style="font-size:12px;font-weight:600;color:var(--blue);margin-bottom:4px">Runde ' + (si + 1) + ' bearbeiten</div>' +
+              '<div style="display:flex;align-items:center;gap:8px">' +
+                '<input type="number" inputmode="decimal" class="input-field" style="flex:1;padding:5px;font-size:13px" id="edit-w-' + ex.id + '-' + si + '" value="' + set.weight + '" step="0.5">' +
                 '<span style="font-size:12px;color:var(--text-sec)">kg' + dbLbl + ' ×</span>' +
-                '<input type="number" inputmode="numeric" class="input-field" style="width:55px;padding:5px;font-size:13px" id="cedit-r-' + ex.id + '-' + viewing + '" value="' + roundData.reps + '">' +
-              '</div></div>';
+                '<input type="number" inputmode="numeric" class="input-field" style="width:55px;padding:5px;font-size:13px" id="edit-r-' + ex.id + '-' + si + '" value="' + set.reps + '">' +
+              '</div>' +
+              '<div style="display:flex;gap:8px;margin-top:6px">' +
+                '<button class="btn btn-sm btn-orange" style="flex:1" onclick="saveEditSet(\'' + ex.id + '\', ' + si + ')">Speichern</button>' +
+                '<button class="btn btn-sm btn-outline" style="flex:1" onclick="cancelEditSet()">Abbrechen</button>' +
+              '</div>' +
+            '</div>';
           } else {
-            html += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">' +
-              '<span>' + ex.name + '</span>' +
-              '<span style="color:var(--text-sec)">' + roundData.weight + 'kg' + dbLbl + ' × ' + roundData.reps + '</span>' +
+            html += '<div class="swipe-wrapper" data-ex-id="' + ex.id + '" data-set-index="' + si + '">' +
+              '<div class="swipe-delete-bg">Löschen</div>' +
+              '<div class="swipe-content set-card done" style="padding:8px 12px;margin-bottom:0" onclick="startEditSet(\'' + ex.id + '\', ' + si + ')">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center">' +
+                  '<span style="font-size:13px">Runde ' + (si + 1) + ' ' + ICONS.check + '</span>' +
+                  '<span style="font-size:13px;color:var(--text-sec)">' + set.weight + 'kg' + dbLbl + ' x' + set.reps + '</span>' +
+                '</div>' +
+              '</div>' +
             '</div>';
           }
+        });
+
+        html += '</div>'; // close sets container
+
+        // "+ Runde" button if session still active
+        if (sessionActive) {
+          html += '<button class="btn btn-sm btn-outline" style="margin-top:6px;font-size:12px" onclick="reopenCircuit(\'' + circuit.id + '\')">+ Runde</button>';
         }
+
+        html += '</div>'; // close exercise-card
       });
 
-      if (isEditMode) {
-        html += '<div style="display:flex;gap:8px;margin-top:8px">' +
-          '<button class="btn btn-sm btn-orange" style="flex:1" onclick="saveCircuitRoundEdit(\'' + circuit.id + '\', ' + ci + ', ' + viewing + ')">Speichern</button>' +
-          '<button class="btn btn-sm btn-outline" style="flex:1" onclick="editingCircuitRound=false; renderWorkoutDetail();">Abbrechen</button>' +
-        '</div>';
-      } else {
-        html += '<div style="display:flex;gap:8px;margin-top:8px">' +
-          '<button class="btn btn-sm btn-outline" onclick="clearViewingRound(\'' + circuit.id + '\')">Zurück</button>' +
-          '<button class="btn btn-sm btn-outline" style="border-color:var(--orange);color:var(--orange)" onclick="editingCircuitRound=true; renderWorkoutDetail();">Bearbeiten</button>' +
-          '<button class="btn btn-sm" style="background:var(--red);color:#fff" onclick="deleteCircuitRound(\'' + circuit.id + '\', ' + ci + ', ' + viewing + ')">Löschen</button>' +
-        '</div>';
-      }
-
-      html += '</div>';
+      html += renderRPESelector(circuit.id);
     }
     // CURRENT INPUT — ALL exercises visible at once (like Acc tab)
     else if (!isDone) {
@@ -3494,14 +3497,7 @@ function renderZirkelTab(plan) {
       html += '</div>';
     }
 
-    // If circuit is ended
-    if (isDone) {
-      html += '<div style="text-align:center;padding:12px">' +
-        '<div style="color:var(--green);font-size:14px;font-weight:600;margin-bottom:8px">✓ Zirkel abgeschlossen (' + completedRounds + ' Runden)</div>' +
-        '<button class="btn btn-sm btn-outline" style="border-color:var(--orange);color:var(--orange)" onclick="reopenCircuit(\'' + circuit.id + '\')">Zirkel wieder öffnen</button>' +
-      '</div>';
-      html += renderRPESelector(circuit.id);
-    }
+    // (completed circuit rendering is now handled above in the isDone block)
 
     html += '</div>'; // close zirkel-round-area
     html += '</div>'; // close circuit container
@@ -5655,7 +5651,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '5.5';
+const APP_VERSION = '5.6';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
