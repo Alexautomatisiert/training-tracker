@@ -957,7 +957,7 @@ const WORKOUT_PLANS = {
         note: 'Double Rounds: jede Runde = 2x durch',
         exercises: [
           { id: 'ra-c2-e1', name: 'Pull Ups', reps: '6-8', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 1.0 },
-          { id: 'ra-c2-e2', name: 'Farmers Carries', reps: '75m', weight: 64, unit: 'kg', bodyweight: false, note: '2x32kg' },
+          { id: 'ra-c2-e2', name: 'Farmers Carries', reps: '75m', weight: 64, unit: 'kg', bodyweight: false, note: '2x32kg', noVolume: true },
           { id: 'ra-c2-e3', name: 'Shrugs', reps: '5-8', weight: 32, unit: 'kg', bodyweight: false, dumbbell: true }
         ]
       }
@@ -1388,12 +1388,24 @@ function checkPR(exerciseId, weight, reps) {
   return volume > best && best > 0;
 }
 
+// Reverse alias lookup: given an old exercise ID, find the current ID
+// EXERCISE_ID_ALIASES maps newId → oldId, so we search for oldId as value
+function resolveExerciseId(exId) {
+  for (const [newId, oldId] of Object.entries(EXERCISE_ID_ALIASES)) {
+    if (oldId === exId) return newId;
+  }
+  return null;
+}
+
 function getExerciseName(exId) {
   for (const plan of Object.values(WORKOUT_PLANS)) {
     for (const ex of plan.strength) if (ex.id === exId) return ex.name;
     for (const c of plan.circuits) for (const ex of c.exercises) if (ex.id === exId) return ex.name;
     for (const ex of plan.accessories) if (ex.id === exId) return ex.name;
   }
+  // Fallback: check if this is an old alias ID → resolve to current ID
+  var resolved = resolveExerciseId(exId);
+  if (resolved) return getExerciseName(resolved);
   return exId;
 }
 
@@ -1403,6 +1415,9 @@ function getExerciseInfo(exId) {
     for (const c of plan.circuits) for (const ex of c.exercises) if (ex.id === exId) return ex;
     for (const ex of plan.accessories) if (ex.id === exId) return ex;
   }
+  // Fallback: check if this is an old alias ID → resolve to current ID
+  var resolved = resolveExerciseId(exId);
+  if (resolved) return getExerciseInfo(resolved);
   return null;
 }
 
@@ -2055,6 +2070,8 @@ function updateAllTimerDisplays() {
 function calcSessionVolume(session) {
   let total = 0;
   Object.entries(session.sets || {}).forEach(([exId, sets]) => {
+    const ex = getExerciseInfo(exId);
+    if (ex && ex.noVolume) return; // Skip exercises excluded from volume stats (e.g. Farmers Carries)
     sets.forEach(set => {
       const w = Number(set.weight) || 0;
       const r = Number(set.reps) || 0;
@@ -2068,6 +2085,8 @@ function calcMuscleVolume(session, muscle) {
   let total = 0;
   Object.entries(session.sets || {}).forEach(([exId, sets]) => {
     if (EXERCISE_MUSCLE[exId] !== muscle) return;
+    const ex = getExerciseInfo(exId);
+    if (ex && ex.noVolume) return; // Skip exercises excluded from volume stats
     sets.forEach(set => {
       const w = Number(set.weight) || 0;
       const r = Number(set.reps) || 0;
@@ -2088,6 +2107,8 @@ function calcWeekSubMuscleVolume(week, muscle, subMuscle, mesocycle) {
       let vol = 0;
       Object.entries(s.sets || {}).forEach(([exId, sets]) => {
         if (EXERCISE_MUSCLE[exId] !== muscle) return;
+        const exInfo = getExerciseInfo(exId);
+        if (exInfo && exInfo.noVolume) return; // Skip exercises excluded from volume stats
         const sub = EXERCISE_SUB_MUSCLE[exId];
         if (sub !== subMuscle && sub !== config.both) return;
         sets.forEach(set => {
@@ -4119,6 +4140,8 @@ function renderDoneTab(plan) {
   Object.entries(session.sets || {}).forEach(([exId, sets]) => {
     const muscle = EXERCISE_MUSCLE[exId];
     if (!muscle) return;
+    const exInfo = getExerciseInfo(exId);
+    if (exInfo && exInfo.noVolume) return; // Skip exercises excluded from volume stats (e.g. Farmers Carries)
     if (!sessionMuscles[muscle]) sessionMuscles[muscle] = { vol: 0, reps: 0 };
     sets.forEach(set => {
       const w = Number(set.weight) || 0;
@@ -5632,7 +5655,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '5.4';
+const APP_VERSION = '5.5';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
