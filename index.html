@@ -885,15 +885,24 @@ const WORKOUT_PLANS = {
     circuits: [
       {
         id: 'va-c1',
-        name: 'Zirkel',
-        type: 'Technik',
+        name: 'Zirkel 1',
+        type: 'Kombi',
         rounds: 4,
-        restSeconds: 150,
+        restSeconds: 120,
         exercises: [
-          { id: 'va-c1-e1', name: 'DB Rev. Lunges', reps: '10-12', weight: 22.5, unit: 'kg', bodyweight: false, dumbbell: true },
-          { id: 'va-c1-e2', name: 'Weighted Ring Dips', reps: '8-10', weight: 5, unit: 'kg', bodyweight: false, weightedBW: true, note: 'BW+5kg' },
-          { id: 'va-c1-e3', name: 'DB OH Walking Lunges', reps: '10-12', weight: 17.5, unit: 'kg', bodyweight: false, dumbbell: true },
-          { id: 'va-c1-e4', name: 'DB Incline Press', reps: '10-12', weight: 22.5, unit: 'kg', bodyweight: false, dumbbell: true }
+          { id: 'va-c1-e1', name: 'DB Rev. Lunges', reps: '10-12', weight: 22.5, unit: 'kg', bodyweight: false, dumbbell: true, bwAdd: 0.60 },
+          { id: 'va-c1-e2', name: 'Weighted Ring Dips', reps: '8-10', weight: 5, unit: 'kg', bodyweight: false, weightedBW: true, note: 'BW+5kg' }
+        ]
+      },
+      {
+        id: 'va-c2',
+        name: 'Zirkel 2',
+        type: 'Kombi',
+        rounds: 4,
+        restSeconds: 120,
+        exercises: [
+          { id: 'va-c2-e3', name: 'DB OH Walking Lunges', reps: '10-12', weight: 17.5, unit: 'kg', bodyweight: false, dumbbell: true, bwAdd: 0.60 },
+          { id: 'va-c2-e4', name: 'DB Incline Press', reps: '10-12', weight: 22.5, unit: 'kg', bodyweight: false, dumbbell: true }
         ]
       }
     ],
@@ -981,27 +990,37 @@ const WORKOUT_PLANS = {
       { id: 'vb-w10', name: '20 Push-ups', duration: '' }
     ],
     strength: [
-      { id: 'vb-s1', name: 'Bulgarian Split Squats', sets: 2, reps: '8-10', weight: 22.5, unit: 'kg', bodyweight: false, dumbbell: true, restSeconds: 120, note: '2x22.5kg DB' }
+      { id: 'vb-s1', name: 'Bulgarian Split Squats', sets: 2, reps: '8-10', weight: 22.5, unit: 'kg', bodyweight: false, dumbbell: true, restSeconds: 120, note: '2x22.5kg DB', bwAdd: 0.65, unilateral: true }
     ],
     circuits: [
       {
         id: 'vb-c1',
-        name: 'Zirkel',
-        type: 'Heavy',
+        name: 'Zirkel 1',
+        type: 'Kombi',
         rounds: 4,
-        restSeconds: 150,
+        restSeconds: 120,
         exercises: [
           { id: 'vb-c1-e3', name: 'Ring Push Ups', reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0.70 },
-          { id: 'vb-c1-e2', name: 'DB Squats', reps: '8-10', weight: 20, unit: 'kg', bodyweight: false, dumbbell: true },
-          { id: 'vb-c1-e1', name: 'Incline DB Press', reps: '10-12', weight: 25, unit: 'kg', bodyweight: false, dumbbell: true },
-          { id: 'vb-c1-e5', name: 'DB Incline Flys', reps: '8-12', weight: 7.5, unit: 'kg', bodyweight: false, dumbbell: true },
-          { id: 'vb-c1-e4', name: 'Walking Lunges', reps: '12-15', weight: 20, unit: 'kg', bodyweight: false, dumbbell: true }
+          { id: 'vb-c1-e2', name: 'DB Squats', reps: '8-10', weight: 20, unit: 'kg', bodyweight: false, dumbbell: true, bwAdd: 0.50 }
+        ]
+      },
+      {
+        id: 'vb-c2',
+        name: 'Zirkel 2',
+        type: 'Kombi',
+        rounds: 4,
+        restSeconds: 120,
+        exercises: [
+          { id: 'vb-c2-e1', name: 'Incline DB Press', reps: '10-12', weight: 25, unit: 'kg', bodyweight: false, dumbbell: true },
+          { id: 'vb-c2-e5', name: 'DB Incline Flys', reps: '8-12', weight: 7.5, unit: 'kg', bodyweight: false, dumbbell: true },
+          { id: 'vb-c2-e4', name: 'Walking Lunges', reps: '12-15', weight: 20, unit: 'kg', bodyweight: false, dumbbell: true, bwAdd: 0.60 }
         ]
       }
     ],
     accessories: [
       { id: 'vb-a1', name: 'Tricep KB Extensions', sets: 3, reps: '10-12', weight: 16, unit: 'kg', bodyweight: false, group: null, dropWeight: 12, note: 'DropSet 16+12kg' },
-      { id: 'vb-a2', name: 'DB Lou Raises + Lateral Raise', sets: 3, reps: '12-15', weight: 7.5, unit: 'kg', bodyweight: false, dumbbell: true, group: null, note: 'SuperSet 7.5kg' },
+      { id: 'vb-a2', name: 'DB Lou Raises', sets: 3, reps: '12-15', weight: 7.5, unit: 'kg', bodyweight: false, dumbbell: true, group: 'ss-vb-shoulders' },
+      { id: 'vb-a2b', name: 'DB Lateral Raise', sets: 3, reps: '12-15', weight: 7.5, unit: 'kg', bodyweight: false, dumbbell: true, group: 'ss-vb-shoulders' },
       { id: 'vb-a3', name: 'TTB + KTC', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: null }
     ]
   },
@@ -1065,11 +1084,13 @@ const WORKOUT_PLANS = {
 // Exercise → primary muscle group mapping (for stats filtering)
 const EXERCISE_MUSCLE = {
   // Vorderseite A
-  'va-s1': 'brust',       // DB Incline Press
-  'va-c1-e1': 'quads',    // DB Rev. Lunges
-  'va-c1-e2': 'brust',    // Weighted Ring Dips
-  'va-c1-e3': 'quads',    // DB OH Walking Lunges
-  'va-c1-e4': 'brust',    // DB Incline Press (circuit)
+  'va-s1': 'brust',       // DB Incline Press (Strength)
+  'va-c1-e1': 'quads',    // DB Rev. Lunges (Zirkel 1)
+  'va-c1-e2': 'brust',    // Weighted Ring Dips (Zirkel 1)
+  'va-c1-e3': 'quads',    // DB OH Walking Lunges (legacy, now va-c2-e3)
+  'va-c1-e4': 'brust',    // DB Incline Press (legacy, now va-c2-e4)
+  'va-c2-e3': 'quads',    // DB OH Walking Lunges (Zirkel 2)
+  'va-c2-e4': 'brust',    // DB Incline Press (Zirkel 2)
   'va-a1': 'trizeps',     // Tricep KB Extensions
   'va-a2': 'schultern',   // DB Lateral Raise
   'va-a3': 'core',        // TTB + KTC
@@ -1088,13 +1109,17 @@ const EXERCISE_MUSCLE = {
   'ra-a3': 'bizeps',      // African Curls
   // Vorderseite B
   'vb-s1': 'quads',       // Bulgarian Split Squats
-  'vb-c1-e1': 'brust',    // Incline DB Press
-  'vb-c1-e2': 'quads',    // DB Squats
-  'vb-c1-e3': 'brust',    // Ring Push Ups
-  'vb-c1-e4': 'quads',    // Walking Lunges
-  'vb-c1-e5': 'brust',    // DB Incline Flys
+  'vb-c1-e1': 'brust',    // Incline DB Press (legacy, now vb-c2-e1)
+  'vb-c1-e2': 'quads',    // DB Squats (Zirkel 1)
+  'vb-c1-e3': 'brust',    // Ring Push Ups (Zirkel 1)
+  'vb-c1-e4': 'quads',    // Walking Lunges (legacy, now vb-c2-e4)
+  'vb-c1-e5': 'brust',    // DB Incline Flys (legacy, now vb-c2-e5)
+  'vb-c2-e1': 'brust',    // Incline DB Press (Zirkel 2)
+  'vb-c2-e4': 'quads',    // Walking Lunges (Zirkel 2)
+  'vb-c2-e5': 'brust',    // DB Incline Flys (Zirkel 2)
   'vb-a1': 'trizeps',     // Tricep KB Extensions
-  'vb-a2': 'schultern',   // DB Lou Raises + Lateral Raise
+  'vb-a2': 'schultern',   // DB Lou Raises
+  'vb-a2b': 'schultern',  // DB Lateral Raise
   'vb-a3': 'core',        // TTB + KTC
   // Rueckseite B
   'rb-s1': 'ruecken',     // DB Seal Rows
@@ -1115,11 +1140,14 @@ const EXERCISE_MUSCLE = {
 const EXERCISE_SUB_MUSCLE = {
   // Brust sub-groups
   'va-s1': 'obere_brust',       // DB Incline Press (Strength)
-  'va-c1-e2': 'untere_brust',   // Weighted Ring Dips
-  'va-c1-e4': 'obere_brust',    // DB Incline Press (Zirkel)
-  'vb-c1-e1': 'obere_brust',    // Incline DB Press
-  'vb-c1-e3': 'beide_brust',    // Ring Push Ups (flat → both)
-  'vb-c1-e5': 'obere_brust',    // DB Incline Flys
+  'va-c1-e2': 'untere_brust',   // Weighted Ring Dips (Zirkel 1)
+  'va-c1-e4': 'obere_brust',    // DB Incline Press (legacy, now va-c2-e4)
+  'va-c2-e4': 'obere_brust',    // DB Incline Press (Zirkel 2)
+  'vb-c1-e1': 'obere_brust',    // Incline DB Press (legacy, now vb-c2-e1)
+  'vb-c1-e3': 'beide_brust',    // Ring Push Ups (Zirkel 1)
+  'vb-c1-e5': 'obere_brust',    // DB Incline Flys (legacy, now vb-c2-e5)
+  'vb-c2-e1': 'obere_brust',    // Incline DB Press (Zirkel 2)
+  'vb-c2-e5': 'obere_brust',    // DB Incline Flys (Zirkel 2)
   // Ruecken sub-groups
   'ra-s1': 'beide_ruecken',      // BB Seal Rows (flat on boxes → full back compound)
   'ra-c1-e1': 'oberer_ruecken', // Snatches (explosive pull → Traps)
@@ -1389,11 +1417,22 @@ function isWeightedBWExercise(exId) {
 }
 
 // Get effective weight for volume calculation (doubles for DB exercises, adds BW for weightedBW)
+// Unilateral exercises: volume × 2 (user enters per-leg reps, both legs worked)
+function getRepMultiplier(exId) {
+  var ex = getExerciseInfo(exId);
+  return (ex && ex.unilateral) ? 2 : 1;
+}
+
 function getVolumeWeight(exId, trackedWeight) {
-  if (isDumbbellExercise(exId)) return trackedWeight * 2;
+  const ex = getExerciseInfo(exId);
+  if (isDumbbellExercise(exId)) {
+    var dbWeight = trackedWeight * 2;
+    // Add partial bodyweight for compound DB exercises (squats, lunges)
+    if (ex && ex.bwAdd) dbWeight += APP_STATE.settings.bodyWeight * ex.bwAdd;
+    return dbWeight;
+  }
   if (isWeightedBWExercise(exId)) return trackedWeight + APP_STATE.settings.bodyWeight;
   // BW exercises: apply bwFraction if defined (e.g. Ring Push Ups=0.70, Ring Rev Fly=0.25, Core=0)
-  const ex = getExerciseInfo(exId);
   if (ex && ex.bodyweight && ex.bwFraction !== undefined) {
     return trackedWeight * ex.bwFraction;
   }
@@ -1572,6 +1611,7 @@ function startCountdown(seconds) {
   restTimer.endTime = Date.now() + seconds * 1000;
   restTimer.pausedRemaining = null;
   restTimer.completed = false;
+  restTimer._lastCountdownBeep = null;
   startDisplayUpdate();
   updateAllTimerDisplays();
 }
@@ -1782,20 +1822,20 @@ let audioCtx = null;
 function playBeep() {
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    var playTone = function(freq, startMs) {
+    var playTone = function(freq, startMs, dur) {
       var osc = audioCtx.createOscillator();
       var gain = audioCtx.createGain();
       osc.connect(gain);
       gain.connect(audioCtx.destination);
       osc.frequency.value = freq;
-      gain.gain.value = 0.4;
+      gain.gain.value = 0.6;
       var t = audioCtx.currentTime + startMs / 1000;
       osc.start(t);
-      osc.stop(t + 0.15);
+      osc.stop(t + (dur || 0.18));
     };
     playTone(880, 0);
-    playTone(880, 250);
-    playTone(1100, 500);
+    playTone(880, 280);
+    playTone(1100, 560, 0.3);
   } catch(e) { console.log('Audio not available'); }
 }
 
@@ -1942,13 +1982,37 @@ function renderCadenceOverlay() {
 }
 
 function checkCountdownCompletion() {
-  if (restTimer.mode === 'countdown' && !restTimer.completed && restTimer.pausedRemaining === null) {
-    if (Date.now() >= restTimer.endTime) {
+  if (restTimer.mode === 'countdown' && restTimer.pausedRemaining === null) {
+    var remaining = Math.ceil((restTimer.endTime - Date.now()) / 1000);
+    // 3-2-1 countdown beeps
+    if (!restTimer.completed && remaining <= 3 && remaining > 0) {
+      if (!restTimer._lastCountdownBeep || restTimer._lastCountdownBeep !== remaining) {
+        restTimer._lastCountdownBeep = remaining;
+        playCountdownTick();
+      }
+    }
+    // Final beep at 0
+    if (!restTimer.completed && Date.now() >= restTimer.endTime) {
       restTimer.completed = true;
+      restTimer._lastCountdownBeep = null;
       playBeep();
       if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
     }
   }
+}
+
+function playCountdownTick() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.frequency.value = 660;
+    gain.gain.value = 0.3;
+    osc.start(audioCtx.currentTime);
+    osc.stop(audioCtx.currentTime + 0.08);
+  } catch(e) {}
 }
 
 // Visibility change handler - check timer on return
@@ -1994,7 +2058,7 @@ function calcSessionVolume(session) {
     sets.forEach(set => {
       const w = Number(set.weight) || 0;
       const r = Number(set.reps) || 0;
-      total += getVolumeWeight(exId, w) * r;
+      total += getVolumeWeight(exId, w) * r * getRepMultiplier(exId);
     });
   });
   return total;
@@ -2007,7 +2071,7 @@ function calcMuscleVolume(session, muscle) {
     sets.forEach(set => {
       const w = Number(set.weight) || 0;
       const r = Number(set.reps) || 0;
-      total += getVolumeWeight(exId, w) * r;
+      total += getVolumeWeight(exId, w) * r * getRepMultiplier(exId);
     });
   });
   return total;
@@ -2029,7 +2093,7 @@ function calcWeekSubMuscleVolume(week, muscle, subMuscle, mesocycle) {
         sets.forEach(set => {
           const w = Number(set.weight) || 0;
           const r = Number(set.reps) || 0;
-          vol += getVolumeWeight(exId, w) * r;
+          vol += getVolumeWeight(exId, w) * r * getRepMultiplier(exId);
         });
       });
       return sum + vol;
@@ -2055,10 +2119,38 @@ function getLastSession(workoutId) {
   return sessions[0] || null;
 }
 
+// Alias mapping: new circuit IDs → old IDs (for backward compat after circuit splits)
+const EXERCISE_ID_ALIASES = {
+  // VA: exercises that moved from c1 to c2 after circuit split
+  'va-c2-e3': 'va-c1-e3',  // DB OH Walking Lunges: was va-c1-e3, now va-c2-e3
+  'va-c2-e4': 'va-c1-e4',  // DB Incline Press: was va-c1-e4, now va-c2-e4
+  // VB: exercises that moved from c1 to c2 after circuit split
+  'vb-c2-e1': 'vb-c1-e1',  // Incline DB Press: was vb-c1-e1, now vb-c2-e1
+  'vb-c2-e4': 'vb-c1-e4',  // Walking Lunges: was vb-c1-e4, now vb-c2-e4
+  'vb-c2-e5': 'vb-c1-e5',  // DB Incline Flys: was vb-c1-e5, now vb-c2-e5
+  // Superset split
+  'vb-a2b': 'vb-a2'         // DB Lateral Raise: split from combined Lou+Lateral
+};
+
+// Get sets for an exercise from a session, checking aliases for backward compat
+function getSessionSetsForEx(session, exId) {
+  if (session.sets[exId] && session.sets[exId].length > 0) return session.sets[exId];
+  var alias = EXERCISE_ID_ALIASES[exId];
+  if (alias && session.sets[alias] && session.sets[alias].length > 0) return session.sets[alias];
+  return null;
+}
+
 function getLastSessionSets(exerciseId) {
   const sorted = [...APP_STATE.sessions].sort((a, b) => b.date.localeCompare(a.date));
   for (const s of sorted) {
     if (s.sets[exerciseId]) return s.sets[exerciseId];
+  }
+  // Fallback: check alias for backward compat
+  const alias = EXERCISE_ID_ALIASES[exerciseId];
+  if (alias) {
+    for (const s of sorted) {
+      if (s.sets[alias]) return s.sets[alias];
+    }
   }
   return null;
 }
@@ -2145,7 +2237,7 @@ const ICONS = {
 let currentPage = 'home';
 let trainingView = 'week-overview'; // 'week-overview' | 'workout-detail'
 let activeWorkoutId = null;
-let activeSubTab = 'warmup';
+let activeSubTab = 'prep';
 let selectedWeek = null;
 let statsTab = 'alle';
 
@@ -2520,7 +2612,7 @@ function selectWeek(w) {
 function openWorkout(workoutId) {
   activeWorkoutId = workoutId;
   trainingView = 'workout-detail';
-  activeSubTab = 'warmup';
+  activeSubTab = 'prep';
   warmupChecked = {};
 
   // Check if there's an existing session for this workout in current week
@@ -2587,10 +2679,10 @@ function renderWorkoutDetail() {
   const isCompleted = activeSession && activeSession._completed;
 
   // Sub tabs - always show all tabs so user can view rounds even when completed
-  const tabs = ['warmup', 'strength', 'zirkel', 'acc', 'done'];
+  const tabs = ['prep', 'warmup', 'strength', 'zirkel', 'acc', 'done'];
 
   let tabsHtml = tabs.map(t => {
-    const labels = { warmup: 'Warmup', strength: 'Strength', zirkel: 'Zirkel', acc: 'Acc', done: 'Done' };
+    const labels = { prep: 'Prep', warmup: 'Warmup', strength: 'Strength', zirkel: 'Zirkel', acc: 'Acc', done: 'Done' };
     return `<button class="sub-tab ${activeSubTab === t ? 'active' : ''}" onclick="switchSubTab('${t}')">${labels[t]}</button>`;
   }).join('');
 
@@ -2606,6 +2698,7 @@ function renderWorkoutDetail() {
 
   let content = '';
   switch (activeSubTab) {
+    case 'prep': content = renderPrepTab(plan); break;
     case 'warmup': content = renderWarmupTab(plan); break;
     case 'strength': content = renderStrengthTab(plan); break;
     case 'zirkel': content = renderZirkelTab(plan); break;
@@ -2709,6 +2802,68 @@ function confirmReadiness() {
   renderWorkoutDetail();
 }
 
+function renderPrepTab(plan) {
+  var html = '';
+  // Recovery Check
+  html += renderReadinessCheck();
+
+  // Estimated Duration
+  var dur = getEstimatedDuration(plan.id);
+  if (dur) {
+    html += '<div class="card" style="padding:12px;margin-bottom:12px;text-align:center">';
+    html += '<div style="font-size:12px;color:var(--text-ter)">Geschätzte Dauer</div>';
+    html += '<div style="font-size:20px;font-weight:700;color:var(--orange)">' + formatTime(dur) + '</div>';
+    html += '</div>';
+  }
+
+  // Exercise Overview
+  html += '<div class="card" style="padding:12px;margin-bottom:12px">';
+  html += '<div style="font-size:14px;font-weight:700;margin-bottom:10px">Übersicht</div>';
+
+  // Strength
+  html += '<div style="font-size:12px;font-weight:600;color:var(--orange);margin-bottom:4px">Strength</div>';
+  plan.strength.forEach(function(ex) {
+    var dbLbl = ex.dumbbell ? ' (DB)' : '';
+    var wLbl = ex.bodyweight ? 'BW' : ex.weight + 'kg' + dbLbl;
+    html += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid var(--border)">' +
+      '<span>' + ex.name + '</span>' +
+      '<span style="color:var(--text-sec)">' + ex.sets + '×' + ex.reps + ' @ ' + wLbl + '</span>' +
+    '</div>';
+  });
+
+  // Circuits
+  plan.circuits.forEach(function(circuit) {
+    var targetR = getTargetRounds(circuit.rounds, activeSession ? activeSession.week : APP_STATE.settings.mesocycle.currentWeek);
+    html += '<div style="font-size:12px;font-weight:600;color:var(--orange);margin-top:10px;margin-bottom:4px">' + circuit.name + ' (' + targetR + ' Runden)</div>';
+    circuit.exercises.forEach(function(ex) {
+      var dbLbl = ex.dumbbell ? ' (DB)' : '';
+      var wLbl = ex.bodyweight ? 'BW' : ex.weight + 'kg' + dbLbl;
+      html += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid var(--border)">' +
+        '<span>' + ex.name + '</span>' +
+        '<span style="color:var(--text-sec)">' + ex.reps + ' @ ' + wLbl + '</span>' +
+      '</div>';
+    });
+  });
+
+  // Accessories
+  html += '<div style="font-size:12px;font-weight:600;color:var(--orange);margin-top:10px;margin-bottom:4px">Accessories</div>';
+  plan.accessories.forEach(function(ex) {
+    var dbLbl = ex.dumbbell ? ' (DB)' : '';
+    var wLbl = ex.bodyweight ? 'BW' : (ex.weight || '-') + 'kg' + dbLbl;
+    html += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid var(--border)">' +
+      '<span>' + ex.name + '</span>' +
+      '<span style="color:var(--text-sec)">' + ex.sets + '×' + ex.reps + ' @ ' + wLbl + '</span>' +
+    '</div>';
+  });
+  html += '</div>';
+
+  // Start button
+  var readyDone = activeSession && activeSession._readinessDone;
+  html += '<button class="btn btn-orange" style="margin-top:8px" onclick="switchSubTab(\'warmup\')">' + (readyDone ? 'Weiter: Warmup' : 'Warmup starten') + '</button>';
+
+  return html;
+}
+
 function renderWarmupTab(plan) {
   // Build cumulative time thresholds for display
   const thresholds = getWarmupThresholds(plan);
@@ -2743,7 +2898,6 @@ function renderWarmupTab(plan) {
   const totalWarmupTime = thresholds.length > 0 ? thresholds[thresholds.length - 1].at : 0;
 
   return `
-    ${renderReadinessCheck()}
     <div class="card" style="text-align:center;padding:24px">
       <div class="rest-timer-display timer-display">${formatTime(getTimerSeconds())}</div>
       ${totalWarmupTime > 0 ? `<div style="font-size:11px;color:var(--text-ter);margin-top:4px">Auto-Check bis ${formatTime(totalWarmupTime)}</div>` : ''}
@@ -3234,41 +3388,79 @@ function renderZirkelTab(plan) {
 
       html += '</div>';
     }
-    // CURRENT ROUND INPUT (only if not done and not viewing past)
-    else if (!isDone && completedRounds < totalRounds) {
-      const currentRound = completedRounds + 1;
+    // CURRENT INPUT — ALL exercises visible at once (like Acc tab)
+    else if (!isDone) {
 
-      circuit.exercises.forEach(function(ex) {
+      circuit.exercises.forEach(function(ex, exIdx) {
+        var exSets = activeSession.sets[ex.id] || [];
+        var exRounds = exSets.length;
         var bw = ex.bodyweight;
         var dbLbl = ex.dumbbell ? ' (pro DB)' : '';
-        var weightLabel = bw ? '@ BW' : '@ ' + ex.weight + 'kg' + dbLbl;
+        var weightLabel = bw ? '@ BW' : '@ ' + (ex.weight || '') + 'kg' + dbLbl;
         var toBeatStr = formatToBeat(ex.id);
+        var lastStr = formatLastSession(ex.id);
+        var noteStr = ex.note ? ' | ' + ex.note : '';
 
-        html += '<div class="exercise-card">' +
+        html += '<div class="exercise-card" style="' + (exRounds < completedRounds + 1 ? 'border-color:var(--orange)' : '') + '">' +
           '<div style="display:flex;justify-content:space-between;align-items:center">' +
-            '<div class="exercise-name">' + ex.name + '</div>' +
-            '<button id="peek-icon-' + ex.id + '" onclick="event.stopPropagation();toggleHistoryPeek(\'' + ex.id + '\')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 6px;font-size:12px;color:var(--text-ter);cursor:pointer">📊</button>' +
-          '</div>' +
-          '<div class="exercise-last">' + ex.reps + ' ' + weightLabel + (ex.note ? ' (' + ex.note + ')' : '') + '</div>' +
-          '<div id="peek-' + ex.id + '" style="display:none">' + renderHistoryPeek(ex.id) + '</div>' +
-          (toBeatStr ? '<div class="to-beat">' + toBeatStr + '</div>' : '') +
-          renderCoachingTip(circuit.id, activeWorkoutId) +
-          '<div class="input-row" style="margin-top:8px">' +
-            (bw ? '<div class="input-group"><div class="input-label">Gewicht</div><div style="text-align:center;padding:8px;font-size:14px">BW</div></div>' :
-            '<div class="input-group">' +
-              '<div class="input-label">Gewicht (kg)' + dbLbl + '</div>' +
-              '<input type="number" inputmode="decimal" class="input-field" id="cw-' + ex.id + '" value="' + (function(){ var ls = getLastSessionSets(ex.id); var rd = activeSession.circuitRounds[circuit.id] || 0; return ls && ls[rd] ? ls[rd].weight : ex.weight; })() + '" step="0.5">' +
-            '</div>') +
-            '<div class="input-group">' +
-              '<div class="input-label">Reps</div>' +
-              '<input type="number" inputmode="decimal" class="input-field" id="cr-' + ex.id + '" value="' + parseInt(ex.reps.split('-')[1] || ex.reps.split('+')[0] || ex.reps) + '">' +
+            '<div>' +
+              '<div class="exercise-name" style="font-size:14px">' + ex.name + '</div>' +
+              '<div class="exercise-last" style="font-size:11px">' + ex.reps + ' ' + weightLabel + noteStr + (lastStr ? ' | ' + lastStr : '') + '</div>' +
+            '</div>' +
+            '<div style="display:flex;align-items:center;gap:6px">' +
+              '<span style="font-size:12px;color:var(--text-sec)">' + exRounds + '/' + targetTotal + '</span>' +
+              '<button id="peek-icon-' + ex.id + '" onclick="event.stopPropagation();toggleHistoryPeek(\'' + ex.id + '\')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 6px;font-size:12px;color:var(--text-ter);cursor:pointer">📊</button>' +
             '</div>' +
           '</div>' +
-        '</div>';
-      });
+          '<div id="peek-' + ex.id + '" style="display:none">' + renderHistoryPeek(ex.id) + '</div>' +
+          (toBeatStr ? '<div class="to-beat" style="margin-top:4px">' + toBeatStr + '</div>' : '') +
+          renderCoachingTip(circuit.id, activeWorkoutId);
 
-      var roundLabel = isDouble ? getDoubleLabel(currentRound) : currentRound;
-      html += '<button class="btn btn-orange" onclick="finishCircuitRound(\'' + circuit.id + '\', ' + ci + ')">Runde ' + roundLabel + ' done</button>';
+        // Show completed sets as done mini-cards (swipe to delete + tap to edit)
+        for (var si = 0; si < exSets.length; si++) {
+          var set = exSets[si];
+          var setDbLbl = ex.dumbbell ? ' (DB)' : '';
+          var isEditingThis = editingSet && editingSet.exId === ex.id && editingSet.index === si;
+
+          if (isEditingThis) {
+            html += '<div class="set-card current" style="padding:6px 12px;border-color:var(--blue);margin-top:4px">' +
+              '<div style="font-size:12px;font-weight:600;color:var(--blue);margin-bottom:4px">Runde ' + (si + 1) + ' bearbeiten</div>' +
+              '<div style="display:flex;align-items:center;gap:8px">' +
+                '<input type="number" inputmode="decimal" class="input-field" style="flex:1;padding:5px;font-size:13px" id="edit-w-' + ex.id + '-' + si + '" value="' + set.weight + '" step="0.5">' +
+                '<span style="font-size:12px;color:var(--text-sec)">kg' + setDbLbl + ' ×</span>' +
+                '<input type="number" inputmode="numeric" class="input-field" style="width:55px;padding:5px;font-size:13px" id="edit-r-' + ex.id + '-' + si + '" value="' + set.reps + '">' +
+              '</div>' +
+              '<div style="display:flex;gap:8px;margin-top:6px">' +
+                '<button class="btn btn-sm btn-orange" style="flex:1" onclick="saveEditSet(\'' + ex.id + '\', ' + si + ')">Speichern</button>' +
+                '<button class="btn btn-sm btn-outline" style="flex:1" onclick="cancelEditSet()">Abbrechen</button>' +
+              '</div>' +
+            '</div>';
+          } else {
+            html += '<div class="swipe-wrapper" data-ex-id="' + ex.id + '" data-set-index="' + si + '" style="margin-top:4px">' +
+              '<div class="swipe-delete-bg">Löschen</div>' +
+              '<div class="swipe-content set-card done" style="padding:6px 12px;margin-bottom:0" onclick="startEditSet(\'' + ex.id + '\', ' + si + ')">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center">' +
+                  '<span style="font-size:12px">' + ICONS.check + ' Runde ' + (si + 1) + '</span>' +
+                  '<span style="font-size:12px;color:var(--text-sec)">' + set.weight + 'kg' + setDbLbl + ' × ' + set.reps + '</span>' +
+                '</div>' +
+              '</div>' +
+            '</div>';
+          }
+        }
+
+        // Current input row (if not all rounds done for this exercise)
+        if (exRounds < totalRounds) {
+          html += '<div style="display:flex;align-items:center;gap:8px;margin-top:8px">' +
+            '<span style="font-size:12px;width:28px;color:var(--text-sec)">' + (exRounds + 1) + '</span>' +
+            (bw ? '<div style="flex:1;text-align:center;font-size:13px;padding:6px">BW</div>' :
+            '<input type="number" inputmode="decimal" class="input-field" style="flex:1;padding:6px" id="cw-' + ex.id + '" value="' + (function(){ var ls = getLastSessionSets(ex.id); var rd = exRounds; return ls && ls[rd] && ls[rd].type !== 'drop' ? ls[rd].weight : ex.weight; })() + '" step="0.5">') +
+            '<input type="number" inputmode="decimal" class="input-field" style="width:55px;padding:6px" id="cr-' + ex.id + '" value="' + parseInt(ex.reps.split('-')[1] || ex.reps.split('+')[0] || ex.reps) + '">' +
+            '<button class="btn btn-orange btn-sm" style="width:auto;padding:6px 14px;min-height:32px;font-size:13px" onclick="finishCircuitExercise(\'' + circuit.id + '\', ' + ci + ', ' + exIdx + ', ' + (bw ? 'true' : 'false') + ')">OK</button>' +
+          '</div>';
+        }
+
+        html += '</div>'; // close exercise-card
+      });
     }
 
     // Zirkel end / add round buttons
@@ -3381,8 +3573,13 @@ function deleteCircuitRound(circuitId, circuitIndex, roundNumber) {
     }
   });
 
-  // Decrement circuit rounds counter
-  activeSession.circuitRounds[circuitId] = Math.max(0, (activeSession.circuitRounds[circuitId] || 0) - 1);
+  // Recalculate circuit rounds = min(sets.length) across all exercises
+  var minSets = Infinity;
+  circuit.exercises.forEach(function(ex) {
+    var len = (activeSession.sets[ex.id] || []).length;
+    if (len < minSets) minSets = len;
+  });
+  activeSession.circuitRounds[circuitId] = minSets === Infinity ? 0 : minSets;
 
   // If we had extra rounds, decrement those first
   if (activeSession._extraRounds && activeSession._extraRounds[circuitId] > 0) {
@@ -3407,39 +3604,44 @@ function addCircuitRound(circuitId, circuitIndex) {
   renderWorkoutDetail();
 }
 
-function finishCircuitRound(circuitId, circuitIndex) {
+function finishCircuitExercise(circuitId, circuitIndex, exIdx, isBW) {
   const plan = WORKOUT_PLANS[activeWorkoutId];
   const circuit = plan.circuits[circuitIndex];
+  const ex = circuit.exercises[exIdx];
 
-  var allZeroReps = true;
-  var roundData = [];
+  var weightEl = document.getElementById('cw-' + ex.id);
+  var repsEl = document.getElementById('cr-' + ex.id);
+  var weight = isBW ? APP_STATE.settings.bodyWeight : (weightEl ? (parseFloat(weightEl.value.replace(',', '.')) || ex.weight || 0) : ex.weight || 0);
+  var reps = repsEl ? (parseInt(repsEl.value) || 0) : 0;
 
-  circuit.exercises.forEach(function(ex) {
-    var bw = ex.bodyweight;
-    var weightEl = document.getElementById('cw-' + ex.id);
-    var repsEl = document.getElementById('cr-' + ex.id);
-    var weight = bw ? APP_STATE.settings.bodyWeight : (weightEl ? (parseFloat(weightEl.value.replace(',', '.')) || ex.weight || 0) : ex.weight || 0);
-    var reps = repsEl ? (parseInt(repsEl.value) || parseInt(ex.reps.split('-')[1] || ex.reps) || 0) : (parseInt(ex.reps.split('-')[1] || ex.reps) || 0);
-
-    roundData.push({ exId: ex.id, weight: weight, reps: reps });
-    if (reps > 0) allZeroReps = false;
-  });
-
-  // Skip round if ALL exercises have 0 reps
-  if (allZeroReps) {
-    alert('Runde übersprungen — alle Übungen haben 0 Reps.');
+  if (reps === 0) {
     renderWorkoutDetail();
     return;
   }
 
-  roundData.forEach(function(d) {
-    if (!activeSession.sets[d.exId]) activeSession.sets[d.exId] = [];
-    activeSession.sets[d.exId].push({ weight: d.weight, reps: d.reps, type: 'working' });
+  // Push one set for this exercise
+  if (!activeSession.sets[ex.id]) activeSession.sets[ex.id] = [];
+  activeSession.sets[ex.id].push({ weight: weight, reps: reps, type: 'working' });
+
+  // Recalculate circuit rounds = min(sets.length) across all exercises
+  var minSets = Infinity;
+  circuit.exercises.forEach(function(e) {
+    var len = (activeSession.sets[e.id] || []).length;
+    if (len < minSets) minSets = len;
   });
+  activeSession.circuitRounds[circuitId] = minSets === Infinity ? 0 : minSets;
 
-  activeSession.circuitRounds[circuitId] = (activeSession.circuitRounds[circuitId] || 0) + 1;
+  // Check PR for this exercise
+  var lastSet = { weight: weight, reps: reps };
+  if (checkPR(ex.id, lastSet.weight, lastSet.reps)) {
+    APP_STATE.prs.push({
+      exerciseId: ex.id, date: activeSession.date,
+      weight: lastSet.weight, reps: lastSet.reps,
+      volume: lastSet.weight * lastSet.reps,
+      week: activeSession.week, mesocycle: activeSession.mesocycle
+    });
+  }
 
-  // DON'T auto-start timer - user starts it manually
   saveState();
   renderWorkoutDetail();
 }
@@ -3536,8 +3738,9 @@ function renderAccExercise(ex) {
     }
   });
 
-  // Current set input if not all done
-  if (sessionSets.length < ex.sets) {
+  // Current set input OR add-set button
+  const showingAddExtra = sessionSets.length >= ex.sets && activeSession._accExtra && activeSession._accExtra[ex.id];
+  if (sessionSets.length < ex.sets || showingAddExtra) {
     setsHtml += `
       <div class="set-card current" style="padding:8px 12px">
         <div style="display:flex;align-items:center;gap:8px">
@@ -3561,6 +3764,9 @@ function renderAccExercise(ex) {
       </div>`;
 
     setsHtml += '</div>';
+  } else if (sessionSets.length >= ex.sets) {
+    // All planned sets done — show "+ Satz" button
+    setsHtml += `<button class="btn btn-sm btn-outline" style="margin-top:4px;font-size:12px" onclick="addExtraAccSet('${ex.id}')">+ Satz</button>`;
   }
 
   return `
@@ -3581,6 +3787,9 @@ function finishAccSet(exId, isBW) {
   const rawW = document.getElementById(`aw-${exId}`).value.replace(',', '.');
   const weight = isBW ? APP_STATE.settings.bodyWeight : (parseFloat(rawW) || 0);
   const reps = parseInt(document.getElementById(`ar-${exId}`).value) || 0;
+
+  // Clear extra-set flag so "+ Satz" button reappears after this set
+  if (activeSession._accExtra) delete activeSession._accExtra[exId];
 
   if (!activeSession.sets[exId]) activeSession.sets[exId] = [];
   activeSession.sets[exId].push({ weight, reps, type: 'working' });
@@ -3605,6 +3814,12 @@ function finishAccSet(exId, isBW) {
   }
 
   saveState();
+  renderWorkoutDetail();
+}
+
+function addExtraAccSet(exId) {
+  if (!activeSession._accExtra) activeSession._accExtra = {};
+  activeSession._accExtra[exId] = true;
   renderWorkoutDetail();
 }
 
@@ -3784,6 +3999,9 @@ function finishWorkout() {
   delete toSave._currentCircuitRound;
   delete toSave._completed;
   delete toSave._readinessDone;
+  delete toSave._accExtra;
+  delete toSave._circuitPending;
+  delete toSave._circuitExIdx;
   // Keep _circuitDone and _extraRounds for round viewing after completion
   // delete toSave._circuitDone;
 
@@ -3905,7 +4123,7 @@ function renderDoneTab(plan) {
     sets.forEach(set => {
       const w = Number(set.weight) || 0;
       const r = Number(set.reps) || 0;
-      sessionMuscles[muscle].vol += getVolumeWeight(exId, w) * r;
+      sessionMuscles[muscle].vol += getVolumeWeight(exId, w) * r * getRepMultiplier(exId);
       sessionMuscles[muscle].reps += r;
     });
   });
@@ -4220,7 +4438,7 @@ function getLiftStatus(exId) {
 
   var firstSet = null, latestSet = null;
   mesoSessions.forEach(function(s) {
-    var sets = s.sets[exId] || [];
+    var sets = getSessionSetsForEx(s, exId) || [];
     if (sets.length === 0) return;
     // Find best set by estimated 1RM (consistent with progression bars)
     // This correctly picks heavier-weight sets over high-rep-low-weight sets
@@ -4288,7 +4506,7 @@ function isStrengthExercise(exId) {
 function getExerciseProgression(exId, exDef) {
   var progression = [];
   APP_STATE.sessions.forEach(function(s) {
-    var sets = s.sets[exId] || [];
+    var sets = getSessionSetsForEx(s, exId) || [];
     if (sets.length === 0) return;
     var bestSet = null;
     var bestEst = 0;
@@ -4488,7 +4706,7 @@ function renderHistoryPeek(exId) {
   var ex = getExerciseInfo(exId);
   if (!ex) return '';
   var sessions = APP_STATE.sessions
-    .filter(function(s) { return s.sets[exId] && s.sets[exId].length > 0; })
+    .filter(function(s) { return getSessionSetsForEx(s, exId); })
     .sort(function(a, b) { return a.date.localeCompare(b.date); })
     .slice(-6);
   if (sessions.length === 0) return '<div style="font-size:12px;color:var(--text-ter);padding:4px 0">Noch keine History</div>';
@@ -4497,7 +4715,7 @@ function renderHistoryPeek(exId) {
   var isBW = !!ex.bodyweight;
   var html = '<div style="padding:6px 0">';
   sessions.forEach(function(s, i) {
-    var sets = s.sets[exId];
+    var sets = getSessionSetsForEx(s, exId);
     var bestSet = null, best1RM = 0;
     sets.forEach(function(set) {
       var est = estimate1RM(set, ex);
@@ -4680,7 +4898,7 @@ function getMesoLiftComparison(exId) {
   var prevBest = null, prevBest1RM = 0;
   // Look at last 2 sessions of prev meso for this exercise
   prevSessions.slice(0, 4).forEach(function(s) {
-    (s.sets[exId] || []).forEach(function(set) {
+    (getSessionSetsForEx(s, exId) || []).forEach(function(set) {
       var est = estimate1RM(set, ex);
       if (est > prevBest1RM) { prevBest1RM = est; prevBest = { weight: Number(set.weight) || 0, reps: Number(set.reps) || 0 }; }
     });
@@ -5414,7 +5632,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '5.2';
+const APP_VERSION = '5.4';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
@@ -5585,6 +5803,24 @@ function deleteSet(exId, setIndex) {
     }
   } else {
     activeSession.sets[exId].splice(setIndex, 1);
+  }
+
+  // Recalculate circuitRounds if this exercise is in a circuit
+  if (activeWorkoutId) {
+    var plan = WORKOUT_PLANS[activeWorkoutId];
+    if (plan && plan.circuits) {
+      plan.circuits.forEach(function(circuit) {
+        var isInCircuit = circuit.exercises.some(function(e) { return e.id === exId; });
+        if (isInCircuit) {
+          var minSets = Infinity;
+          circuit.exercises.forEach(function(e) {
+            var len = (activeSession.sets[e.id] || []).length;
+            if (len < minSets) minSets = len;
+          });
+          activeSession.circuitRounds[circuit.id] = minSets === Infinity ? 0 : minSets;
+        }
+      });
+    }
   }
 
   saveState();
