@@ -1458,6 +1458,7 @@ function getVolumeWeight(exId, trackedWeight) {
 let viewingRound = {}; // { circuitId: roundNumber (1-based) } when viewing past rounds
 let editingSet = null; // { exId, index } when editing a completed set
 let editingCircuitRound = false; // true when editing a circuit round inline
+let _addingCircuitSet = {}; // { exId: true } when inline add-set row is open in completed circuit
 
 // Get "To Beat" data from last session
 function getToBeat(exerciseId) {
@@ -3354,10 +3355,8 @@ function renderZirkelTab(plan) {
     // Content area
     html += '<div class="zirkel-round-area" data-circuit-id="' + circuit.id + '" data-circuit-index="' + ci + '" data-completed="' + completedRounds + '" data-total="' + targetTotal + '">';
 
-    // COMPLETED CIRCUIT — Acc-style exercise cards with set chips
+    // COMPLETED CIRCUIT — Acc-style exercise cards with inline add
     if (isDone) {
-      var totalSetsInCircuit = circuit.exercises.reduce(function(sum, ex) { return sum + (activeSession.sets[ex.id] || []).length; }, 0);
-
       if (completedRounds > 0) {
         html += '<div style="color:var(--green);font-size:14px;font-weight:600;margin-bottom:12px;text-align:center">' +
           ICONS.check + ' Zirkel abgeschlossen (' + completedRounds + ' Runden)</div>';
@@ -3369,6 +3368,8 @@ function renderZirkelTab(plan) {
       circuit.exercises.forEach(function(ex) {
         var exSets = activeSession.sets[ex.id] || [];
         var dbLbl = ex.dumbbell ? ' (DB)' : '';
+        var bw = ex.bodyweight;
+        var showAddRow = _addingCircuitSet[ex.id] || exSets.length === 0;
 
         html += '<div class="exercise-card">' +
           '<div style="display:flex;justify-content:space-between;align-items:center">' +
@@ -3412,17 +3413,27 @@ function renderZirkelTab(plan) {
           html += '</div>'; // close sets container
         }
 
+        // Inline add-set row (visible for 0-set exercises or when toggled)
+        if (sessionActive) {
+          if (showAddRow) {
+            var nextRound = exSets.length + 1;
+            var defaultWeight = exSets.length > 0 ? exSets[exSets.length - 1].weight : (ex.weight || 0);
+            var defaultReps = parseInt(ex.reps.toString().split('-')[1] || ex.reps.toString().split('+')[0] || ex.reps) || 10;
+            html += '<div style="display:flex;align-items:center;gap:8px;margin-top:8px">' +
+              '<span style="font-size:12px;width:24px;color:var(--text-sec)">' + nextRound + '</span>' +
+              (bw ? '<div style="flex:1;text-align:center;font-size:13px;padding:6px;color:var(--text-sec)">BW</div>' :
+              '<input type="number" inputmode="decimal" class="input-field" style="flex:1;padding:6px;font-size:13px" id="ci-w-' + ex.id + '" value="' + defaultWeight + '" step="0.5">') +
+              '<input type="number" inputmode="numeric" class="input-field" style="width:55px;padding:6px;font-size:13px" id="ci-r-' + ex.id + '" value="' + defaultReps + '">' +
+              '<button class="btn btn-orange btn-sm" style="width:auto;padding:6px 14px;min-height:32px;font-size:13px" onclick="addCircuitSetInline(\'' + circuit.id + '\', \'' + ex.id + '\')">OK</button>' +
+            '</div>';
+          } else {
+            // "+ Runde" button to reveal the input row
+            html += '<button class="btn btn-sm btn-outline" style="width:100%;margin-top:6px;font-size:12px;padding:6px" onclick="toggleAddCircuitSet(\'' + ex.id + '\')">+ Runde</button>';
+          }
+        }
+
         html += '</div>'; // close exercise-card
       });
-
-      // Single prominent "+ Runde" / "Daten nachtragen" button at section level
-      if (sessionActive) {
-        var btnLabel = totalSetsInCircuit === 0 ? 'Daten nachtragen' : '+ Runde hinzufügen';
-        var btnStyle = totalSetsInCircuit === 0
-          ? 'margin-top:12px;border-color:var(--orange);color:var(--orange);font-size:14px;padding:10px'
-          : 'margin-top:8px;font-size:12px';
-        html += '<button class="btn btn-sm btn-outline" style="' + btnStyle + ';width:100%" onclick="reopenCircuit(\'' + circuit.id + '\')">' + btnLabel + '</button>';
-      }
 
       html += renderRPESelector(circuit.id);
     }
@@ -3562,6 +3573,57 @@ function reopenCircuit(circuitId) {
   if (activeSession._completed) {
     activeSession._completed = false;
   }
+  saveState();
+  renderWorkoutDetail();
+}
+
+function toggleAddCircuitSet(exId) {
+  _addingCircuitSet[exId] = !_addingCircuitSet[exId];
+  renderWorkoutDetail();
+}
+
+function addCircuitSetInline(circuitId, exId) {
+  var weightEl = document.getElementById('ci-w-' + exId);
+  var repsEl = document.getElementById('ci-r-' + exId);
+
+  var exInfo = getExerciseInfo(exId);
+  var isBW = exInfo && exInfo.bodyweight;
+  var weight = isBW ? APP_STATE.settings.bodyWeight : (weightEl ? (parseFloat(weightEl.value.replace(',', '.')) || 0) : 0);
+  var reps = repsEl ? (parseInt(repsEl.value) || 0) : 0;
+
+  if (reps === 0) return;
+
+  if (!activeSession.sets[exId]) activeSession.sets[exId] = [];
+  activeSession.sets[exId].push({ weight: weight, reps: reps, type: 'working' });
+
+  // Recalculate circuit rounds = min(sets.length) across all exercises
+  var plan = WORKOUT_PLANS[activeWorkoutId];
+  var circuit = null;
+  for (var c = 0; c < plan.circuits.length; c++) {
+    if (plan.circuits[c].id === circuitId) { circuit = plan.circuits[c]; break; }
+  }
+  if (circuit) {
+    var minSets = Infinity;
+    circuit.exercises.forEach(function(e) {
+      var len = (activeSession.sets[e.id] || []).length;
+      if (len < minSets) minSets = len;
+    });
+    activeSession.circuitRounds[circuitId] = minSets === Infinity ? 0 : minSets;
+  }
+
+  // Check PR
+  if (checkPR(exId, weight, reps)) {
+    APP_STATE.prs.push({
+      exerciseId: exId, date: activeSession.date,
+      weight: weight, reps: reps,
+      volume: weight * reps,
+      week: activeSession.week, mesocycle: activeSession.mesocycle
+    });
+  }
+
+  // Clear the adding state
+  delete _addingCircuitSet[exId];
+
   saveState();
   renderWorkoutDetail();
 }
@@ -5665,7 +5727,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '5.6';
+const APP_VERSION = '5.7';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
