@@ -3356,8 +3356,15 @@ function renderZirkelTab(plan) {
 
     // COMPLETED CIRCUIT — Acc-style exercise cards with set chips
     if (isDone) {
-      html += '<div style="color:var(--green);font-size:14px;font-weight:600;margin-bottom:12px;text-align:center">' +
-        ICONS.check + ' Zirkel abgeschlossen (' + completedRounds + ' Runden)</div>';
+      var totalSetsInCircuit = circuit.exercises.reduce(function(sum, ex) { return sum + (activeSession.sets[ex.id] || []).length; }, 0);
+
+      if (completedRounds > 0) {
+        html += '<div style="color:var(--green);font-size:14px;font-weight:600;margin-bottom:12px;text-align:center">' +
+          ICONS.check + ' Zirkel abgeschlossen (' + completedRounds + ' Runden)</div>';
+      } else {
+        html += '<div style="color:var(--orange);font-size:14px;font-weight:600;margin-bottom:12px;text-align:center">' +
+          'Keine Daten eingetragen</div>';
+      }
 
       circuit.exercises.forEach(function(ex) {
         var exSets = activeSession.sets[ex.id] || [];
@@ -3367,48 +3374,55 @@ function renderZirkelTab(plan) {
           '<div style="display:flex;justify-content:space-between;align-items:center">' +
             '<div class="exercise-name" style="font-size:14px">' + ex.name + '</div>' +
             '<span style="font-size:12px;color:var(--text-sec)">' + exSets.length + ' Sets</span>' +
-          '</div>' +
-          '<div style="margin-top:6px">';
+          '</div>';
 
-        // Set chips — swipe-to-delete + tap-to-edit (same as Acc)
-        exSets.forEach(function(set, si) {
-          var isEditingThis = editingSet && editingSet.exId === ex.id && editingSet.index === si;
+        if (exSets.length > 0) {
+          html += '<div style="margin-top:6px">';
 
-          if (isEditingThis) {
-            html += '<div class="set-card current" style="padding:8px 12px;border-color:var(--blue)">' +
-              '<div style="font-size:12px;font-weight:600;color:var(--blue);margin-bottom:4px">Runde ' + (si + 1) + ' bearbeiten</div>' +
-              '<div style="display:flex;align-items:center;gap:8px">' +
-                '<input type="number" inputmode="decimal" class="input-field" style="flex:1;padding:5px;font-size:13px" id="edit-w-' + ex.id + '-' + si + '" value="' + set.weight + '" step="0.5">' +
-                '<span style="font-size:12px;color:var(--text-sec)">kg' + dbLbl + ' ×</span>' +
-                '<input type="number" inputmode="numeric" class="input-field" style="width:55px;padding:5px;font-size:13px" id="edit-r-' + ex.id + '-' + si + '" value="' + set.reps + '">' +
-              '</div>' +
-              '<div style="display:flex;gap:8px;margin-top:6px">' +
-                '<button class="btn btn-sm btn-orange" style="flex:1" onclick="saveEditSet(\'' + ex.id + '\', ' + si + ')">Speichern</button>' +
-                '<button class="btn btn-sm btn-outline" style="flex:1" onclick="cancelEditSet()">Abbrechen</button>' +
-              '</div>' +
-            '</div>';
-          } else {
-            html += '<div class="swipe-wrapper" data-ex-id="' + ex.id + '" data-set-index="' + si + '">' +
-              '<div class="swipe-delete-bg">Löschen</div>' +
-              '<div class="swipe-content set-card done" style="padding:8px 12px;margin-bottom:0" onclick="startEditSet(\'' + ex.id + '\', ' + si + ')">' +
-                '<div style="display:flex;justify-content:space-between;align-items:center">' +
-                  '<span style="font-size:13px">Runde ' + (si + 1) + ' ' + ICONS.check + '</span>' +
-                  '<span style="font-size:13px;color:var(--text-sec)">' + set.weight + 'kg' + dbLbl + ' x' + set.reps + '</span>' +
+          // Set chips — swipe-to-delete + tap-to-edit (same as Acc)
+          exSets.forEach(function(set, si) {
+            var isEditingThis = editingSet && editingSet.exId === ex.id && editingSet.index === si;
+
+            if (isEditingThis) {
+              html += '<div class="set-card current" style="padding:8px 12px;border-color:var(--blue)">' +
+                '<div style="font-size:12px;font-weight:600;color:var(--blue);margin-bottom:4px">Runde ' + (si + 1) + ' bearbeiten</div>' +
+                '<div style="display:flex;align-items:center;gap:8px">' +
+                  '<input type="number" inputmode="decimal" class="input-field" style="flex:1;padding:5px;font-size:13px" id="edit-w-' + ex.id + '-' + si + '" value="' + set.weight + '" step="0.5">' +
+                  '<span style="font-size:12px;color:var(--text-sec)">kg' + dbLbl + ' ×</span>' +
+                  '<input type="number" inputmode="numeric" class="input-field" style="width:55px;padding:5px;font-size:13px" id="edit-r-' + ex.id + '-' + si + '" value="' + set.reps + '">' +
                 '</div>' +
-              '</div>' +
-            '</div>';
-          }
-        });
+                '<div style="display:flex;gap:8px;margin-top:6px">' +
+                  '<button class="btn btn-sm btn-orange" style="flex:1" onclick="saveEditSet(\'' + ex.id + '\', ' + si + ')">Speichern</button>' +
+                  '<button class="btn btn-sm btn-outline" style="flex:1" onclick="cancelEditSet()">Abbrechen</button>' +
+                '</div>' +
+              '</div>';
+            } else {
+              html += '<div class="swipe-wrapper" data-ex-id="' + ex.id + '" data-set-index="' + si + '">' +
+                '<div class="swipe-delete-bg">Löschen</div>' +
+                '<div class="swipe-content set-card done" style="padding:8px 12px;margin-bottom:0" onclick="startEditSet(\'' + ex.id + '\', ' + si + ')">' +
+                  '<div style="display:flex;justify-content:space-between;align-items:center">' +
+                    '<span style="font-size:13px">Runde ' + (si + 1) + ' ' + ICONS.check + '</span>' +
+                    '<span style="font-size:13px;color:var(--text-sec)">' + set.weight + 'kg' + dbLbl + ' x' + set.reps + '</span>' +
+                  '</div>' +
+                '</div>' +
+              '</div>';
+            }
+          });
 
-        html += '</div>'; // close sets container
-
-        // "+ Runde" button if session still active
-        if (sessionActive) {
-          html += '<button class="btn btn-sm btn-outline" style="margin-top:6px;font-size:12px" onclick="reopenCircuit(\'' + circuit.id + '\')">+ Runde</button>';
+          html += '</div>'; // close sets container
         }
 
         html += '</div>'; // close exercise-card
       });
+
+      // Single prominent "+ Runde" / "Daten nachtragen" button at section level
+      if (sessionActive) {
+        var btnLabel = totalSetsInCircuit === 0 ? 'Daten nachtragen' : '+ Runde hinzufügen';
+        var btnStyle = totalSetsInCircuit === 0
+          ? 'margin-top:12px;border-color:var(--orange);color:var(--orange);font-size:14px;padding:10px'
+          : 'margin-top:8px;font-size:12px';
+        html += '<button class="btn btn-sm btn-outline" style="' + btnStyle + ';width:100%" onclick="reopenCircuit(\'' + circuit.id + '\')">' + btnLabel + '</button>';
+      }
 
       html += renderRPESelector(circuit.id);
     }
