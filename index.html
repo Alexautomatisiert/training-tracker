@@ -48,6 +48,8 @@ body {
   height: 100%;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 input, button, select, textarea {
@@ -939,7 +941,7 @@ const WORKOUT_PLANS = {
         id: 'ra-c1',
         name: 'Zirkel 1',
         type: 'Technik',
-        rounds: 4,
+        rounds: 3,
         restSeconds: 150,
         exercises: [
           { id: 'ra-c1-e1', name: 'Snatches', reps: '6-8', weight: 30, unit: 'kg', bodyweight: false },
@@ -1051,7 +1053,7 @@ const WORKOUT_PLANS = {
         id: 'rb-c1',
         name: 'Zirkel 1',
         type: 'Heavy',
-        rounds: 4,
+        rounds: 3,
         restSeconds: 90,
         exercises: [
           { id: 'rb-c1-e1', name: 'Ring Pull Ups', reps: '6-8', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 1.0 },
@@ -1062,7 +1064,7 @@ const WORKOUT_PLANS = {
         id: 'rb-c2',
         name: 'Zirkel 2',
         type: 'Volume',
-        rounds: 4,
+        rounds: 3,
         restSeconds: 90,
         exercises: [
           { id: 'rb-c2-e3', name: 'KB Deadlifts', reps: '8-10', weight: 24, unit: 'kg', bodyweight: false, note: '2x12kg' },
@@ -2297,6 +2299,24 @@ function renderHomePage() {
   const totalWeeks = meso.weeksHard + meso.weeksDeload;
   const progressPct = (cw / totalWeeks) * 100;
 
+  // A) Header: weekday + date on left, next workout on right
+  const now = new Date();
+  const deWeekdays = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+  const weekdayStr = deWeekdays[now.getDay()];
+  const dateStr = weekdayStr + ', ' + String(now.getDate()).padStart(2,'0') + '.' + String(now.getMonth()+1).padStart(2,'0') + '.';
+  const nextWid = getNextWorkoutId();
+  const nextPlan = WORKOUT_PLANS[nextWid];
+  const nextWorkoutLabel = nextPlan ? nextPlan.name : '';
+
+  // Subtitle: streak, sessions, meso
+  const streak = getTrainingStreak();
+  const totalSess = getTotalSessions();
+  let subtitleParts = [];
+  if (streak > 0) subtitleParts.push(streak + ' Wochen Streak');
+  subtitleParts.push(totalSess + ' Sessions');
+  subtitleParts.push('Meso ' + meso.number);
+  const subtitleLine = subtitleParts.join(' · ');
+
   // This week's workouts
   let workoutRows = '';
   WEEK_SCHEDULE.forEach(wid => {
@@ -2317,88 +2337,236 @@ function renderHomePage() {
       </div>`;
   });
 
-  // Volume last week
-  const lastWeek = Math.max(1, cw - 1);
-  const muscles = ['ruecken', 'brust', 'quads', 'hams'];
-  const muscleLabels = { ruecken: 'Ruecken', brust: 'Brust', quads: 'Quads', hams: 'Hams' };
-  const muscleColors = { ruecken: 'var(--blue)', brust: 'var(--orange)', quads: 'var(--green)', hams: 'var(--purple)' };
+  // B) Deload banner (kept)
+  var deloadBanner = (function() {
+    var deload = shouldSuggestDeload();
+    if (!deload) return '';
+    var reason = deload.reason === 'volume_and_rpe' ? 'Volumen sinkt + RPE Ø ' + deload.avgRPE
+      : deload.reason === 'high_rpe' ? 'RPE Durchschnitt ' + deload.avgRPE + '/10'
+      : 'Volumen sinkt seit 2 Wochen';
+    return '<div style="background:var(--red);color:#fff;padding:12px 14px;border-radius:10px;margin-bottom:12px;display:flex;align-items:center;gap:10px">' +
+      '<span style="font-size:20px">⚠</span>' +
+      '<div style="flex:1"><div style="font-size:13px;font-weight:700">Deload empfohlen</div>' +
+      '<div style="font-size:11px;opacity:0.85">' + reason + '</div></div></div>';
+  })();
 
-  let volumeBars = '';
-  const maxMuscleVol = Math.max(...muscles.map(m => calcWeekMuscleVolume(lastWeek, m)));
-  muscles.forEach(m => {
-    const vol = calcWeekMuscleVolume(lastWeek, m);
-    const prevVol = lastWeek > 1 ? calcWeekMuscleVolume(lastWeek - 1, m) : vol;
-    const change = prevVol > 0 ? Math.round((vol - prevVol) / prevVol * 100) : 0;
-    const pct = maxMuscleVol > 0 ? (vol / maxMuscleVol * 100) : 0;
-    const changeClass = change >= 0 ? 'up' : 'down';
-    const changeStr = change >= 0 ? `+${change}%` : `${change}%`;
-    volumeBars += `
-      <div class="volume-bar-row">
-        <div class="volume-label">${muscleLabels[m]}</div>
-        <div class="volume-bar-bg"><div class="volume-bar-fill" style="width:${pct}%;background:${muscleColors[m]}"></div></div>
-        <div class="volume-change ${changeClass}">${changeStr}</div>
-      </div>`;
-  });
+  // D) Widget 1: Muskel-Check
+  var muskelCheckHtml = '';
+  if (APP_STATE.sessions.length > 0) {
+    var checkMuscles = ['brust', 'ruecken', 'quads', 'hams'];
+    var checkLabels = { brust: 'Brust', ruecken: 'Rücken', quads: 'Quads', hams: 'Hams' };
+    var checkColors = { brust: '#E8720C', ruecken: '#4488FF', quads: '#2D7D46', hams: '#9B59B6' };
+    // Map workouts to muscles for RPE: va/vb -> brust+quads, ra/rb -> ruecken+hams
+    var muscleWorkoutMap = { brust: ['va','vb'], ruecken: ['ra','rb'], quads: ['va','vb'], hams: ['ra','rb'] };
 
-  // Recent PRs
+    var tiles = '';
+    checkMuscles.forEach(function(m) {
+      var col = checkColors[m];
+      var vol = calcWeekMuscleVolume(cw, m);
+      var volTons = (vol / 1000).toFixed(1);
+
+      // Count working sets for this muscle in current week (non-drop sets)
+      var setsDone = 0;
+      APP_STATE.sessions
+        .filter(function(s) { return s.week === cw && s.mesocycle === meso.number; })
+        .forEach(function(s) {
+          Object.entries(s.sets || {}).forEach(function(entry) {
+            var exId = entry[0]; var sets = entry[1];
+            if (EXERCISE_MUSCLE[exId] !== m) return;
+            sets.forEach(function(set) {
+              if (!set.isDrop) setsDone++;
+            });
+          });
+        });
+
+      // Target sets: count from plan structure for exercises mapped to this muscle
+      var targetSets = 0;
+      WEEK_SCHEDULE.forEach(function(wid) {
+        var plan = WORKOUT_PLANS[wid];
+        plan.strength.forEach(function(ex) {
+          if (EXERCISE_MUSCLE[ex.id] === m) targetSets += (ex.sets || 3);
+        });
+        plan.circuits.forEach(function(c) {
+          var targetR = getTargetRounds(c.rounds, cw);
+          c.exercises.forEach(function(ex) {
+            if (EXERCISE_MUSCLE[ex.id] === m) targetSets += targetR;
+          });
+        });
+        plan.accessories.forEach(function(ex) {
+          if (EXERCISE_MUSCLE[ex.id] === m) targetSets += (ex.sets || 3);
+        });
+      });
+
+      var setsPct = targetSets > 0 ? Math.min(100, Math.round(setsDone / targetSets * 100)) : 0;
+
+      // Average RPE from sessions matching this muscle's workouts
+      var rpeSum = 0; var rpeCount = 0;
+      var wids = muscleWorkoutMap[m] || [];
+      APP_STATE.sessions
+        .filter(function(s) { return s.week === cw && s.mesocycle === meso.number && wids.indexOf(s.workoutId) >= 0; })
+        .forEach(function(s) {
+          if (!s.rpe) return;
+          Object.values(s.rpe).forEach(function(v) {
+            if (v > 0) { rpeSum += v; rpeCount++; }
+          });
+        });
+      var avgRpe = rpeCount > 0 ? (rpeSum / rpeCount).toFixed(1) : '';
+
+      tiles += '<div onclick="switchStatsTab(\'' + m + '\');navigateTo(\'stats\')" style="cursor:pointer;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px;border-top:3px solid ' + col + '">' +
+        '<div style="font-size:13px;font-weight:700;color:' + col + ';margin-bottom:6px">' + checkLabels[m] + '</div>' +
+        '<div style="font-size:12px;color:var(--text-sec);margin-bottom:4px">' + setsDone + '/' + targetSets + ' Sets</div>' +
+        '<div style="height:4px;background:var(--bg);border-radius:2px;margin-bottom:6px;overflow:hidden"><div style="height:100%;width:' + setsPct + '%;background:' + col + ';border-radius:2px"></div></div>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center">' +
+          '<span style="font-size:12px;font-weight:600;color:var(--text)">' + volTons + 't</span>' +
+          (avgRpe ? '<span style="font-size:11px;color:var(--text-ter)">RPE ' + avgRpe + '</span>' : '') +
+        '</div>' +
+      '</div>';
+    });
+
+    muskelCheckHtml = '<div class="section-title">Muskel-Check W' + cw + '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">' + tiles + '</div>';
+  }
+
+  // D) Widget 2: Top Performer - exercises with biggest top-set volume improvement
+  var topPerformerHtml = '';
+  if (APP_STATE.sessions.length > 0) {
+    var performers = [];
+    var prevWeek = Math.max(1, cw - 1);
+
+    Object.values(WORKOUT_PLANS).forEach(function(plan) {
+      var allEx = plan.strength.slice();
+      plan.circuits.forEach(function(c) { allEx = allEx.concat(c.exercises); });
+
+      allEx.forEach(function(ex) {
+        var exDef = ex;
+        // Current week best set volume
+        var curBest = 0;
+        var curWeight = 0; var curReps = 0;
+        APP_STATE.sessions
+          .filter(function(s) { return s.week === cw && s.mesocycle === meso.number; })
+          .forEach(function(s) {
+            var sets = getSessionSetsForEx(s, ex.id) || [];
+            sets.forEach(function(set) {
+              var w = Number(set.weight) || 0;
+              var r = Number(set.reps) || 0;
+              var vw = getVolumeWeight(ex.id, w);
+              var vol = vw * r * getRepMultiplier(ex.id);
+              if (vol > curBest) { curBest = vol; curWeight = w; curReps = r; }
+            });
+          });
+
+        if (curBest <= 0) return;
+
+        // Previous week (or previous meso equivalent week) best set volume
+        var prevBest = 0;
+        var prevWeight = 0; var prevReps = 0;
+        // Try previous week in current meso first
+        APP_STATE.sessions
+          .filter(function(s) { return s.week === prevWeek && s.mesocycle === meso.number && prevWeek !== cw; })
+          .forEach(function(s) {
+            var sets = getSessionSetsForEx(s, ex.id) || [];
+            sets.forEach(function(set) {
+              var w = Number(set.weight) || 0;
+              var r = Number(set.reps) || 0;
+              var vw = getVolumeWeight(ex.id, w);
+              var vol = vw * r * getRepMultiplier(ex.id);
+              if (vol > prevBest) { prevBest = vol; prevWeight = w; prevReps = r; }
+            });
+          });
+        // Fallback: previous meso same week
+        if (prevBest <= 0 && meso.number > 1) {
+          APP_STATE.sessions
+            .filter(function(s) { return s.week === cw && s.mesocycle === meso.number - 1; })
+            .forEach(function(s) {
+              var sets = getSessionSetsForEx(s, ex.id) || [];
+              sets.forEach(function(set) {
+                var w = Number(set.weight) || 0;
+                var r = Number(set.reps) || 0;
+                var vw = getVolumeWeight(ex.id, w);
+                var vol = vw * r * getRepMultiplier(ex.id);
+                if (vol > prevBest) { prevBest = vol; prevWeight = w; prevReps = r; }
+              });
+            });
+        }
+
+        if (prevBest <= 0) return;
+        var changePct = Math.round((curBest - prevBest) / prevBest * 100);
+        var repDiff = curReps - prevReps;
+        // Check if this is a PR
+        var isPR = APP_STATE.prs.some(function(pr) { return pr.exerciseId === ex.id && pr.weight === curWeight && pr.reps === curReps; });
+
+        performers.push({
+          name: ex.name,
+          weight: curWeight,
+          reps: curReps,
+          changePct: changePct,
+          repDiff: repDiff,
+          isPR: isPR,
+          exDef: exDef
+        });
+      });
+    });
+
+    // Sort by changePct descending, take top 3
+    performers.sort(function(a, b) { return b.changePct - a.changePct; });
+    var top3 = performers.slice(0, 3);
+
+    if (top3.length > 0) {
+      var perfRows = '';
+      top3.forEach(function(p) {
+        var isDbl = p.exDef && p.exDef.dumbbell;
+        var isWBW = p.exDef && p.exDef.weightedBW;
+        var wLabel = isDbl ? p.weight + 'kg/DB' : (isWBW ? '+' + p.weight + 'kg' : p.weight + 'kg');
+        var changeColor = p.changePct >= 0 ? 'var(--green)' : 'var(--red)';
+        var repStr = p.repDiff !== 0 ? ' <span style="color:var(--green);font-size:11px">(+' + p.repDiff + ')</span>' : '';
+        perfRows += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">' +
+          '<div style="display:flex;align-items:center;gap:6px">' +
+            (p.isPR ? '<span>' + ICONS.trophy + '</span>' : '') +
+            '<div><div style="font-size:13px;font-weight:600">' + p.name + '</div>' +
+            '<div style="font-size:12px;color:var(--text-sec)">' + wLabel + ' x' + p.reps + '</div></div>' +
+          '</div>' +
+          '<div style="text-align:right"><span style="font-size:13px;font-weight:700;color:' + changeColor + '">' + (p.changePct >= 0 ? '+' : '') + p.changePct + '%</span>' + repStr + '</div>' +
+        '</div>';
+      });
+
+      topPerformerHtml = '<div class="section-title" style="display:flex;justify-content:space-between;align-items:center">' +
+        '<span>Top Performer</span>' +
+        '<button style="background:none;border:none;color:var(--orange);font-size:12px;font-weight:600;cursor:pointer" onclick="goToStatsAll()">Alle Stats →</button>' +
+      '</div>' +
+      '<div class="card">' + perfRows + '</div>';
+    }
+  }
+
+  // E) Recent PRs with rep improvement
   const recentPRs = APP_STATE.prs.slice(-5).reverse();
   let prHtml = '';
   if (recentPRs.length > 0) {
     prHtml = '<div class="card"><h3>Aktuelle PRs</h3><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">';
-    recentPRs.forEach(pr => {
-      prHtml += `<div class="pr-badge">${ICONS.trophy} ${getExerciseName(pr.exerciseId)} ${pr.weight}kg x${pr.reps}</div>`;
+    recentPRs.forEach(function(pr) {
+      // Find previous best volume for this exercise (older sessions)
+      var prevBestVol = 0;
+      var prevBestReps = 0;
+      var prDate = pr.date || '';
+      APP_STATE.sessions.forEach(function(s) {
+        if (s.date >= prDate && prDate) return;
+        var sets = getSessionSetsForEx(s, pr.exerciseId) || [];
+        sets.forEach(function(set) {
+          var w = Number(set.weight) || 0;
+          var r = Number(set.reps) || 0;
+          var vol = w * r;
+          if (vol > prevBestVol) { prevBestVol = vol; prevBestReps = r; }
+        });
+      });
+      var repDiffStr = '';
+      if (prevBestVol > 0 && pr.reps > prevBestReps) {
+        repDiffStr = ' <span style="color:var(--green);font-size:10px">(+' + (pr.reps - prevBestReps) + ')</span>';
+      }
+      prHtml += '<div class="pr-badge">' + ICONS.trophy + ' ' + getExerciseName(pr.exerciseId) + ' ' + pr.weight + 'kg x' + pr.reps + repDiffStr + '</div>';
     });
     prHtml += '</div></div>';
   }
 
-  // Lift Status Summary for home screen (strength exercises with current stand + % + 1RM)
-  let rmSummary = '';
-  if (APP_STATE.sessions.length > 0) {
-    const liftItems = [];
-    Object.values(WORKOUT_PLANS).forEach(function(plan) {
-      plan.strength.forEach(function(ex) {
-        const status = getLiftStatus(ex.id);
-        if (!status) return;
-        let best1RM = 0;
-        APP_STATE.sessions.forEach(function(s) {
-          (s.sets[ex.id] || []).forEach(function(set) {
-            const est = estimate1RM(set, ex);
-            if (est > best1RM) best1RM = est;
-          });
-        });
-        liftItems.push({ name: ex.name, status: status, rm: Math.round(best1RM * 10) / 10, def: ex });
-      });
-    });
-    if (liftItems.length > 0) {
-      rmSummary = '<div style="margin-top:8px">';
-      liftItems.forEach(function(item) {
-        var s = item.status;
-        var liftLabel = s.weightLabel ? s.weightLabel + ' × ' + s.reps : s.reps + ' reps';
-        var changeStr = s.hasChange ? ((s.changePct >= 0 ? '+' : '') + s.changePct + '%') : '';
-        var changeColor = s.changePct >= 0 ? 'var(--green)' : 'var(--red)';
-        rmSummary += '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)">' +
-          '<div>' +
-            '<div style="font-size:12px;color:var(--text-sec)">' + item.name + '</div>' +
-            '<div style="font-size:14px;font-weight:700;margin-top:1px">' + liftLabel +
-              (changeStr ? ' <span style="font-size:11px;color:' + changeColor + ';font-weight:600">' + changeStr + '</span>' : '') +
-            '</div>' +
-          '</div>' +
-          (item.rm > 0 ? '<div style="text-align:right"><div style="font-size:11px;color:var(--text-ter)">1RM</div><div style="font-size:13px;font-weight:600">' + format1RMDisplay(item.rm, item.def) + '</div></div>' : '') +
-        '</div>';
-      });
-      rmSummary += '</div>';
-    }
-  }
-
-  // Current week volume
-  let currentWeekVol = 0;
-  if (APP_STATE.sessions.length > 0) {
-    currentWeekVol = calcWeekVolume(cw);
-  }
-  const weekVolGoal = APP_STATE.settings.goals.weeklyVolume || 0;
-  const weekVolPct = weekVolGoal > 0 ? Math.min(100, Math.round(currentWeekVol / weekVolGoal * 100)) : 0;
-
-  // Learnings widget
+  // G) Learnings widget (kept as-is)
   const recentLearnings = (APP_STATE.learnings || []).slice(-3).reverse();
   let learningsHtml = '';
   if (recentLearnings.length > 0) {
@@ -2414,10 +2582,16 @@ function renderHomePage() {
   }
 
   document.getElementById('home-content').innerHTML = `
-    <h1>Training</h1>
-    <p style="color:var(--text-sec);margin-bottom:20px">Dein Fortschritt</p>
+    <!-- A) Compact Header -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+      <span style="font-size:16px;font-weight:700">${dateStr}</span>
+      <span style="font-size:14px;font-weight:600;color:var(--orange)">${nextWorkoutLabel}</span>
+    </div>
+    <div style="font-size:12px;color:var(--text-sec);margin-bottom:16px">${subtitleLine}</div>
 
-    <!-- Mesocycle Card -->
+    ${deloadBanner}
+
+    <!-- C) Mesocycle Card with clickable week pills -->
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <h3>Mesozyklus ${meso.number}</h3>
@@ -2427,63 +2601,18 @@ function renderHomePage() {
         ${Array.from({length: meso.weeksHard}, (_, i) => {
           const w = i + 1;
           const cls = w < cw ? 'done' : w === cw ? 'current' : 'future';
-          return `<div class="week-pill" style="padding:4px 8px;font-size:11px;flex:1;text-align:center;${cls === 'done' ? 'background:var(--green);border-color:var(--green);color:#fff;opacity:0.7' : cls === 'current' ? 'background:var(--orange);border-color:var(--orange);color:#fff' : 'opacity:0.5'}">W${w}</div>`;
+          return `<div class="week-pill" onclick="setHomeWeek(${w})" style="cursor:pointer;padding:4px 8px;font-size:11px;flex:1;text-align:center;${cls === 'done' ? 'background:var(--green);border-color:var(--green);color:#fff;opacity:0.7' : cls === 'current' ? 'background:var(--orange);border-color:var(--orange);color:#fff' : 'opacity:0.5'}">W${w}</div>`;
         }).join('')}
         <div class="week-pill" style="padding:4px 8px;font-size:11px;flex:1;text-align:center;opacity:0.5">DL</div>
       </div>
       <div class="progress-bar"><div class="progress-fill" style="width:${progressPct}%"></div></div>
     </div>
 
-    <!-- Streak + Deload Banner -->
-    ${(function() {
-      var streak = getTrainingStreak();
-      var totalSess = getTotalSessions();
-      var deload = shouldSuggestDeload();
-      var html = '';
-      if (streak > 0 || totalSess > 0) {
-        html += '<div style="display:flex;gap:8px;margin-bottom:12px">';
-        if (streak > 0) {
-          html += '<div style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;text-align:center">' +
-            '<div style="font-size:20px;font-weight:700;color:var(--orange)">' + streak + '</div>' +
-            '<div style="font-size:10px;color:var(--text-ter);text-transform:uppercase;letter-spacing:0.5px">Wochen Streak</div></div>';
-        }
-        html += '<div style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;text-align:center">' +
-          '<div style="font-size:20px;font-weight:700;color:var(--text)">' + totalSess + '</div>' +
-          '<div style="font-size:10px;color:var(--text-ter);text-transform:uppercase;letter-spacing:0.5px">Sessions Total</div></div>';
-        html += '</div>';
-      }
-      if (deload) {
-        var reason = deload.reason === 'volume_and_rpe' ? 'Volumen sinkt + RPE Ø ' + deload.avgRPE
-          : deload.reason === 'high_rpe' ? 'RPE Durchschnitt ' + deload.avgRPE + '/10'
-          : 'Volumen sinkt seit 2 Wochen';
-        html += '<div style="background:var(--red);color:#fff;padding:12px 14px;border-radius:10px;margin-bottom:12px;display:flex;align-items:center;gap:10px">' +
-          '<span style="font-size:20px">⚠</span>' +
-          '<div style="flex:1"><div style="font-size:13px;font-weight:700">Deload empfohlen</div>' +
-          '<div style="font-size:11px;opacity:0.85">' + reason + '</div></div></div>';
-      }
-      return html;
-    })()}
-
-    <!-- Meso Goals Widget -->
-    ${getMesoGoalWidget()}
-
     <!-- This Week -->
     <div class="section-title">Diese Woche</div>
     <div class="card">${workoutRows}</div>
 
-    <!-- Volume Section -->
-    ${APP_STATE.sessions.length > 0 ? `
-    <div class="section-title">Volumen W${lastWeek}</div>
-    <div class="card">
-      <div class="expandable-header" onclick="toggleExpand(this)">
-        <span style="font-size:14px;font-weight:600">Muskelgruppen</span>
-        <span class="chevron">${ICONS.chevDown}</span>
-      </div>
-      <div class="expandable-content open" style="margin-top:12px">
-        ${volumeBars}
-      </div>
-    </div>
-    ` : `
+    ${APP_STATE.sessions.length > 0 ? '' : `
     <div class="card" style="text-align:center;padding:24px 16px">
       <div style="font-size:32px;margin-bottom:8px">${ICONS.flame || '🔥'}</div>
       <div style="font-size:15px;font-weight:600;margin-bottom:4px">Bereit fuer Mesozyklus ${meso.number}!</div>
@@ -2491,23 +2620,11 @@ function renderHomePage() {
     </div>
     `}
 
-    ${prHtml}
+    <!-- D) Muskel-Check + Top Performer -->
+    ${muskelCheckHtml}
+    ${topPerformerHtml}
 
-    <!-- Stats Quick View -->
-    ${APP_STATE.sessions.length > 0 ? `
-    <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
-      <span>Statistiken</span>
-      <button style="background:none;border:none;color:var(--orange);font-size:12px;font-weight:600;cursor:pointer" onclick="goToStatsAll()">Alle anzeigen →</button>
-    </div>
-    <div class="card" onclick="goToStatsAll()" style="cursor:pointer">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <span style="font-size:13px;color:var(--text-sec)">Wochen-Volumen W${cw}</span>
-        <span style="font-size:14px;font-weight:600">${(currentWeekVol/1000).toFixed(1)}t / ${(weekVolGoal/1000).toFixed(1)}t</span>
-      </div>
-      <div class="progress-bar"><div class="progress-fill" style="width:${weekVolPct}%"></div></div>
-      ${rmSummary ? '<div style="margin-top:8px"><div style="font-size:12px;color:var(--text-sec);font-weight:600;margin-bottom:4px">Lift Status</div>' + rmSummary + '</div>' : ''}
-    </div>
-    ` : ''}
+    ${prHtml}
 
     <!-- Learnings Widget -->
     <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
@@ -2521,6 +2638,13 @@ function renderHomePage() {
       ${learningsHtml}
     </div>
   `;
+}
+
+// C) Helper: set current week from pill click
+function setHomeWeek(week) {
+  APP_STATE.settings.mesocycle.currentWeek = week;
+  saveState();
+  renderHomePage();
 }
 
 function goToStatsAll() {
@@ -4677,7 +4801,7 @@ function findExerciseDef(exId) {
 // LIFT PROGRESSION HELPERS
 // =============================================
 
-// Get current lift status: latest weight×reps + % change vs mesocycle start
+// Get current lift status: latest weight x reps + % change based on top-set volume vs mesocycle start
 function getLiftStatus(exId) {
   var ex = getExerciseInfo(exId);
   if (!ex) return null;
@@ -4686,37 +4810,37 @@ function getLiftStatus(exId) {
     .filter(function(s) { return s.mesocycle === mesoNumber; })
     .sort(function(a, b) { return a.date.localeCompare(b.date); });
 
-  var firstSet = null, latestSet = null;
+  var firstTopVol = 0, firstSet = null;
+  var latestTopVol = 0, latestSet = null;
+  var latestAllSets = []; // all sets from latest session for expandable view
   mesoSessions.forEach(function(s) {
     var sets = getSessionSetsForEx(s, exId) || [];
     if (sets.length === 0) return;
-    // Find best set by estimated 1RM (consistent with progression bars)
-    // This correctly picks heavier-weight sets over high-rep-low-weight sets
-    var bestSet = null, best1RM = 0;
+    // Find best set by top-set volume (weight x reps, accounting for dumbbell x2)
+    var bestSet = null, bestVol = 0;
     sets.forEach(function(set) {
       var w = Number(set.weight) || 0;
       var r = Number(set.reps) || 0;
       if (r <= 0 || w <= 0) return;
-      var est = estimate1RM(set, ex);
-      if (est > best1RM || (est === best1RM && w > (bestSet ? Number(bestSet.weight) : 0))) { best1RM = est; bestSet = set; }
+      var vw = getVolumeWeight(exId, w);
+      var vol = vw * r * getRepMultiplier(exId);
+      if (vol > bestVol || (vol === bestVol && w > (bestSet ? Number(bestSet.weight) : 0))) { bestVol = vol; bestSet = set; }
     });
     if (!bestSet) return;
-    if (!firstSet) firstSet = { weight: bestSet.weight, reps: bestSet.reps };
+    if (!firstSet) { firstSet = { weight: bestSet.weight, reps: bestSet.reps }; firstTopVol = bestVol; }
     latestSet = { weight: bestSet.weight, reps: bestSet.reps };
+    latestTopVol = bestVol;
+    latestAllSets = sets;
   });
 
   if (!latestSet) return null;
 
-  // % change based on estimated 1RM
+  // % change based on top-set volume
   var changePct = 0;
   var hasChange = false;
-  if (firstSet && (firstSet.weight !== latestSet.weight || firstSet.reps !== latestSet.reps)) {
-    var first1RM = estimate1RM(firstSet, ex);
-    var latest1RM = estimate1RM(latestSet, ex);
-    if (first1RM > 0) {
-      changePct = Math.round((latest1RM - first1RM) / first1RM * 100);
-      hasChange = true;
-    }
+  if (firstSet && firstTopVol > 0 && (firstSet.weight !== latestSet.weight || firstSet.reps !== latestSet.reps)) {
+    changePct = Math.round((latestTopVol - firstTopVol) / firstTopVol * 100);
+    hasChange = true;
   }
 
   // Format weight label in training unit
@@ -4733,13 +4857,89 @@ function getLiftStatus(exId) {
     weightLabel = latestSet.weight + 'kg';
   }
 
+  // Build per-set detail for expandable view
+  var setDetails = [];
+  var totalVol = 0;
+  latestAllSets.forEach(function(set, idx) {
+    var w = Number(set.weight) || 0;
+    var r = Number(set.reps) || 0;
+    if (r <= 0 || w <= 0) return;
+    var vw = getVolumeWeight(exId, w);
+    var vol = vw * r * getRepMultiplier(exId);
+    totalVol += vol;
+    setDetails.push({ weight: w, reps: r, vol: vol, isDrop: !!set.isDrop, index: idx + 1 });
+  });
+
+  // Compute per-set % change vs first session sets
+  var firstAllSets = [];
+  var firstTotalVol = 0;
+  for (var si = 0; si < mesoSessions.length; si++) {
+    var fSets = getSessionSetsForEx(mesoSessions[si], exId) || [];
+    if (fSets.length > 0) {
+      fSets.forEach(function(set) {
+        var w = Number(set.weight) || 0;
+        var r = Number(set.reps) || 0;
+        if (r > 0 && w > 0) {
+          var vw = getVolumeWeight(exId, w);
+          var vol = vw * r * getRepMultiplier(exId);
+          firstTotalVol += vol;
+          firstAllSets.push({ vol: vol });
+        }
+      });
+      break;
+    }
+  }
+
   return {
     weightLabel: weightLabel,
     weight: latestSet.weight,
     reps: latestSet.reps,
     changePct: changePct,
-    hasChange: hasChange
+    hasChange: hasChange,
+    setDetails: setDetails,
+    totalVol: totalVol,
+    firstTotalVol: firstTotalVol,
+    firstTopVol: firstTopVol,
+    latestTopVol: latestTopVol
   };
+}
+
+// Render expandable per-set detail for a lift
+function renderLiftSetDetail(status, exId) {
+  if (!status || !status.setDetails || status.setDetails.length === 0) return '';
+  var ex = getExerciseInfo(exId);
+  var isDbl = ex && ex.dumbbell;
+  var isWBW = ex && ex.weightedBW;
+  var html = '<div id="sets-' + exId + '" style="display:none;padding:4px 0">';
+  status.setDetails.forEach(function(s) {
+    var wLabel = isDbl ? s.weight + 'kg/DB' : (isWBW ? '+' + s.weight + 'kg' : s.weight + 'kg');
+    var setLabel = s.isDrop ? 'Drop' : 'Set ' + s.index;
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:12px">' +
+      '<span style="color:var(--text-sec)">' + setLabel + ': ' + wLabel + ' x' + s.reps + '</span>' +
+      '<span style="color:var(--text-ter)">' + (s.vol / 1000).toFixed(2) + 't</span>' +
+    '</div>';
+  });
+  // Gesamt row
+  var totalChangePct = (status.firstTotalVol > 0) ? Math.round((status.totalVol - status.firstTotalVol) / status.firstTotalVol * 100) : 0;
+  var totalChangeColor = totalChangePct >= 0 ? 'var(--green)' : 'var(--red)';
+  var totalChangeStr = status.firstTotalVol > 0 ? (' <span style="color:' + totalChangeColor + '">' + (totalChangePct >= 0 ? '+' : '') + totalChangePct + '%</span>') : '';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;margin-top:2px;border-top:1px solid var(--border);font-size:12px;font-weight:600">' +
+    '<span>Gesamt</span>' +
+    '<span>' + (status.totalVol / 1000).toFixed(2) + 't' + totalChangeStr + '</span>' +
+  '</div>';
+  html += '</div>';
+  return html;
+}
+
+// Toggle expandable sets view
+function toggleLiftSets(exId) {
+  var el = document.getElementById('sets-' + exId);
+  if (el) {
+    var isHidden = el.style.display === 'none';
+    el.style.display = isHidden ? 'block' : 'none';
+    var arrow = document.getElementById('sarrow-' + exId);
+    if (arrow) arrow.textContent = isHidden ? '▲' : '▼';
+  }
 }
 
 // Check if exercise is a strength exercise (not circuit or accessory)
@@ -5350,17 +5550,22 @@ function renderStatsAll() {
     const changeStr = s.hasChange ? ((s.changePct >= 0 ? '+' : '') + s.changePct + '%') : '—';
     const prog = getExerciseProgression(ex.id, ex.def);
     const progHtml = renderProgressionBars(prog, ex.def);
+    const setDetailHtml = renderLiftSetDetail(s, ex.id);
     const mesoComp = getMesoLiftComparison(ex.id);
     const mesoTag = mesoComp ? '<span style="font-size:10px;padding:1px 5px;border-radius:4px;margin-left:6px;background:' + (mesoComp.changePct >= 0 ? 'rgba(46,204,113,0.15);color:var(--green)' : 'rgba(231,76,60,0.15);color:var(--red)') + '">vs M' + (APP_STATE.settings.mesocycle.number - 1) + ' ' + (mesoComp.changePct >= 0 ? '+' : '') + mesoComp.changePct + '%</span>' : '';
-    rmHtml += '<div onclick="toggleProgression(\'' + ex.id + '\')" style="cursor:pointer;padding:8px 0;border-bottom:1px solid var(--border)">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center">' +
-        '<span style="font-size:14px">' + ex.name + mesoTag + ' <span id="arrow-' + ex.id + '" style="font-size:9px;color:var(--text-ter)">▼</span></span>' +
-        '<span class="volume-change ' + cls + '" style="font-size:13px">' + changeStr + '</span>' +
+    rmHtml += '<div style="padding:8px 0;border-bottom:1px solid var(--border)">' +
+      '<div onclick="toggleLiftSets(\'' + ex.id + '\')" style="cursor:pointer">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center">' +
+          '<span style="font-size:14px">' + ex.name + mesoTag + ' <span id="sarrow-' + ex.id + '" style="font-size:9px;color:var(--text-ter)">▼</span></span>' +
+          '<span class="volume-change ' + cls + '" style="font-size:13px">' + changeStr + '</span>' +
+        '</div>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px">' +
+          '<span style="font-size:15px;font-weight:700;color:var(--text)">' + liftLabel + '</span>' +
+          (ex.rm > 0 ? '<span style="font-size:12px;color:var(--text-ter)">1RM ' + format1RMDisplay(ex.rm, ex.def) + '</span>' : '') +
+        '</div>' +
       '</div>' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px">' +
-        '<span style="font-size:15px;font-weight:700;color:var(--text)">' + liftLabel + '</span>' +
-        (ex.rm > 0 ? '<span style="font-size:12px;color:var(--text-ter)">1RM ' + format1RMDisplay(ex.rm, ex.def) + '</span>' : '') +
-      '</div>' +
+      setDetailHtml +
+      '<div onclick="toggleProgression(\'' + ex.id + '\')" style="cursor:pointer;margin-top:4px;font-size:11px;color:var(--text-ter)">Verlauf <span id="arrow-' + ex.id + '" style="font-size:9px">▼</span></div>' +
     '</div>' +
     '<div id="prog-' + ex.id + '" style="display:none">' + progHtml + '</div>';
   });
@@ -5502,18 +5707,23 @@ function renderStatsMuscle(muscle) {
       const exDef = ex.def || findExerciseDef(ex.id);
       const prog = getExerciseProgression(ex.id, exDef);
       const progHtml = renderProgressionBars(prog, exDef);
+      const setDetailHtml = renderLiftSetDetail(s, ex.id);
       const mc = getMesoLiftComparison(ex.id);
       const mcTag = mc ? '<span style="font-size:10px;padding:1px 5px;border-radius:4px;margin-left:6px;background:' + (mc.changePct >= 0 ? 'rgba(46,204,113,0.15);color:var(--green)' : 'rgba(231,76,60,0.15);color:var(--red)') + '">vs M' + (APP_STATE.settings.mesocycle.number - 1) + ' ' + (mc.changePct >= 0 ? '+' : '') + mc.changePct + '%</span>' : '';
-      // Primary: current lift status + % change
-      exHtml += '<div onclick="toggleProgression(\'' + ex.id + '\')" style="cursor:pointer;padding:8px 0;border-bottom:1px solid var(--border)">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center">' +
-          '<span style="font-size:14px">' + ex.name + mcTag + ' <span id="arrow-' + ex.id + '" style="font-size:9px;color:var(--text-ter)">▼</span></span>' +
-          '<span class="volume-change ' + cls + '" style="font-size:13px">' + changeStr + '</span>' +
+      // Primary: current lift status + % change + expandable sets
+      exHtml += '<div style="padding:8px 0;border-bottom:1px solid var(--border)">' +
+        '<div onclick="toggleLiftSets(\'' + ex.id + '\')" style="cursor:pointer">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center">' +
+            '<span style="font-size:14px">' + ex.name + mcTag + ' <span id="sarrow-' + ex.id + '" style="font-size:9px;color:var(--text-ter)">▼</span></span>' +
+            '<span class="volume-change ' + cls + '" style="font-size:13px">' + changeStr + '</span>' +
+          '</div>' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px">' +
+            '<span style="font-size:15px;font-weight:700;color:var(--text)">' + liftLabel + '</span>' +
+            (ex.isStrength && ex.rm > 0 ? '<span style="font-size:12px;color:var(--text-ter)">1RM ' + format1RMDisplay(ex.rm, exDef) + '</span>' : '') +
+          '</div>' +
         '</div>' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px">' +
-          '<span style="font-size:15px;font-weight:700;color:var(--text)">' + liftLabel + '</span>' +
-          (ex.isStrength && ex.rm > 0 ? '<span style="font-size:12px;color:var(--text-ter)">1RM ' + format1RMDisplay(ex.rm, exDef) + '</span>' : '') +
-        '</div>' +
+        setDetailHtml +
+        '<div onclick="toggleProgression(\'' + ex.id + '\')" style="cursor:pointer;margin-top:4px;font-size:11px;color:var(--text-ter)">Verlauf <span id="arrow-' + ex.id + '" style="font-size:9px">▼</span></div>' +
       '</div>' +
       '<div id="prog-' + ex.id + '" style="display:none">' + progHtml + '</div>';
     });
@@ -5882,7 +6092,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '6.0';
+const APP_VERSION = '6.1';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
