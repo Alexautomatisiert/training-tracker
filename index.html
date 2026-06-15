@@ -2464,6 +2464,9 @@ function renderHomePage() {
       return html;
     })()}
 
+    <!-- Meso Goals Widget -->
+    ${getMesoGoalWidget()}
+
     <!-- This Week -->
     <div class="section-title">Diese Woche</div>
     <div class="card">${workoutRows}</div>
@@ -2484,7 +2487,7 @@ function renderHomePage() {
     <div class="card" style="text-align:center;padding:24px 16px">
       <div style="font-size:32px;margin-bottom:8px">${ICONS.flame || '🔥'}</div>
       <div style="font-size:15px;font-weight:600;margin-bottom:4px">Bereit fuer Mesozyklus ${meso.number}!</div>
-      <div style="font-size:13px;color:var(--text-sec)">Starte dein erstes Training. Nach W1 werden automatisch progressive Ziele berechnet (+15% ueber 5 Wochen).</div>
+      <div style="font-size:13px;color:var(--text-sec)">Starte dein erstes Training. Nach W1 werden automatisch progressive Ziele berechnet (Runden-Progression + Volumen-Targets).</div>
     </div>
     `}
 
@@ -4155,9 +4158,122 @@ function finishWorkout() {
 }
 
 // =============================================
+// MESO GOALS WIDGET (Home Screen)
+// Evidence-based: Set progression is primary driver
+// =============================================
+
+function getMesoGoalWidget() {
+  if (!APP_STATE.settings.goalsAutoSet) return '';
+  const meso = APP_STATE.settings.mesocycle;
+  const cw = meso.currentWeek;
+  const weeksHard = meso.weeksHard;
+
+  // Build per-workout circuit goals
+  var workoutGoals = [];
+  WEEK_SCHEDULE.forEach(function(wid) {
+    var plan = WORKOUT_PLANS[wid];
+    var circuitInfo = [];
+    plan.circuits.forEach(function(c) {
+      var baseR = c.rounds;
+      var thisWeekR = getTargetRounds(baseR, cw);
+      var lastWeekR = cw > 1 ? getTargetRounds(baseR, cw - 1) : baseR;
+      var maxR = getTargetRounds(baseR, weeksHard);
+      var isProgression = thisWeekR > lastWeekR;
+      circuitInfo.push({
+        name: c.id,
+        baseRounds: baseR,
+        targetRounds: thisWeekR,
+        maxRounds: maxR,
+        isProgression: isProgression,
+        exercises: c.exercises.length
+      });
+    });
+    workoutGoals.push({ id: wid, name: plan.name, circuits: circuitInfo });
+  });
+
+  // W1 baseline per muscle
+  var baselineStr = '';
+  if (APP_STATE.settings.goalsBaseline) {
+    var bl = APP_STATE.settings.goalsBaseline;
+    var muscles = [
+      { key: 'brust', label: 'Brust' },
+      { key: 'ruecken', label: 'Rücken' },
+      { key: 'quads', label: 'Quads' },
+      { key: 'hams', label: 'Hams' }
+    ];
+    baselineStr = muscles.map(function(m) {
+      var base = bl[m.key] || 0;
+      var current = calcWeekMuscleVolume(cw, m.key);
+      var target = getWeekTarget(cw, m.key);
+      var pct = target > 0 ? Math.round(current / target * 100) : 0;
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0">' +
+        '<span style="font-size:12px;color:var(--text-sec)">' + m.label + '</span>' +
+        '<span style="font-size:12px;font-weight:600;color:' + (pct >= 90 ? 'var(--green)' : pct > 0 ? 'var(--orange)' : 'var(--text-ter)') + '">' +
+        (current > 0 ? (current/1000).toFixed(1) + 't / ' + (target/1000).toFixed(1) + 't' : '–') + '</span></div>';
+    }).join('');
+  }
+
+  // This week's focus message
+  var focusMsg = '';
+  if (cw <= 2) {
+    focusMsg = 'Runden halten, Gewichte + Reps stabilisieren';
+  } else if (cw === 3) {
+    focusMsg = 'Runden-Progression! Eine Runde mehr bei jedem Zirkel';
+  } else if (cw <= weeksHard) {
+    focusMsg = 'Max-Runden halten, Reps + Gewichte verbessern';
+  } else {
+    focusMsg = 'Deload — Volumen reduzieren, Erholung priorisieren';
+  }
+
+  // Circuit goals rows
+  var circuitRows = '';
+  workoutGoals.forEach(function(wg) {
+    var roundsInfo = wg.circuits.map(function(c) {
+      var badge = c.isProgression
+        ? '<span style="color:var(--orange);font-weight:700">' + c.targetRounds + 'R ↑</span>'
+        : '<span style="color:var(--text-sec)">' + c.targetRounds + 'R</span>';
+      return badge;
+    }).join(' + ');
+    circuitRows += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">' +
+      '<span style="font-size:13px;font-weight:600">' + wg.name.split(' ')[0] + '</span>' +
+      '<span style="font-size:12px">' + roundsInfo + '</span></div>';
+  });
+
+  // Meso-Endziel (W5)
+  var endGoalRows = '';
+  workoutGoals.forEach(function(wg) {
+    var maxInfo = wg.circuits.map(function(c) {
+      return '<span style="color:var(--green);font-weight:600">' + c.maxRounds + 'R</span>';
+    }).join(' + ');
+    endGoalRows += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">' +
+      '<span style="font-size:13px;font-weight:600">' + wg.name.split(' ')[0] + '</span>' +
+      '<span style="font-size:12px">' + maxInfo + '</span></div>';
+  });
+
+  return '<div class="card" style="border-left:3px solid var(--orange)">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+      '<h3 style="margin:0">🎯 Woche ' + cw + ' Ziel</h3>' +
+    '</div>' +
+    '<div style="font-size:12px;color:var(--orange);margin-bottom:10px;font-weight:600">' + focusMsg + '</div>' +
+    '<div style="margin-bottom:8px">' + circuitRows + '</div>' +
+    (baselineStr ? '<div class="expandable-header" onclick="toggleExpand(this)" style="margin-top:8px">' +
+      '<span style="font-size:12px;color:var(--text-sec);font-weight:600">Volumen-Fortschritt W' + cw + '</span>' +
+      '<span class="chevron">' + ICONS.chevDown + '</span></div>' +
+      '<div class="expandable-content" style="margin-top:4px">' + baselineStr + '</div>' : '') +
+    '<div class="expandable-header" onclick="toggleExpand(this)" style="margin-top:8px">' +
+      '<span style="font-size:12px;color:var(--text-sec);font-weight:600">Meso-Endziel (W' + weeksHard + ')</span>' +
+      '<span class="chevron">' + ICONS.chevDown + '</span></div>' +
+    '<div class="expandable-content" style="margin-top:4px">' +
+      endGoalRows +
+      '<div style="font-size:11px;color:var(--text-ter);margin-top:6px;line-height:1.4">Erfolg = Max-Runden bei W1-Gewichten schaffen. Reps halten = Ziel erreicht, Reps steigern = Bonus.</div>' +
+    '</div>' +
+  '</div>';
+}
+
+// =============================================
 // AUTO-GOAL ENGINE
-// Progressive Overload: +15% over 5 weeks (~3% per week)
-// Based on Renaissance Periodization / Eric Helms research
+// Set progression is primary hypertrophy driver (RP/Israetel)
+// Round increases drive volume; weight/rep gains are secondary
 // =============================================
 
 function checkAutoGoals() {
@@ -5766,7 +5882,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '5.9';
+const APP_VERSION = '6.0';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
