@@ -997,7 +997,7 @@ const WORKOUT_PLANS = {
         id: 'vb-c1',
         name: 'Zirkel 1',
         type: 'Kombi',
-        rounds: 4,
+        rounds: 3,
         restSeconds: 120,
         exercises: [
           { id: 'vb-c1-e3', name: 'Ring Push Ups', reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0.70 },
@@ -1008,7 +1008,7 @@ const WORKOUT_PLANS = {
         id: 'vb-c2',
         name: 'Zirkel 2',
         type: 'Kombi',
-        rounds: 4,
+        rounds: 3,
         restSeconds: 120,
         exercises: [
           { id: 'vb-c2-e1', name: 'Incline DB Press', reps: '10-12', weight: 25, unit: 'kg', bodyweight: false, dumbbell: true },
@@ -1055,7 +1055,7 @@ const WORKOUT_PLANS = {
         restSeconds: 90,
         exercises: [
           { id: 'rb-c1-e1', name: 'Ring Pull Ups', reps: '6-8', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 1.0 },
-          { id: 'rb-c1-e2', name: 'DB SL RDLs + Row', reps: '8-10', weight: 10, unit: 'kg', bodyweight: false, dumbbell: true }
+          { id: 'rb-c1-e2', name: 'DB SL RDLs', reps: '8-10', weight: 10, unit: 'kg', bodyweight: false, dumbbell: true, unilateral: true }
         ]
       },
       {
@@ -1072,7 +1072,7 @@ const WORKOUT_PLANS = {
       }
     ],
     accessories: [
-      { id: 'rb-a1', name: 'SL GHD Hypers', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0.50, group: 'ss-rb-ghd' },
+      { id: 'rb-a1', name: 'SL GHD Hypers', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0.50, group: 'ss-rb-ghd', unilateral: true },
       { id: 'rb-a1b', name: 'GHD Hypers', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0.50, group: 'ss-rb-ghd' },
       { id: 'rb-a2', name: 'TTB', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: 'ss-rb-core' },
       { id: 'rb-a2b', name: 'GHD Situps', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: 'ss-rb-core' },
@@ -2770,7 +2770,7 @@ function renderReadinessCheck() {
     html += '<span style="font-size:14px;font-weight:700;color:' + scoreColor + '">' + score + '/5</span>';
   }
   html += '</div>';
-  html += '<div style="font-size:11px;color:var(--text-ter);margin-bottom:12px">Wie erholt bist du? (Daten werden gesammelt)</div>';
+  html += '<div style="font-size:11px;color:var(--text-ter);margin-bottom:12px">Bezogen auf die heutigen Zielmuskelgruppen</div>';
 
   // Slider 1: Schlaf
   html += renderReadinessSlider('sleep', 'Schlaf', rd.sleep || 0, ['😴', '😐', '😊', '😄', '🌟']);
@@ -3201,7 +3201,7 @@ function renderStrengthTab(plan) {
             </div>`}
             <div class="input-group">
               <div class="input-label">Reps</div>
-              <input type="number" inputmode="decimal" class="input-field" id="reps-${ex.id}" value="${parseInt(ex.reps.split('-')[1] || ex.reps)}">
+              <input type="number" inputmode="decimal" class="input-field" id="reps-${ex.id}" value="${(lastSets && lastSets[sessionSets.length] && lastSets[sessionSets.length].type !== 'drop') ? lastSets[sessionSets.length].reps : parseInt(ex.reps.split('-')[1] || ex.reps)}">
             </div>
           </div>
         </div>
@@ -3256,11 +3256,6 @@ function finishStrengthSet(exId, isBW) {
   if (!activeSession.sets[exId]) activeSession.sets[exId] = [];
   activeSession.sets[exId].push({ weight, reps, type: 'working' });
 
-  // Start rest timer - use exercise-specific rest time
-  const exInfo = getExerciseInfo(exId);
-  const restTime = (exInfo && exInfo.restSeconds) ? exInfo.restSeconds : 120;
-  startCountdown(restTime);
-
   // Check for PR
   if (checkPR(exId, weight, reps)) {
     APP_STATE.prs.push({
@@ -3285,7 +3280,6 @@ function addDropSet(exId, isBW) {
   if (!activeSession.sets[exId]) activeSession.sets[exId] = [];
   activeSession.sets[exId].push({ weight: Math.round(weight * 0.7), reps, type: 'drop' });
 
-  startCountdown(90);
   saveState();
   renderWorkoutDetail();
 }
@@ -3483,11 +3477,12 @@ function renderZirkelTab(plan) {
               '</div>' +
             '</div>';
           } else {
+            var circuitPR = checkPR(ex.id, set.weight, set.reps);
             html += '<div class="swipe-wrapper" data-ex-id="' + ex.id + '" data-set-index="' + si + '" style="margin-top:4px">' +
               '<div class="swipe-delete-bg">Löschen</div>' +
               '<div class="swipe-content set-card done" style="padding:6px 12px;margin-bottom:0" onclick="startEditSet(\'' + ex.id + '\', ' + si + ')">' +
                 '<div style="display:flex;justify-content:space-between;align-items:center">' +
-                  '<span style="font-size:12px">' + ICONS.check + ' Runde ' + (si + 1) + '</span>' +
+                  '<span style="font-size:12px">' + ICONS.check + ' Runde ' + (si + 1) + (circuitPR ? ' ' + ICONS.trophy : '') + '</span>' +
                   '<span style="font-size:12px;color:var(--text-sec)">' + set.weight + 'kg' + setDbLbl + ' × ' + set.reps + '</span>' +
                 '</div>' +
               '</div>' +
@@ -3501,7 +3496,7 @@ function renderZirkelTab(plan) {
             '<span style="font-size:12px;width:28px;color:var(--text-sec)">' + (exRounds + 1) + '</span>' +
             (bw ? '<div style="flex:1;text-align:center;font-size:13px;padding:6px">BW</div>' :
             '<input type="number" inputmode="decimal" class="input-field" style="flex:1;padding:6px" id="cw-' + ex.id + '" value="' + (function(){ var ls = getLastSessionSets(ex.id); var rd = exRounds; return ls && ls[rd] && ls[rd].type !== 'drop' ? ls[rd].weight : ex.weight; })() + '" step="0.5">') +
-            '<input type="number" inputmode="decimal" class="input-field" style="width:55px;padding:6px" id="cr-' + ex.id + '" value="' + parseInt(ex.reps.split('-')[1] || ex.reps.split('+')[0] || ex.reps) + '">' +
+            '<input type="number" inputmode="decimal" class="input-field" style="width:55px;padding:6px" id="cr-' + ex.id + '" value="' + (function(){ var ls = getLastSessionSets(ex.id); var rd = exRounds; return ls && ls[rd] && ls[rd].type !== 'drop' ? ls[rd].reps : parseInt(ex.reps.split('-')[1] || ex.reps.split('+')[0] || ex.reps); })() + '">' +
             '<button class="btn btn-orange btn-sm" style="width:auto;padding:6px 14px;min-height:32px;font-size:13px" onclick="finishCircuitExercise(\'' + circuit.id + '\', ' + ci + ', ' + exIdx + ', ' + (bw ? 'true' : 'false') + ')">OK</button>' +
           '</div>';
         }
@@ -3825,12 +3820,13 @@ function renderAccExercise(ex) {
         </div>
       </div>`;
     } else {
+      const accPR = set.type !== 'drop' && checkPR(ex.id, set.weight, set.reps);
       setsHtml += `
       <div class="swipe-wrapper" data-ex-id="${ex.id}" data-set-index="${i}">
         <div class="swipe-delete-bg">Löschen</div>
         <div class="swipe-content set-card done" style="padding:8px 12px;margin-bottom:0" onclick="startEditSet('${ex.id}', ${i})">
           <div style="display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:13px">Satz ${i + 1} ${set.type === 'drop' ? '(Drop)' : ''} ${ICONS.check}</span>
+            <span style="font-size:13px">Satz ${i + 1} ${set.type === 'drop' ? '(Drop)' : ''} ${ICONS.check}${accPR ? ' ' + ICONS.trophy : ''}</span>
             <span style="font-size:13px;color:var(--text-sec)">${set.weight}kg${dbLabel} x${set.reps}</span>
           </div>
         </div>
@@ -3847,7 +3843,7 @@ function renderAccExercise(ex) {
           <span style="font-size:13px;width:50px">Satz ${sessionSets.length + 1}</span>
           ${bw ? '<span style="font-size:13px;flex:1;text-align:center">BW</span>' :
           `<input type="number" inputmode="decimal" class="input-field" style="flex:1;padding:6px" id="aw-${ex.id}" value="${(function(){ var ls = getLastSessionSets(ex.id); var si = sessionSets.length; var lw = ls && ls[si] && ls[si].type !== 'drop' ? ls[si].weight : null; return lw !== null ? lw : (ex.weight || 10); })()}" step="0.5">`}
-          <input type="number" inputmode="decimal" class="input-field" style="width:60px;padding:6px" id="ar-${ex.id}" value="${parseInt(ex.reps.split('-')[1] || ex.reps)}">
+          <input type="number" inputmode="decimal" class="input-field" style="width:60px;padding:6px" id="ar-${ex.id}" value="${(function(){ var ls = getLastSessionSets(ex.id); var si = sessionSets.length; return ls && ls[si] && ls[si].type !== 'drop' ? ls[si].reps : parseInt(ex.reps.split('-')[1] || ex.reps); })()}">
           <button class="btn btn-orange btn-sm" style="width:auto;padding:6px 12px;min-height:32px" onclick="finishAccSet('${ex.id}', ${bw})">OK</button>
         </div>`;
 
@@ -3923,6 +3919,12 @@ function addExtraAccSet(exId) {
   renderWorkoutDetail();
 }
 
+function addExtraAccSuperset(mainExId) {
+  if (!activeSession._accExtra) activeSession._accExtra = {};
+  activeSession._accExtra[mainExId] = true;
+  renderWorkoutDetail();
+}
+
 // =============================================
 // ACC SUPERSET (grouped exercises in one card)
 // =============================================
@@ -3980,8 +3982,9 @@ function renderAccSuperset(exercises) {
       setsHtml += '<div class="swipe-wrapper" data-ex-id="' + mainEx.id + '" data-set-index="' + si + '">';
       setsHtml += '<div class="swipe-delete-bg">Löschen</div>';
       setsHtml += '<div class="swipe-content set-card done" style="padding:8px 12px;margin-bottom:0" onclick="startEditSet(\'' + mainEx.id + '\', ' + si + ')">';
+      var ssPR = exercises.some(function(e) { var d = (activeSession.sets[e.id] || [])[si]; return d && checkPR(e.id, d.weight, d.reps); });
       setsHtml += '<div style="display:flex;justify-content:space-between;align-items:center">';
-      setsHtml += '<span style="font-size:13px">Satz ' + (si + 1) + ' ' + ICONS.check + '</span>';
+      setsHtml += '<span style="font-size:13px">Satz ' + (si + 1) + ' ' + ICONS.check + (ssPR ? ' ' + ICONS.trophy : '') + '</span>';
       setsHtml += '<span style="font-size:11px;color:var(--text-sec)">' + summary + '</span>';
       setsHtml += '</div></div></div>';
     }
@@ -4002,13 +4005,42 @@ function renderAccSuperset(exercises) {
         var autoWeight = (function(){ var ls = getLastSessionSets(e.id); var idx = completedCount; var lw = ls && ls[idx] && ls[idx].type !== 'drop' ? ls[idx].weight : null; return lw !== null ? lw : (e.weight || 10); })();
         setsHtml += '<input type="number" inputmode="decimal" class="input-field" style="flex:1;padding:6px" id="ssw-' + e.id + '" value="' + autoWeight + '" step="0.5">';
       }
-      setsHtml += '<input type="number" inputmode="decimal" class="input-field" style="width:60px;padding:6px" id="ssr-' + e.id + '" value="' + parseInt(e.reps.split('-')[1] || e.reps) + '">';
+      var autoReps = (function(){ var ls = getLastSessionSets(e.id); var idx = completedCount; return ls && ls[idx] && ls[idx].type !== 'drop' ? ls[idx].reps : parseInt(e.reps.split('-')[1] || e.reps); })();
+      setsHtml += '<input type="number" inputmode="decimal" class="input-field" style="width:60px;padding:6px" id="ssr-' + e.id + '" value="' + autoReps + '">';
       setsHtml += '</div>';
     });
 
     var okExIds = exercises.map(function(e) { return "'" + e.id + "'"; }).join(',');
     setsHtml += '<button class="btn btn-orange btn-sm" style="width:100%;padding:8px;min-height:36px" onclick="finishAccSuperset([' + okExIds + '])">OK</button>';
     setsHtml += '</div>';
+  } else if (activeSession._accExtra && activeSession._accExtra[mainEx.id]) {
+    // Extra set input after all planned sets done
+    setsHtml += '<div class="set-card current" style="padding:8px 12px">';
+    setsHtml += '<div style="font-size:12px;font-weight:600;margin-bottom:6px">Satz ' + (completedCount + 1) + ' (Extra)</div>';
+
+    exercises.forEach(function(e) {
+      var dbLbl = e.dumbbell ? ' (pro DB)' : '';
+      setsHtml += '<div style="font-size:11px;color:var(--text-sec);margin-bottom:2px">' + e.name + '</div>';
+      setsHtml += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
+      if (e.bodyweight) {
+        setsHtml += '<span style="font-size:13px;flex:1;text-align:center">BW</span>';
+      } else {
+        var lastSets = activeSession.sets[e.id] || [];
+        var lastSet = lastSets.length > 0 ? lastSets[lastSets.length - 1] : null;
+        var autoWeight = lastSet ? lastSet.weight : (e.weight || 10);
+        setsHtml += '<input type="number" inputmode="decimal" class="input-field" style="flex:1;padding:6px" id="ssw-' + e.id + '" value="' + autoWeight + '" step="0.5">';
+      }
+      setsHtml += '<input type="number" inputmode="decimal" class="input-field" style="width:60px;padding:6px" id="ssr-' + e.id + '" value="' + parseInt(e.reps.split('-')[1] || e.reps) + '">';
+      setsHtml += '</div>';
+    });
+
+    var extraExIds = exercises.map(function(e) { return "'" + e.id + "'"; }).join(',');
+    setsHtml += '<button class="btn btn-orange btn-sm" style="width:100%;padding:8px;min-height:36px" onclick="finishAccSuperset([' + extraExIds + '])">OK</button>';
+    setsHtml += '</div>';
+  } else {
+    // All planned sets done — show "+ Satz" button
+    var addExIds = exercises.map(function(e) { return "'" + e.id + "'"; }).join(',');
+    setsHtml += '<button class="btn btn-sm btn-outline" style="margin-top:4px;font-size:12px" onclick="addExtraAccSuperset(\'' + mainEx.id + '\')">+ Satz</button>';
   }
 
   var lastStrs = exercises.map(function(e) { return formatLastSession(e.id); }).filter(Boolean);
@@ -5734,7 +5766,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '5.7';
+const APP_VERSION = '5.9';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
