@@ -536,7 +536,6 @@ h3 { font-size: 15px; font-weight: 600; }
    ============================================= */
 .chart-container {
   width: 100%;
-  height: 180px;
   position: relative;
   margin-bottom: 8px;
 }
@@ -544,9 +543,8 @@ h3 { font-size: 15px; font-weight: 600; }
 .chart-bar-group {
   display: flex;
   align-items: flex-end;
-  justify-content: space-around;
-  height: 140px;
-  padding: 0 8px;
+  height: 160px;
+  padding: 0 0 0 36px;
   position: relative;
 }
 
@@ -556,25 +554,45 @@ h3 { font-size: 15px; font-weight: 600; }
   align-items: center;
   gap: 4px;
   flex: 1;
+  max-width: 80px;
 }
 
 .chart-bar {
-  width: 32px;
+  width: 100%;
+  max-width: 48px;
   background: var(--orange);
-  border-radius: 4px 4px 0 0;
+  border-radius: 6px 6px 0 0;
   transition: height 0.5s ease;
-  min-height: 2px;
+  min-height: 4px;
 }
 
-.chart-label { font-size: 11px; color: var(--text-sec); }
-.chart-value { font-size: 10px; color: var(--text-ter); }
+.chart-label { font-size: 12px; color: var(--text-sec); font-weight: 600; margin-top: 4px; }
+.chart-value { font-size: 12px; color: var(--text); font-weight: 700; }
 
 .chart-goal-line {
   position: absolute;
-  left: 0;
+  left: 36px;
   right: 0;
   border-top: 2px dashed var(--text-ter);
   z-index: 1;
+}
+
+.chart-y-axis {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 36px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 2px 0 20px;
+}
+.chart-y-label {
+  font-size: 10px;
+  color: var(--text-ter);
+  text-align: right;
+  padding-right: 4px;
 }
 
 /* =============================================
@@ -883,6 +901,7 @@ const WORKOUT_PLANS = {
       { id: 'va-w7', name: 'Innenrotation R', duration: '45s' },
       { id: 'va-w8', name: 'Innenrotation L', duration: '45s' },
       { id: 'va-w9', name: 'Plank Rotation', duration: '60s' },
+      { id: 'va-w10b', name: 'Rev. Planks', duration: '30s' },
       { id: 'va-w10', name: '20 Push-ups', duration: '' }
     ],
     strength: [
@@ -935,6 +954,7 @@ const WORKOUT_PLANS = {
       { id: 'ra-w7', name: 'Innenrotation R', duration: '45s' },
       { id: 'ra-w8', name: 'Innenrotation L', duration: '45s' },
       { id: 'ra-w9', name: 'Plank Rotation', duration: '60s' },
+      { id: 'ra-w10b', name: 'Rev. Planks', duration: '30s' },
       { id: 'ra-w10', name: '10 Scapula Pull-ups', duration: '' }
     ],
     strength: [
@@ -963,7 +983,7 @@ const WORKOUT_PLANS = {
         note: 'Double Rounds: jede Runde = 2x durch',
         exercises: [
           { id: 'ra-c2-e1', name: 'Pull Ups', reps: '6-8', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 1.0 },
-          { id: 'ra-c2-e2', name: 'Farmers Carries', reps: '75m', weight: 64, unit: 'kg', bodyweight: false, note: '2x32kg', noVolume: true },
+          { id: 'ra-c2-e2', name: 'Farmers Carries', reps: '75m', weight: 32, unit: 'kg', bodyweight: false, dumbbell: true, note: 'pro KB', noVolume: true },
           { id: 'ra-c2-e3', name: 'Shrugs', reps: '5-8', weight: 32, unit: 'kg', bodyweight: false, dumbbell: true }
         ]
       }
@@ -993,6 +1013,7 @@ const WORKOUT_PLANS = {
       { id: 'vb-w7', name: 'Innenrotation R', duration: '45s' },
       { id: 'vb-w8', name: 'Innenrotation L', duration: '45s' },
       { id: 'vb-w9', name: 'Plank Rotation', duration: '60s' },
+      { id: 'vb-w10b', name: 'Rev. Planks', duration: '30s' },
       { id: 'vb-w10', name: '20 Push-ups', duration: '' }
     ],
     strength: [
@@ -1047,6 +1068,7 @@ const WORKOUT_PLANS = {
       { id: 'rb-w7', name: 'Innenrotation R', duration: '45s' },
       { id: 'rb-w8', name: 'Innenrotation L', duration: '45s' },
       { id: 'rb-w9', name: 'Plank Rotation', duration: '60s' },
+      { id: 'rb-w10b', name: 'Rev. Planks', duration: '30s' },
       { id: 'rb-w10', name: '10 Scapula Pull-ups', duration: '' }
     ],
     strength: [
@@ -1141,6 +1163,13 @@ const EXERCISE_MUSCLE = {
   'rb-a3': 'bizeps'       // Hammer Curls
 };
 
+var WORKOUT_TARGET_MUSCLES = {
+  va: ['Brust', 'Beine'],
+  vb: ['Beine', 'Brust'],
+  ra: ['Rücken', 'Hamstrings'],
+  rb: ['Rücken', 'Hamstrings']
+};
+
 // Sub-muscle group mapping for detailed breakdown (brust + ruecken)
 // 'beide_brust' = counts in both obere + untere; 'beide_ruecken' = counts in both lats + oberer
 const EXERCISE_SUB_MUSCLE = {
@@ -1226,6 +1255,25 @@ function loadState() {
           });
         });
       });
+      // Migrate: remove duplicate old-alias exercise entries from sessions
+      // (caused by circuit split #100 storing sets under both old and new IDs)
+      var migrated = false;
+      (state.sessions || []).forEach(function(session) {
+        Object.keys(session.sets || {}).forEach(function(exId) {
+          var newId = null;
+          for (var k in EXERCISE_ID_ALIASES) {
+            if (EXERCISE_ID_ALIASES[k] === exId) { newId = k; break; }
+          }
+          if (newId && session.sets[newId]) {
+            // Old alias AND canonical both exist — remove old duplicate
+            delete session.sets[exId];
+            migrated = true;
+          }
+        });
+      });
+      if (migrated) {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
+      }
       return state;
     }
   } catch (e) {
@@ -1359,6 +1407,9 @@ function detectAllPRs(sessions) {
 
   sorted.forEach(session => {
     Object.entries(session.sets || {}).forEach(([exId, sets]) => {
+      // Skip old alias IDs if canonical ID also exists (prevent duplicate PRs)
+      var resolved = resolveExerciseId(exId);
+      if (resolved && session.sets[resolved]) return;
       sets.forEach(set => {
         const volume = set.weight * set.reps;
         if (!bestByExercise[exId] || volume > bestByExercise[exId]) {
@@ -1382,14 +1433,24 @@ function detectAllPRs(sessions) {
   return prs;
 }
 
-function checkPR(exerciseId, weight, reps) {
+function checkPR(exerciseId, weight, reps, setIndex) {
   const volume = weight * reps;
   let best = 0;
   APP_STATE.sessions.forEach(s => {
-    (s.sets[exerciseId] || []).forEach(set => {
-      const v = set.weight * set.reps;
-      if (v > best) best = v;
-    });
+    const sets = s.sets[exerciseId] || [];
+    if (typeof setIndex === 'number' && setIndex >= 0) {
+      // Compare against same set index from previous sessions
+      if (sets[setIndex]) {
+        const v = sets[setIndex].weight * sets[setIndex].reps;
+        if (v > best) best = v;
+      }
+    } else {
+      // Fallback: compare against all sets
+      sets.forEach(set => {
+        const v = set.weight * set.reps;
+        if (v > best) best = v;
+      });
+    }
   });
   return volume > best && best > 0;
 }
@@ -1834,7 +1895,7 @@ function confirmEmomRound(exId, roundNum) {
     activeSession.sets[exId].push({ weight: 0, reps: 0, type: 'working' });
   }
   activeSession.sets[exId][roundNum - 1] = { weight: weight, reps: reps, type: 'working' };
-  checkPR(exId, weight, reps);
+  checkPR(exId, weight, reps, roundNum - 1);
   saveState();
   renderWorkoutDetail();
 }
@@ -2077,6 +2138,9 @@ function updateAllTimerDisplays() {
 function calcSessionVolume(session) {
   let total = 0;
   Object.entries(session.sets || {}).forEach(([exId, sets]) => {
+    // Skip old alias IDs if canonical ID also exists (prevent double-counting)
+    var resolved = resolveExerciseId(exId);
+    if (resolved && session.sets[resolved]) return;
     const ex = getExerciseInfo(exId);
     if (ex && ex.noVolume) return; // Skip exercises excluded from volume stats (e.g. Farmers Carries)
     sets.forEach(set => {
@@ -2091,6 +2155,9 @@ function calcSessionVolume(session) {
 function calcMuscleVolume(session, muscle) {
   let total = 0;
   Object.entries(session.sets || {}).forEach(([exId, sets]) => {
+    // Skip old alias IDs if canonical ID also exists (prevent double-counting)
+    var resolved = resolveExerciseId(exId);
+    if (resolved && session.sets[resolved]) return;
     if (EXERCISE_MUSCLE[exId] !== muscle) return;
     const ex = getExerciseInfo(exId);
     if (ex && ex.noVolume) return; // Skip exercises excluded from volume stats
@@ -2113,6 +2180,9 @@ function calcWeekSubMuscleVolume(week, muscle, subMuscle, mesocycle) {
     .reduce((sum, s) => {
       let vol = 0;
       Object.entries(s.sets || {}).forEach(([exId, sets]) => {
+        // Skip old alias IDs if canonical ID also exists (prevent double-counting)
+        var resolved = resolveExerciseId(exId);
+        if (resolved && s.sets[resolved]) return;
         if (EXERCISE_MUSCLE[exId] !== muscle) return;
         const exInfo = getExerciseInfo(exId);
         if (exInfo && exInfo.noVolume) return; // Skip exercises excluded from volume stats
@@ -2376,6 +2446,9 @@ function renderHomePage() {
         .forEach(function(s) {
           Object.entries(s.sets || {}).forEach(function(entry) {
             var exId = entry[0]; var sets = entry[1];
+            // Skip old alias IDs if canonical ID also exists (prevent double-counting)
+            var resolved = resolveExerciseId(exId);
+            if (resolved && s.sets[resolved]) return;
             if (EXERCISE_MUSCLE[exId] !== m) return;
             sets.forEach(function(set) {
               if (!set.isDrop) setsDone++;
@@ -2891,12 +2964,12 @@ function switchSubTab(tab) {
 function renderReadinessCheck() {
   if (!activeSession || activeSession._readinessDone || activeSession._completed) return '';
   var rd = activeSession.readiness || {};
-  var hasAll = rd.sleep > 0 && rd.soreness > 0 && rd.motivation > 0;
+  var hasAll = rd.sleep > 0 && rd.muscle1 > 0 && rd.muscle2 > 0 && rd.motivation > 0;
   var html = '<div class="card" style="margin-bottom:16px;border:1px solid var(--orange)">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
   html += '<div style="font-size:14px;font-weight:700;color:var(--text)">Recovery Check</div>';
   if (hasAll) {
-    var score = Math.round((rd.sleep + rd.soreness + rd.motivation) / 3 * 10) / 10;
+    var score = Math.round((rd.sleep + rd.muscle1 + rd.muscle2 + rd.motivation) / 4 * 10) / 10;
     var scoreColor = score >= 4 ? 'var(--green)' : score >= 2.5 ? 'var(--orange)' : 'var(--red)';
     html += '<span style="font-size:14px;font-weight:700;color:' + scoreColor + '">' + score + '/5</span>';
   }
@@ -2904,10 +2977,10 @@ function renderReadinessCheck() {
   html += '<div style="font-size:11px;color:var(--text-ter);margin-bottom:12px">Bezogen auf die heutigen Zielmuskelgruppen</div>';
 
   // Slider 1: Schlaf
+  var muscles = WORKOUT_TARGET_MUSCLES[activeWorkoutId] || ['Muskeln', 'Muskeln'];
   html += renderReadinessSlider('sleep', 'Schlaf', rd.sleep || 0, ['😴', '😐', '😊', '😄', '🌟']);
-  // Slider 2: Muskelerschöpfung (inverted: 1=sehr erschöpft, 5=frisch)
-  html += renderReadinessSlider('soreness', 'Muskeln', rd.soreness || 0, ['🔥', '😣', '😐', '💪', '🦾']);
-  // Slider 3: Motivation
+  html += renderReadinessSlider('muscle1', muscles[0], rd.muscle1 || 0, ['🔥', '😣', '😐', '💪', '🦾']);
+  html += renderReadinessSlider('muscle2', muscles[1], rd.muscle2 || 0, ['🔥', '😣', '😐', '💪', '🦾']);
   html += renderReadinessSlider('motivation', 'Motivation', rd.motivation || 0, ['😩', '😕', '😐', '😤', '🔥']);
 
   if (hasAll) {
@@ -2947,7 +3020,7 @@ function confirmReadiness() {
   activeSession._readinessDone = true;
   // Calculate score
   var rd = activeSession.readiness;
-  if (rd) rd.score = Math.round((rd.sleep + rd.soreness + rd.motivation) / 3 * 10) / 10;
+  if (rd) rd.score = Math.round((rd.sleep + (rd.muscle1 || rd.soreness || 0) + (rd.muscle2 || rd.soreness || 0) + rd.motivation) / 4 * 10) / 10;
   // Save to stored session
   var idx = APP_STATE.sessions.findIndex(function(s) { return s.id === activeSession.id; });
   if (idx >= 0) APP_STATE.sessions[idx].readiness = activeSession.readiness;
@@ -3180,7 +3253,7 @@ function renderStrengthTab(plan) {
         const timerColor = isPrep ? 'var(--blue)' : (emomDone ? 'var(--green)' : 'var(--orange)');
         const statusText = isPrep ? 'Vorbereitung...' : (emomDone ? 'Fertig!' : 'Runde ' + emomRound + ' / ' + ex.sets);
         html += `
-        <div style="text-align:center;margin:12px 0;padding:16px;border-radius:12px;background:rgba(232,114,12,0.1)">
+        <div style="text-align:center;margin:12px 0;padding:16px;border-radius:12px;background:var(--card);border:1px solid rgba(232,114,12,0.3);position:sticky;top:0;z-index:10">
           <div style="font-size:12px;color:${timerColor};font-weight:600;margin-bottom:4px">${statusText}</div>
           <div class="rest-timer-display emom-timer-display" style="font-family:'SF Mono','Menlo',monospace;font-size:48px;font-weight:700;padding:4px 0;color:${timerColor}">${formatTime(Math.ceil(emomRemaining))}</div>
           ${emomDone ? '<button class="btn btn-sm btn-outline" style="margin-top:8px" onclick="resetEmomTimer(); renderWorkoutDetail();">Reset</button>' : ''}
@@ -3202,7 +3275,7 @@ function renderStrengthTab(plan) {
         var toBeatHint = toBeatSet ? ' <span style="color:var(--text-ter);font-size:10px">To Beat: ' + toBeatSet.weight + 'kg×' + toBeatSet.reps + '</span>' : '';
 
         if (isConfirmed) {
-          var isPR = checkPR(ex.id, savedSet.weight, savedSet.reps);
+          var isPR = checkPR(ex.id, savedSet.weight, savedSet.reps, ri - 1);
           html += `
           <div class="swipe-wrapper" data-ex-id="${ex.id}" data-set-index="${ri - 1}">
             <div class="swipe-delete-bg">Löschen</div>
@@ -3257,7 +3330,7 @@ function renderStrengthTab(plan) {
 
     // Completed sets with swipe-to-delete + tap-to-edit (skip for EMOM - handled above)
     if (!isEMOM) sessionSets.forEach((set, i) => {
-      const isPR = checkPR(ex.id, set.weight, set.reps);
+      const isPR = checkPR(ex.id, set.weight, set.reps, i);
       const isEditing = editingSet && editingSet.exId === ex.id && editingSet.index === i;
 
       if (isEditing) {
@@ -3387,8 +3460,8 @@ function finishStrengthSet(exId, isBW) {
   if (!activeSession.sets[exId]) activeSession.sets[exId] = [];
   activeSession.sets[exId].push({ weight, reps, type: 'working' });
 
-  // Check for PR
-  if (checkPR(exId, weight, reps)) {
+  // Check for PR (per set index)
+  if (checkPR(exId, weight, reps, activeSession.sets[exId].length - 1)) {
     APP_STATE.prs.push({
       exerciseId: exId,
       date: activeSession.date,
@@ -3608,7 +3681,7 @@ function renderZirkelTab(plan) {
               '</div>' +
             '</div>';
           } else {
-            var circuitPR = checkPR(ex.id, set.weight, set.reps);
+            var circuitPR = checkPR(ex.id, set.weight, set.reps, si);
             html += '<div class="swipe-wrapper" data-ex-id="' + ex.id + '" data-set-index="' + si + '" style="margin-top:4px">' +
               '<div class="swipe-delete-bg">Löschen</div>' +
               '<div class="swipe-content set-card done" style="padding:6px 12px;margin-bottom:0" onclick="startEditSet(\'' + ex.id + '\', ' + si + ')">' +
@@ -3735,8 +3808,8 @@ function addCircuitSetInline(circuitId, exId) {
     activeSession.circuitRounds[circuitId] = minSets === Infinity ? 0 : minSets;
   }
 
-  // Check PR
-  if (checkPR(exId, weight, reps)) {
+  // Check PR (per set index)
+  if (checkPR(exId, weight, reps, activeSession.sets[exId].length - 1)) {
     APP_STATE.prs.push({
       exerciseId: exId, date: activeSession.date,
       weight: weight, reps: reps,
@@ -3857,9 +3930,9 @@ function finishCircuitExercise(circuitId, circuitIndex, exIdx, isBW) {
   });
   activeSession.circuitRounds[circuitId] = minSets === Infinity ? 0 : minSets;
 
-  // Check PR for this exercise
+  // Check PR for this exercise (per set index)
   var lastSet = { weight: weight, reps: reps };
-  if (checkPR(ex.id, lastSet.weight, lastSet.reps)) {
+  if (checkPR(ex.id, lastSet.weight, lastSet.reps, activeSession.sets[ex.id].length - 1)) {
     APP_STATE.prs.push({
       exerciseId: ex.id, date: activeSession.date,
       weight: lastSet.weight, reps: lastSet.reps,
@@ -3951,7 +4024,7 @@ function renderAccExercise(ex) {
         </div>
       </div>`;
     } else {
-      const accPR = set.type !== 'drop' && checkPR(ex.id, set.weight, set.reps);
+      const accPR = set.type !== 'drop' && checkPR(ex.id, set.weight, set.reps, i);
       setsHtml += `
       <div class="swipe-wrapper" data-ex-id="${ex.id}" data-set-index="${i}">
         <div class="swipe-delete-bg">Löschen</div>
@@ -4003,9 +4076,14 @@ function renderAccExercise(ex) {
           <div class="exercise-name" style="font-size:14px">${ex.name}</div>
           <div class="exercise-last" style="font-size:11px">${ex.sets}x${ex.reps}${dbLabel}${noteStr}${lastStr ? ' | ' + lastStr : ''}</div>
         </div>
-        <span style="font-size:12px;color:var(--text-sec)">${sessionSets.length}/${ex.sets}</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:12px;color:var(--text-sec)">${sessionSets.length}/${ex.sets}</span>
+          <button id="peek-icon-${ex.id}" onclick="event.stopPropagation();toggleHistoryPeek('${ex.id}')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 6px;font-size:12px;color:var(--text-ter);cursor:pointer">📊</button>
+        </div>
       </div>
+      <div id="peek-${ex.id}" style="display:none">${renderHistoryPeek(ex.id)}</div>
       ${toBeatStr ? '<div class="to-beat" style="margin-top:6px">' + toBeatStr + '</div>' : ''}
+      ${sessionSets.length > 0 ? '<div style="text-align:center;margin:8px 0"><div class="rest-timer-display" style="font-family:\'SF Mono\',\'Menlo\',monospace;font-size:24px;font-weight:700;color:var(--orange);padding:4px 0">' + formatTime(getTimerSeconds()) + '</div><div class="timer-presets"><button class="timer-preset" onclick="startCountdown(60)">1:00</button><button class="timer-preset" onclick="startCountdown(90)">1:30</button><button class="timer-preset" onclick="startCountdown(120)">2:00</button></div><div class="timer-controls"><button class="timer-btn" onclick="toggleRestTimer(90)">' + (isRestTimerRunning() ? ICONS.pause : ICONS.play) + '</button><button class="timer-btn" onclick="resetRestTimer(); renderWorkoutDetail();">' + ICONS.reset + '</button></div></div>' : ''}
       <div style="margin-top:8px">${setsHtml}</div>
     </div>`;
 }
@@ -4020,6 +4098,7 @@ function finishAccSet(exId, isBW) {
 
   if (!activeSession.sets[exId]) activeSession.sets[exId] = [];
   activeSession.sets[exId].push({ weight, reps, type: 'working' });
+  const workingSetIdx = activeSession.sets[exId].length - 1;
 
   // Check for drop set
   const dropWeightEl = document.getElementById('adw-' + exId);
@@ -4032,7 +4111,7 @@ function finishAccSet(exId, isBW) {
     }
   }
 
-  if (checkPR(exId, weight, reps)) {
+  if (checkPR(exId, weight, reps, workingSetIdx)) {
     APP_STATE.prs.push({
       exerciseId: exId, date: activeSession.date,
       weight, reps, volume: weight * reps,
@@ -4113,7 +4192,7 @@ function renderAccSuperset(exercises) {
       setsHtml += '<div class="swipe-wrapper" data-ex-id="' + mainEx.id + '" data-set-index="' + si + '">';
       setsHtml += '<div class="swipe-delete-bg">Löschen</div>';
       setsHtml += '<div class="swipe-content set-card done" style="padding:8px 12px;margin-bottom:0" onclick="startEditSet(\'' + mainEx.id + '\', ' + si + ')">';
-      var ssPR = exercises.some(function(e) { var d = (activeSession.sets[e.id] || [])[si]; return d && checkPR(e.id, d.weight, d.reps); });
+      var ssPR = exercises.some(function(e) { var d = (activeSession.sets[e.id] || [])[si]; return d && checkPR(e.id, d.weight, d.reps, si); });
       setsHtml += '<div style="display:flex;justify-content:space-between;align-items:center">';
       setsHtml += '<span style="font-size:13px">Satz ' + (si + 1) + ' ' + ICONS.check + (ssPR ? ' ' + ICONS.trophy : '') + '</span>';
       setsHtml += '<span style="font-size:11px;color:var(--text-sec)">' + summary + '</span>';
@@ -4202,7 +4281,7 @@ function finishAccSuperset(exIds) {
     if (!activeSession.sets[exId]) activeSession.sets[exId] = [];
     activeSession.sets[exId].push({ weight: weight, reps: reps, type: 'working' });
 
-    if (checkPR(exId, weight, reps)) {
+    if (checkPR(exId, weight, reps, activeSession.sets[exId].length - 1)) {
       APP_STATE.prs.push({
         exerciseId: exId, date: activeSession.date,
         weight: weight, reps: reps, volume: weight * reps,
@@ -4493,6 +4572,9 @@ function renderDoneTab(plan) {
   const muscleLabels = { ruecken: 'Ruecken', brust: 'Brust', quads: 'Quads', hams: 'Hams', bizeps: 'Bizeps', core: 'Core', trizeps: 'Trizeps', schultern: 'Schultern' };
   const sessionMuscles = {};
   Object.entries(session.sets || {}).forEach(([exId, sets]) => {
+    // Skip old alias IDs if canonical ID also exists (prevent double-counting)
+    var resolved = resolveExerciseId(exId);
+    if (resolved && session.sets[resolved]) return;
     const muscle = EXERCISE_MUSCLE[exId];
     if (!muscle) return;
     const exInfo = getExerciseInfo(exId);
@@ -5602,10 +5684,15 @@ function renderStatsAll() {
       ${volumeChartMode === 'meso' ? `
         <div class="chart-container">
           <div class="chart-bar-group" style="position:relative">
-            <div class="chart-goal-line" style="bottom:${goalBottom}%;position:absolute;left:0;right:0"></div>
+            <div class="chart-y-axis">
+              <span class="chart-y-label">${(maxVol/1000).toFixed(1)}t</span>
+              <span class="chart-y-label">${(maxVol/2000).toFixed(1)}t</span>
+              <span class="chart-y-label">0</span>
+            </div>
+            <div class="chart-goal-line" style="bottom:${goalBottom}%"></div>
             ${bars}
           </div>
-          <div style="text-align:right;font-size:10px;color:var(--text-ter);margin-top:4px">Ziel: ${(goal/1000).toFixed(1)}t ---</div>
+          <div style="text-align:right;font-size:10px;color:var(--text-ter);margin-top:4px">--- Ziel: ${(goal/1000).toFixed(1)}t</div>
         </div>
       ` : timelineHtml}
     </div>
@@ -5759,10 +5846,15 @@ function renderStatsMuscle(muscle) {
       ${volumeChartMode === 'meso' ? `
         <div class="chart-container">
           <div class="chart-bar-group" style="position:relative">
+            <div class="chart-y-axis">
+              <span class="chart-y-label">${(maxVol/1000).toFixed(1)}t</span>
+              <span class="chart-y-label">${(maxVol/2000).toFixed(1)}t</span>
+              <span class="chart-y-label">0</span>
+            </div>
             <div class="chart-goal-line" style="bottom:${goalPct}%"></div>
             ${bars}
           </div>
-          <div style="text-align:right;font-size:10px;color:var(--text-ter);margin-top:4px">Ziel: ${(goal/1000).toFixed(1)}t ---</div>
+          <div style="text-align:right;font-size:10px;color:var(--text-ter);margin-top:4px">--- Ziel: ${(goal/1000).toFixed(1)}t</div>
         </div>
       ` : muscleTimelineHtml}
     </div>
@@ -6096,7 +6188,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '6.1';
+const APP_VERSION = '6.3';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
@@ -6126,6 +6218,9 @@ function exportCSV() {
       if (!plan) return;
 
       Object.entries(session.sets || {}).forEach(([exId, sets]) => {
+        // Skip old alias IDs if canonical ID also exists (prevent duplicate rows)
+        var resolved = resolveExerciseId(exId);
+        if (resolved && session.sets[resolved]) return;
         const exName = getExerciseName(exId);
         sets.forEach((set, i) => {
           const isDB = isDumbbellExercise(exId);
