@@ -1129,7 +1129,7 @@ const WORKOUT_PLANS = {
       { id: 'rbo-w10', name: '10 Scapula Pull-ups', duration: '' }
     ],
     strength: [
-      { id: 'rbo-s1', name: 'Australian Rows', sets: 10, reps: '8-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0.50, restSeconds: 60, note: '10min EMOM' }
+      { id: 'rbo-s1', name: 'Australian Rows', sets: 10, reps: '8-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0.50, restSeconds: 60, emom: true, emomMinutes: 10, note: '10min EMOM' }
     ],
     circuits: [
       {
@@ -1965,8 +1965,8 @@ function playEmomBeep(isFinal) {
 function confirmEmomRound(exId, roundNum) {
   var wEl = document.getElementById('emom-w-' + exId + '-' + roundNum);
   var rEl = document.getElementById('emom-r-' + exId + '-' + roundNum);
-  if (!wEl || !rEl) return;
-  var weight = parseFloat(wEl.value.replace(',', '.')) || 0;
+  if (!rEl) return;
+  var weight = wEl ? (parseFloat(wEl.value.replace(',', '.')) || 0) : APP_STATE.settings.bodyWeight;
   var reps = parseInt(rEl.value) || 0;
   if (!activeSession.sets[exId]) activeSession.sets[exId] = [];
   // Set or update the round's data
@@ -1976,6 +1976,35 @@ function confirmEmomRound(exId, roundNum) {
   activeSession.sets[exId][roundNum - 1] = { weight: weight, reps: reps, type: 'working' };
   checkPR(exId, weight, reps, roundNum - 1);
   saveState();
+  renderWorkoutDetail();
+}
+
+function autofillEmomSets(exId, totalSets, isBW) {
+  // Fill all unconfirmed rounds with the values from the first confirmed round (or inputs)
+  var sets = activeSession.sets[exId] || [];
+  var refWeight = 0;
+  var refReps = 0;
+  // Find reference from first confirmed set
+  if (sets.length > 0 && sets[0].reps > 0) {
+    refWeight = sets[0].weight;
+    refReps = sets[0].reps;
+  } else {
+    // Try reading from first round's input fields
+    var wEl = document.getElementById('emom-w-' + exId + '-1');
+    var rEl = document.getElementById('emom-r-' + exId + '-1');
+    if (wEl) refWeight = parseFloat(wEl.value.replace(',', '.')) || 0;
+    if (rEl) refReps = parseInt(rEl.value) || 0;
+    if (isBW) refWeight = APP_STATE.settings.bodyWeight;
+  }
+  if (refReps === 0) { showToast('Erst mindestens 1 Satz eintragen'); return; }
+  if (!activeSession.sets[exId]) activeSession.sets[exId] = [];
+  for (var i = 0; i < totalSets; i++) {
+    if (!activeSession.sets[exId][i] || activeSession.sets[exId][i].reps === 0) {
+      activeSession.sets[exId][i] = { weight: refWeight, reps: refReps, type: 'working' };
+    }
+  }
+  saveState();
+  showToast(totalSets + ' Sätze ausgefüllt');
   renderWorkoutDetail();
 }
 
@@ -2805,6 +2834,9 @@ function renderHomePage() {
     </div>
     `}
 
+    <!-- Meso Goals Widget -->
+    ${getMesoGoalWidget()}
+
     <!-- D) Muskel-Check + Top Performer -->
     ${muskelCheckHtml}
     ${topPerformerHtml}
@@ -2946,10 +2978,9 @@ function selectWeek(w) {
 }
 
 function openWorkout(workoutId) {
-  // Check for variants — if this workout has variants, show picker
+  // If clicking a base workout that has variants, check if a variant session exists
   var variants = getWorkoutVariants(workoutId);
   if (variants.length > 1) {
-    // Check if there's already a completed session (any variant) this week
     var targetWeek = selectedWeek || APP_STATE.settings.mesocycle.currentWeek;
     var existingVariant = APP_STATE.sessions.find(function(s) {
       return variants.indexOf(s.workoutId) !== -1 &&
@@ -2957,35 +2988,27 @@ function openWorkout(workoutId) {
              s.mesocycle === APP_STATE.settings.mesocycle.number;
     });
     if (existingVariant) {
-      // Show the completed session directly
       doOpenWorkout(existingVariant.workoutId);
-    } else {
-      // Show variant picker
-      showVariantPicker(workoutId, variants);
+      return;
     }
-    return;
   }
+  // Default: open the base workout (variant can be switched in prep screen)
   doOpenWorkout(workoutId);
 }
 
-function showVariantPicker(baseId, variants) {
-  var html = '<div style="padding:20px;text-align:center">';
-  html += '<div style="font-size:18px;font-weight:700;margin-bottom:16px">Variante waehlen</div>';
-  variants.forEach(function(vid) {
-    var plan = WORKOUT_PLANS[vid];
-    var label = plan.name;
-    var sub = plan.subtitle;
-    var isBase = vid === baseId;
-    html += '<div onclick="closeModal();doOpenWorkout(\'' + vid + '\')" style="' +
-      'background:var(--card);border:1px solid ' + (isBase ? 'var(--border)' : 'var(--orange)') + ';' +
-      'border-radius:12px;padding:16px;margin-bottom:10px;cursor:pointer;text-align:left">' +
-      '<div style="font-size:15px;font-weight:600;color:var(--text)">' + label + '</div>' +
-      '<div style="font-size:12px;color:var(--text-sec);margin-top:2px">' + sub + '</div>' +
-      '</div>';
-  });
-  html += '<div onclick="closeModal()" style="margin-top:8px;color:var(--text-sec);font-size:14px;cursor:pointer">Abbrechen</div>';
-  html += '</div>';
-  showModal(html);
+function switchToVariant(variantId) {
+  // Switch current session to a different workout variant
+  activeWorkoutId = variantId;
+  activeSession.workoutId = variantId;
+  activeSession.sets = {};
+  activeSession.circuitRounds = {};
+  activeSession._currentStrengthSet = {};
+  activeSession._currentCircuitRound = {};
+  activeSession._circuitDone = {};
+  activeSession._readinessDone = false;
+  warmupChecked = {};
+  activeSubTab = 'prep';
+  renderWorkoutDetail();
 }
 
 function doOpenWorkout(workoutId) {
@@ -3185,6 +3208,31 @@ function confirmReadiness() {
 
 function renderPrepTab(plan) {
   var html = '';
+
+  // Variant switch button (only if variants exist for this workout's base)
+  var baseId = getBaseWorkoutId(plan.id);
+  var variants = getWorkoutVariants(baseId);
+  if (variants.length > 1) {
+    // Build variant options (exclude current)
+    var otherVariants = variants.filter(function(v) { return v !== plan.id; });
+    if (otherVariants.length > 0) {
+      var btns = '';
+      otherVariants.forEach(function(vid) {
+        var vplan = WORKOUT_PLANS[vid];
+        btns += '<div onclick="switchToVariant(\'' + vid + '\')" style="' +
+          'display:flex;align-items:center;justify-content:space-between;' +
+          'background:var(--card);border:1px solid var(--orange);border-radius:10px;' +
+          'padding:10px 14px;cursor:pointer;margin-bottom:8px">' +
+          '<div><div style="font-size:13px;font-weight:600;color:var(--orange)">' + vplan.subtitle + '</div>' +
+          '<div style="font-size:11px;color:var(--text-sec)">' + vplan.strength[0].name + ' + ' + vplan.circuits[0].exercises.map(function(e){return e.name}).join(' + ') + '</div></div>' +
+          '<span style="color:var(--orange);font-size:16px">&rarr;</span></div>';
+      });
+      html += '<div style="margin-bottom:12px">' +
+        '<div style="font-size:11px;color:var(--text-ter);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Alternatives Training</div>' +
+        btns + '</div>';
+    }
+  }
+
   // Recovery Check
   html += renderReadinessCheck();
 
@@ -3279,15 +3327,15 @@ function renderWarmupTab(plan) {
   const totalWarmupTime = thresholds.length > 0 ? thresholds[thresholds.length - 1].at : 0;
 
   return `
-    <div class="card" style="text-align:center;padding:24px">
-      <div class="rest-timer-display timer-display">${formatTime(getTimerSeconds())}</div>
-      ${totalWarmupTime > 0 ? `<div style="font-size:11px;color:var(--text-ter);margin-top:4px">Auto-Check bis ${formatTime(totalWarmupTime)}</div>` : ''}
-      <div class="timer-controls" style="margin-top:8px">
-        <button class="timer-btn" onclick="toggleWarmupTimer()">
+    <div class="card" style="text-align:center;padding:10px 16px">
+      <div style="display:flex;align-items:center;justify-content:center;gap:12px">
+        <button class="timer-btn" onclick="toggleWarmupTimer()" style="width:32px;height:32px;font-size:14px">
           ${isRestTimerRunning() ? ICONS.pause : ICONS.play}
         </button>
-        <button class="timer-btn" onclick="resetWarmupTimer()">${ICONS.reset}</button>
+        <div class="rest-timer-display timer-display" style="font-size:32px">${formatTime(getTimerSeconds())}</div>
+        <button class="timer-btn" onclick="resetWarmupTimer()" style="width:32px;height:32px;font-size:14px">${ICONS.reset}</button>
       </div>
+      ${totalWarmupTime > 0 ? `<div style="font-size:10px;color:var(--text-ter);margin-top:2px">Auto-Check bis ${formatTime(totalWarmupTime)}</div>` : ''}
     </div>
     <div class="card" id="warmup-scroll-container" style="max-height:45vh;overflow-y:auto;-webkit-overflow-scrolling:touch">${items}</div>
     ${allDone ? '<button class="btn btn-orange" onclick="warmupToStrength()">Weiter: Strength</button>' : ''}
@@ -3308,9 +3356,26 @@ function autoScrollWarmup() {
 }
 
 function toggleWarmup(id) {
+  // Save scroll position before re-render
+  var container = document.getElementById('warmup-scroll-container');
+  var scrollTop = container ? container.scrollTop : 0;
   warmupChecked[id] = !warmupChecked[id];
   if (activeSession) activeSession.warmupDone = Object.values(warmupChecked).every(v => v);
+  var allDone = activeSession && activeSession.warmupDone;
   renderWorkoutDetail();
+  // Restore scroll position or scroll to "Weiter" button if all done
+  requestAnimationFrame(function() {
+    if (allDone) {
+      // Scroll the "Weiter: Strength" button into view
+      var btn = document.querySelector('.btn-orange');
+      if (btn && btn.textContent.indexOf('Strength') !== -1) {
+        btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    } else {
+      var c = document.getElementById('warmup-scroll-container');
+      if (c) c.scrollTop = scrollTop;
+    }
+  });
 }
 
 function toggleWarmupTimer() {
@@ -3412,6 +3477,16 @@ function renderStrengthTab(plan) {
           <div style="font-size:12px;color:${timerColor};font-weight:600;margin-bottom:4px">${statusText}</div>
           <div class="rest-timer-display emom-timer-display" style="font-family:'SF Mono','Menlo',monospace;font-size:48px;font-weight:700;padding:4px 0;color:${timerColor}">${formatTime(Math.ceil(emomRemaining))}</div>
           ${emomDone ? '<button class="btn btn-sm btn-outline" style="margin-top:8px" onclick="resetEmomTimer(); renderWorkoutDetail();">Reset</button>' : ''}
+        </div>`;
+      }
+
+      // Autofill button
+      var confirmedCount = sessionSets.filter(function(s) { return s && s.reps > 0; }).length;
+      if (confirmedCount > 0 && confirmedCount < ex.sets) {
+        html += `<div style="text-align:center;margin:4px 0 8px">
+          <button class="btn btn-sm btn-outline" onclick="autofillEmomSets('${ex.id}', ${ex.sets}, ${!!ex.bodyweight})" style="font-size:12px;padding:6px 16px">
+            Alle Sätze ausfüllen (${confirmedCount > 0 ? sessionSets[0].weight + 'kg × ' + sessionSets[0].reps : ''})
+          </button>
         </div>`;
       }
 
@@ -3608,7 +3683,8 @@ function renderStrengthTab(plan) {
 }
 
 function finishStrengthSet(exId, isBW) {
-  const rawW = document.getElementById(`weight-${exId}`).value.replace(',', '.');
+  const weightEl = document.getElementById(`weight-${exId}`);
+  const rawW = weightEl ? weightEl.value.replace(',', '.') : '0';
   const weight = isBW ? APP_STATE.settings.bodyWeight : (parseFloat(rawW) || 0);
   const reps = parseInt(document.getElementById(`reps-${exId}`).value) || 0;
 
@@ -3627,12 +3703,22 @@ function finishStrengthSet(exId, isBW) {
     });
   }
 
+  // Auto-start rest countdown (only if no countdown already running, and not EMOM)
+  var plan = WORKOUT_PLANS[activeWorkoutId];
+  var exDef = plan.strength.find(function(e) { return e.id === exId; });
+  var isEMOM = exDef && exDef.emom;
+  if (!isEMOM && !isRestTimerRunning()) {
+    var restSec = (exDef && exDef.restSeconds) ? exDef.restSeconds : 120;
+    startCountdown(restSec);
+  }
+
   saveState();
   renderWorkoutDetail();
 }
 
 function addDropSet(exId, isBW) {
-  const rawW = document.getElementById(`weight-${exId}`).value.replace(',', '.');
+  const weightEl = document.getElementById(`weight-${exId}`);
+  const rawW = weightEl ? weightEl.value.replace(',', '.') : '0';
   const weight = isBW ? APP_STATE.settings.bodyWeight : (parseFloat(rawW) || 0);
   const reps = parseInt(document.getElementById(`reps-${exId}`).value) || 0;
 
@@ -3690,19 +3776,46 @@ function renderZirkelTab(plan) {
 
     // Timer — only when session active & circuit not done
     const sessionActive = !activeSession._completed;
-    const circuitRest = circuit.restSeconds || 90;
-    const timerPresets = circuitRest >= 150 ? [120, 150, 180] : circuitRest >= 90 ? [60, 90, 120] : [45, 60, 90];
+    const isEmomCircuit = circuit.type === 'EMOM';
     if (sessionActive && !isDone) {
-      html += '<div style="text-align:center;margin:4px 0 8px">' +
-          '<div class="timer-presets">' +
-            timerPresets.map(function(s) { return '<button class="timer-preset" onclick="startCountdown(' + s + ')">' + formatTime(s) + '</button>'; }).join('') +
-          '</div>' +
-          '<div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-top:4px">' +
-            '<button class="timer-btn" onclick="toggleRestTimer(' + circuitRest + ')">' + (isRestTimerRunning() ? ICONS.pause : ICONS.play) + '</button>' +
-            '<div class="rest-timer-display" style="font-family:\'SF Mono\',\'Menlo\',monospace;font-size:28px;font-weight:700;color:var(--orange)">' + formatTime(getTimerSeconds()) + '</div>' +
-            '<button class="timer-btn" onclick="resetRestTimer(); renderWorkoutDetail();">' + ICONS.reset + '</button>' +
-          '</div>' +
-        '</div>';
+      if (isEmomCircuit) {
+        // EMOM timer for circuit
+        var emomActive = emomTimer.running && emomTimer.exerciseId === circuit.id;
+        var emomDone = emomTimer.finished && emomTimer.exerciseId === circuit.id;
+        var emomRound = emomActive ? getEmomCurrentRound() : 0;
+        var emomRemaining = emomActive ? getEmomRemaining() : (targetTotal * 60 + 10);
+
+        if (!emomActive && !emomDone) {
+          html += '<div style="text-align:center;margin:4px 0 8px;padding:12px;border-radius:12px;background:rgba(232,114,12,0.1)">' +
+            '<div style="font-size:12px;color:var(--orange);font-weight:600;margin-bottom:4px">EMOM ' + targetTotal + ' MIN</div>' +
+            '<div style="font-size:11px;color:var(--text-sec);margin-bottom:10px">' + targetTotal + ' Runden × 60s + 10s Vorbereitung</div>' +
+            '<button class="btn btn-orange" style="font-size:16px;padding:12px 32px" onclick="startEmomTimer(\'' + circuit.id + '\', ' + targetTotal + ', 10)">EMOM Starten</button>' +
+          '</div>';
+        } else {
+          var isPrep = emomActive && emomRound === 0;
+          var timerColor = isPrep ? 'var(--blue)' : (emomDone ? 'var(--green)' : 'var(--orange)');
+          var statusText = isPrep ? 'Vorbereitung...' : (emomDone ? 'Fertig!' : 'Runde ' + emomRound + ' / ' + targetTotal);
+          html += '<div style="text-align:center;margin:4px 0 8px;padding:12px;border-radius:12px;background:var(--card);border:1px solid rgba(232,114,12,0.3)">' +
+            '<div style="font-size:12px;color:' + timerColor + ';font-weight:600;margin-bottom:4px">' + statusText + '</div>' +
+            '<div class="rest-timer-display emom-timer-display" style="font-family:\'SF Mono\',\'Menlo\',monospace;font-size:36px;font-weight:700;color:' + timerColor + '">' + formatTime(Math.ceil(emomRemaining)) + '</div>' +
+            (emomDone ? '<button class="btn btn-sm btn-outline" style="margin-top:8px" onclick="resetEmomTimer(); renderWorkoutDetail();">Reset</button>' : '') +
+          '</div>';
+        }
+      } else {
+        // Regular rest timer
+        var circuitRest = circuit.restSeconds || 90;
+        var timerPresets = circuitRest >= 150 ? [120, 150, 180] : circuitRest >= 90 ? [60, 90, 120] : [45, 60, 90];
+        html += '<div style="text-align:center;margin:4px 0 8px">' +
+            '<div class="timer-presets">' +
+              timerPresets.map(function(s) { return '<button class="timer-preset" onclick="startCountdown(' + s + ')">' + formatTime(s) + '</button>'; }).join('') +
+            '</div>' +
+            '<div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-top:4px">' +
+              '<button class="timer-btn" onclick="toggleRestTimer(' + circuitRest + ')">' + (isRestTimerRunning() ? ICONS.pause : ICONS.play) + '</button>' +
+              '<div class="rest-timer-display" style="font-family:\'SF Mono\',\'Menlo\',monospace;font-size:28px;font-weight:700;color:var(--orange)">' + formatTime(getTimerSeconds()) + '</div>' +
+              '<button class="timer-btn" onclick="resetRestTimer(); renderWorkoutDetail();">' + ICONS.reset + '</button>' +
+            '</div>' +
+          '</div>';
+      }
     }
 
     // Content area
@@ -4244,7 +4357,8 @@ function renderAccExercise(ex) {
 }
 
 function finishAccSet(exId, isBW) {
-  const rawW = document.getElementById(`aw-${exId}`).value.replace(',', '.');
+  const weightEl = document.getElementById(`aw-${exId}`);
+  const rawW = weightEl ? weightEl.value.replace(',', '.') : '0';
   const weight = isBW ? APP_STATE.settings.bodyWeight : (parseFloat(rawW) || 0);
   const reps = parseInt(document.getElementById(`ar-${exId}`).value) || 0;
 
@@ -4764,25 +4878,57 @@ function renderDoneTab(plan) {
     prHtml += '</div>';
   }
 
-  // Compare with last session
+  // Compare with last session — per muscle group
+  const allVariants = getWorkoutVariants(getBaseWorkoutId(session.workoutId));
   const lastSession = APP_STATE.sessions.find(
-    s => s.workoutId === session.workoutId && s.id !== session.id && s.date < session.date
+    s => allVariants.indexOf(s.workoutId) !== -1 && s.id !== session.id && s.date < session.date
   );
   let improvHtml = '';
   if (lastSession) {
-    const lastVol = calcSessionVolume(lastSession);
-    const volChange = totalVol - lastVol;
-    const volPct = lastVol > 0 ? Math.round(volChange / lastVol * 100) : 0;
-    const changeClass = volChange >= 0 ? 'up' : 'down';
-    const sign = volChange >= 0 ? '+' : '';
-    improvHtml = `
-      <div class="card">
-        <h3>Steigerungen</h3>
-        <div style="margin-top:8px;display:flex;justify-content:space-between">
-          <span>Volumen vs. letztes Mal</span>
-          <span class="volume-change ${changeClass}">${sign}${volPct}% (${sign}${(volChange/1000).toFixed(1)}t)</span>
-        </div>
-      </div>`;
+    // Calculate last session muscles
+    var lastMuscles = {};
+    Object.entries(lastSession.sets || {}).forEach(function(entry) {
+      var exId = entry[0], sets = entry[1];
+      var resolved = resolveExerciseId(exId);
+      if (resolved && lastSession.sets[resolved]) return;
+      var muscle = EXERCISE_MUSCLE[exId];
+      if (!muscle) return;
+      var exInfo = getExerciseInfo(exId);
+      if (exInfo && exInfo.noVolume) return;
+      if (!lastMuscles[muscle]) lastMuscles[muscle] = 0;
+      sets.forEach(function(set) {
+        lastMuscles[muscle] += getVolumeWeight(exId, Number(set.weight) || 0) * (Number(set.reps) || 0) * getRepMultiplier(exId);
+      });
+    });
+
+    var muscleRows = '';
+    Object.entries(sessionMuscles).forEach(function(entry) {
+      var muscle = entry[0], data = entry[1];
+      var lastVol = lastMuscles[muscle] || 0;
+      var change = data.vol - lastVol;
+      var pct = lastVol > 0 ? Math.round(change / lastVol * 100) : (data.vol > 0 ? 100 : 0);
+      var cls = change >= 0 ? 'up' : 'down';
+      var sign = change >= 0 ? '+' : '';
+      muscleRows += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">' +
+        '<span style="font-size:13px">' + (muscleLabels[muscle] || muscle) + '</span>' +
+        '<span class="volume-change ' + cls + '" style="font-size:13px">' + sign + pct + '% (' + sign + (change/1000).toFixed(1) + 't)</span>' +
+      '</div>';
+    });
+
+    var totalLast = calcSessionVolume(lastSession);
+    var totalChange = totalVol - totalLast;
+    var totalPct = totalLast > 0 ? Math.round(totalChange / totalLast * 100) : 0;
+    var totalSign = totalChange >= 0 ? '+' : '';
+    var totalCls = totalChange >= 0 ? 'up' : 'down';
+
+    improvHtml = '<div class="card">' +
+      '<h3>Steigerungen vs. letztes Mal</h3>' +
+      '<div style="margin-top:8px">' + muscleRows + '</div>' +
+      '<div style="display:flex;justify-content:space-between;padding:6px 0;font-weight:600;font-size:13px">' +
+        '<span>Gesamt</span>' +
+        '<span class="volume-change ' + totalCls + '">' + totalSign + totalPct + '% (' + totalSign + (totalChange/1000).toFixed(1) + 't)</span>' +
+      '</div>' +
+    '</div>';
   }
 
   // Motivation messages
@@ -6348,7 +6494,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '6.4';
+const APP_VERSION = '6.5';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
