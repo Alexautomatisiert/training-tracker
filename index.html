@@ -6105,6 +6105,11 @@ function renderSettingsPage() {
         <div class="settings-label">JSON Export</div>
         <span style="color:var(--text-sec);font-size:18px">&rarr;</span>
       </div>
+      <div class="settings-row" onclick="document.getElementById('importFileInput').click()" style="cursor:pointer">
+        <div class="settings-label">JSON Import</div>
+        <span style="color:var(--text-sec);font-size:18px">&larr;</span>
+      </div>
+      <input type="file" id="importFileInput" accept=".json" style="display:none" onchange="importData(this)">
       <div class="settings-row" onclick="exportCSV()" style="cursor:pointer">
         <div class="settings-label">CSV Export (Google Sheets)</div>
         <span style="color:var(--text-sec);font-size:18px">&rarr;</span>
@@ -6120,7 +6125,7 @@ function renderSettingsPage() {
     </div>
 
     <div style="text-align:center;padding:20px 0;color:var(--text-ter);font-size:12px">
-      Training Tracker v3.0
+      Training Tracker v6.4
     </div>
   `;
 }
@@ -6188,7 +6193,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '6.3';
+const APP_VERSION = '6.4';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
@@ -6205,6 +6210,38 @@ function exportData() {
   a.download = `training-data-${new Date().toISOString().split('T')[0]}.json`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function importData(input) {
+  if (!input.files || !input.files[0]) return;
+  var file = input.files[0];
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var data = JSON.parse(e.target.result);
+      // Basic validation: must have sessions array
+      if (!data.sessions || !Array.isArray(data.sessions)) {
+        showToast('Ungueltige Datei: Keine Sessions gefunden');
+        return;
+      }
+      var count = data.sessions.length;
+      if (!confirm('Import: ' + count + ' Sessions gefunden. Aktuelle Daten werden ersetzt. Fortfahren?')) {
+        input.value = '';
+        return;
+      }
+      // Replace APP_STATE
+      APP_STATE = data;
+      APP_STATE._appVersion = APP_VERSION;
+      saveState();
+      input.value = '';
+      showToast(count + ' Sessions importiert!');
+      // Re-render current page
+      setTimeout(function() { location.reload(); }, 500);
+    } catch(err) {
+      showToast('Fehler beim Import: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
 }
 
 function exportCSV() {
