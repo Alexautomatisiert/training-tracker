@@ -1257,12 +1257,20 @@ function loadState() {
       });
       // Migrate: remove duplicate old-alias exercise entries from sessions
       // (caused by circuit split #100 storing sets under both old and new IDs)
+      // Only applies to circuit-split aliases, NOT superset-split (vb-a2b/vb-a2 are different exercises)
+      var CIRCUIT_SPLIT_ALIASES = {
+        'va-c2-e3': 'va-c1-e3',
+        'va-c2-e4': 'va-c1-e4',
+        'vb-c2-e1': 'vb-c1-e1',
+        'vb-c2-e4': 'vb-c1-e4',
+        'vb-c2-e5': 'vb-c1-e5'
+      };
       var migrated = false;
       (state.sessions || []).forEach(function(session) {
         Object.keys(session.sets || {}).forEach(function(exId) {
           var newId = null;
-          for (var k in EXERCISE_ID_ALIASES) {
-            if (EXERCISE_ID_ALIASES[k] === exId) { newId = k; break; }
+          for (var k in CIRCUIT_SPLIT_ALIASES) {
+            if (CIRCUIT_SPLIT_ALIASES[k] === exId) { newId = k; break; }
           }
           if (newId && session.sets[newId]) {
             // Old alias AND canonical both exist — remove old duplicate
