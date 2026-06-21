@@ -1106,6 +1106,49 @@ const WORKOUT_PLANS = {
       { id: 'rb-a2b', name: 'GHD Situps', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: 'ss-rb-core' },
       { id: 'rb-a3', name: 'Hammer Curls', sets: 3, reps: '10-12', weight: 15, unit: 'kg', bodyweight: false, dumbbell: true, group: null, dropWeight: 10, note: 'DropSet 15+10kg' }
     ]
+  },
+  'rb-outdoor': {
+    id: 'rb-outdoor',
+    name: 'Rueckseite B',
+    subtitle: 'Outdoor',
+    day: 'So',
+    dayIndex: 0,
+    variantOf: 'rb',
+    muscleSplit: { ruecken: 55, hams: 15, bizeps: 10, core: 20 },
+    warmup: [
+      { id: 'rbo-w1', name: 'Iso Aussenrotation R', duration: '30s' },
+      { id: 'rbo-w2', name: 'Iso Aussenrotation L', duration: '30s' },
+      { id: 'rbo-w3', name: 'Iso Innenrotation R', duration: '30s' },
+      { id: 'rbo-w4', name: 'Iso Innenrotation L', duration: '30s' },
+      { id: 'rbo-w5', name: 'Aussenrotation R', duration: '45s' },
+      { id: 'rbo-w6', name: 'Aussenrotation L', duration: '45s' },
+      { id: 'rbo-w7', name: 'Innenrotation R', duration: '45s' },
+      { id: 'rbo-w8', name: 'Innenrotation L', duration: '45s' },
+      { id: 'rbo-w9', name: 'Plank Rotation', duration: '60s' },
+      { id: 'rbo-w10b', name: 'Rev. Planks', duration: '30s' },
+      { id: 'rbo-w10', name: '10 Scapula Pull-ups', duration: '' }
+    ],
+    strength: [
+      { id: 'rbo-s1', name: 'Australian Rows', sets: 10, reps: '8-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0.50, restSeconds: 60, note: '10min EMOM' }
+    ],
+    circuits: [
+      {
+        id: 'rbo-c1',
+        name: 'Zirkel',
+        type: 'EMOM',
+        rounds: 10,
+        restSeconds: 60,
+        exercises: [
+          { id: 'rbo-c1-e1', name: 'Neutral Grip Pull Ups', reps: '5-8', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 1.0 },
+          { id: 'rbo-c1-e2', name: 'Ring Rev Flys', reps: '10-15', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0.25 }
+        ]
+      }
+    ],
+    accessories: [
+      { id: 'rbo-a1', name: 'Hyperextensions', sets: 3, reps: '12-15', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0.50, group: null },
+      { id: 'rbo-a2', name: 'Hammer Curls', sets: 3, reps: '10-12', weight: 15, unit: 'kg', bodyweight: false, dumbbell: true, group: null },
+      { id: 'rbo-a3', name: 'TTB + KTC', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: null }
+    ]
   }
 };
 
@@ -1160,14 +1203,22 @@ const EXERCISE_MUSCLE = {
   'rb-a1b': 'hams',       // GHD Hypers
   'rb-a2': 'core',        // TTB
   'rb-a2b': 'core',       // GHD Situps
-  'rb-a3': 'bizeps'       // Hammer Curls
+  'rb-a3': 'bizeps',      // Hammer Curls
+  // Rueckseite B Outdoor
+  'rbo-s1': 'ruecken',    // Australian Rows
+  'rbo-c1-e1': 'ruecken', // Neutral Grip Pull Ups
+  'rbo-c1-e2': 'ruecken', // Ring Rev Flys
+  'rbo-a1': 'hams',       // Hyperextensions (erectors → hams category)
+  'rbo-a2': 'bizeps',     // Hammer Curls
+  'rbo-a3': 'core'        // TTB + KTC
 };
 
 var WORKOUT_TARGET_MUSCLES = {
   va: ['Brust', 'Beine'],
   vb: ['Beine', 'Brust'],
   ra: ['Rücken', 'Hamstrings'],
-  rb: ['Rücken', 'Hamstrings']
+  rb: ['Rücken', 'Hamstrings'],
+  'rb-outdoor': ['Rücken', 'Hamstrings']
 };
 
 // Sub-muscle group mapping for detailed breakdown (brust + ruecken)
@@ -1195,7 +1246,11 @@ const EXERCISE_SUB_MUSCLE = {
   'rb-c1-e1': 'lats',           // Ring Pull Ups
   'rb-c2-e1': 'oberer_ruecken', // Ring Rev Fly (Rear Delts/Rhomboids)
   'rb-c2-e3': 'beide_ruecken',  // KB Deadlifts (compound → both)
-  'rb-c2-e4': 'lats'            // DB Pullovers (Lats)
+  'rb-c2-e4': 'lats',           // DB Pullovers (Lats)
+  // Rueckseite B Outdoor
+  'rbo-s1': 'oberer_ruecken',   // Australian Rows (horizontal pull → upper back)
+  'rbo-c1-e1': 'lats',          // Neutral Grip Pull Ups (vertical pull → lats)
+  'rbo-c1-e2': 'oberer_ruecken' // Ring Rev Flys (rear delts/rhomboids)
 };
 
 // Sub-muscle config: which sub-groups exist for each muscle, and what 'beide' resolves to
@@ -1214,6 +1269,22 @@ const SUB_MUSCLE_CONFIG = {
 
 // Weekly schedule order
 const WEEK_SCHEDULE = ['va', 'ra', 'vb', 'rb'];
+
+// Workout variants: maps variant ID → base schedule ID
+// Variants count as their base workout for scheduling purposes
+function getBaseWorkoutId(workoutId) {
+  var plan = WORKOUT_PLANS[workoutId];
+  return (plan && plan.variantOf) ? plan.variantOf : workoutId;
+}
+
+// Get all variant IDs for a base workout (including the base itself)
+function getWorkoutVariants(baseId) {
+  var variants = [baseId];
+  Object.keys(WORKOUT_PLANS).forEach(function(id) {
+    if (WORKOUT_PLANS[id].variantOf === baseId) variants.push(id);
+  });
+  return variants;
+}
 
 // =============================================
 // STATE MANAGEMENT
@@ -2293,9 +2364,11 @@ function getWeekDateRange(week) {
 
 function getCurrentWeekWorkoutStatus(workoutId) {
   const cw = APP_STATE.settings.mesocycle.currentWeek;
-  const session = APP_STATE.sessions.find(
-    s => s.workoutId === workoutId && s.week === cw && s.mesocycle === APP_STATE.settings.mesocycle.number
-  );
+  // Check if this workout (or any variant) was done this week
+  var allVariants = getWorkoutVariants(workoutId);
+  const session = APP_STATE.sessions.find(function(s) {
+    return allVariants.indexOf(s.workoutId) !== -1 && s.week === cw && s.mesocycle === APP_STATE.settings.mesocycle.number;
+  });
   if (session) return 'done';
   // Check if this is the next workout
   const doneCount = APP_STATE.sessions.filter(
@@ -2360,6 +2433,33 @@ function navigateTo(page) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.querySelector(`[data-page="${page}"]`).classList.add('active');
   renderPage(page);
+}
+
+// Generic modal
+function showModal(contentHtml) {
+  closeModal();
+  var overlay = document.createElement('div');
+  overlay.id = 'generic-modal';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px';
+  overlay.innerHTML = '<div style="background:var(--card);border-radius:16px;width:100%;max-width:360px">' + contentHtml + '</div>';
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) closeModal(); });
+  document.body.appendChild(overlay);
+}
+function closeModal() {
+  var m = document.getElementById('generic-modal');
+  if (m) m.remove();
+}
+
+// Toast notification
+function showToast(msg) {
+  var existing = document.getElementById('toast-msg');
+  if (existing) existing.remove();
+  var el = document.createElement('div');
+  el.id = 'toast-msg';
+  el.textContent = msg;
+  el.style.cssText = 'position:fixed;bottom:calc(var(--nav-height) + var(--safe-bottom) + 24px);left:50%;transform:translateX(-50%);background:var(--card);color:var(--text);border:1px solid var(--border);padding:10px 20px;border-radius:10px;font-size:13px;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.4);white-space:nowrap';
+  document.body.appendChild(el);
+  setTimeout(function() { el.remove(); }, 3000);
 }
 
 function renderPage(page) {
@@ -2439,7 +2539,7 @@ function renderHomePage() {
     var checkLabels = { brust: 'Brust', ruecken: 'Rücken', quads: 'Quads', hams: 'Hams' };
     var checkColors = { brust: '#E8720C', ruecken: '#4488FF', quads: '#2D7D46', hams: '#9B59B6' };
     // Map workouts to muscles for RPE: va/vb -> brust+quads, ra/rb -> ruecken+hams
-    var muscleWorkoutMap = { brust: ['va','vb'], ruecken: ['ra','rb'], quads: ['va','vb'], hams: ['ra','rb'] };
+    var muscleWorkoutMap = { brust: ['va','vb'], ruecken: ['ra','rb','rb-outdoor'], quads: ['va','vb'], hams: ['ra','rb','rb-outdoor'] };
 
     var tiles = '';
     checkMuscles.forEach(function(m) {
@@ -2780,19 +2880,21 @@ function renderWeekOverview() {
   let workoutRows = '';
   WEEK_SCHEDULE.forEach(wid => {
     const plan = WORKOUT_PLANS[wid];
-    const session = APP_STATE.sessions.find(
-      s => s.workoutId === wid && s.week === selectedWeek && s.mesocycle === meso.number
-    );
+    var allV = getWorkoutVariants(wid);
+    const session = APP_STATE.sessions.find(function(s) {
+      return allV.indexOf(s.workoutId) !== -1 && s.week === selectedWeek && s.mesocycle === meso.number;
+    });
     const isDone = !!session;
     const status = isDone ? 'done' : (selectedWeek === cw ? getCurrentWeekWorkoutStatus(wid) : 'pending');
     const checkHtml = isDone ? ICONS.check : '';
     const volStr = session ? `${Math.round(calcSessionVolume(session) / 1000)}t` : '-';
+    const variantLabel = (session && session.workoutId !== wid) ? ' (Outdoor)' : '';
 
     workoutRows += `
       <div class="workout-row" onclick="openWorkout('${wid}')">
         <div class="workout-status ${status}">${checkHtml}</div>
         <div class="workout-info">
-          <div class="workout-name">${plan.name}</div>
+          <div class="workout-name">${plan.name}${variantLabel}</div>
           <div class="workout-sub">${plan.subtitle} ${isDone ? '- ' + volStr : ''}</div>
         </div>
         <div class="workout-day">${plan.day}</div>
@@ -2844,17 +2946,62 @@ function selectWeek(w) {
 }
 
 function openWorkout(workoutId) {
+  // Check for variants — if this workout has variants, show picker
+  var variants = getWorkoutVariants(workoutId);
+  if (variants.length > 1) {
+    // Check if there's already a completed session (any variant) this week
+    var targetWeek = selectedWeek || APP_STATE.settings.mesocycle.currentWeek;
+    var existingVariant = APP_STATE.sessions.find(function(s) {
+      return variants.indexOf(s.workoutId) !== -1 &&
+             s.week === targetWeek &&
+             s.mesocycle === APP_STATE.settings.mesocycle.number;
+    });
+    if (existingVariant) {
+      // Show the completed session directly
+      doOpenWorkout(existingVariant.workoutId);
+    } else {
+      // Show variant picker
+      showVariantPicker(workoutId, variants);
+    }
+    return;
+  }
+  doOpenWorkout(workoutId);
+}
+
+function showVariantPicker(baseId, variants) {
+  var html = '<div style="padding:20px;text-align:center">';
+  html += '<div style="font-size:18px;font-weight:700;margin-bottom:16px">Variante waehlen</div>';
+  variants.forEach(function(vid) {
+    var plan = WORKOUT_PLANS[vid];
+    var label = plan.name;
+    var sub = plan.subtitle;
+    var isBase = vid === baseId;
+    html += '<div onclick="closeModal();doOpenWorkout(\'' + vid + '\')" style="' +
+      'background:var(--card);border:1px solid ' + (isBase ? 'var(--border)' : 'var(--orange)') + ';' +
+      'border-radius:12px;padding:16px;margin-bottom:10px;cursor:pointer;text-align:left">' +
+      '<div style="font-size:15px;font-weight:600;color:var(--text)">' + label + '</div>' +
+      '<div style="font-size:12px;color:var(--text-sec);margin-top:2px">' + sub + '</div>' +
+      '</div>';
+  });
+  html += '<div onclick="closeModal()" style="margin-top:8px;color:var(--text-sec);font-size:14px;cursor:pointer">Abbrechen</div>';
+  html += '</div>';
+  showModal(html);
+}
+
+function doOpenWorkout(workoutId) {
   activeWorkoutId = workoutId;
   trainingView = 'workout-detail';
   activeSubTab = 'prep';
   warmupChecked = {};
 
   // Check if there's an existing session for this workout in current week
-  const existing = APP_STATE.sessions.find(
-    s => s.workoutId === workoutId &&
-         s.week === (selectedWeek || APP_STATE.settings.mesocycle.currentWeek) &&
-         s.mesocycle === APP_STATE.settings.mesocycle.number
-  );
+  // Also check variants of this workout
+  var allVariants = getWorkoutVariants(getBaseWorkoutId(workoutId));
+  const existing = APP_STATE.sessions.find(function(s) {
+    return s.workoutId === workoutId &&
+           s.week === (selectedWeek || APP_STATE.settings.mesocycle.currentWeek) &&
+           s.mesocycle === APP_STATE.settings.mesocycle.number;
+  });
 
   if (existing) {
     activeSession = JSON.parse(JSON.stringify(existing));
@@ -4501,7 +4648,7 @@ function checkAutoGoals() {
   const w1Sessions = APP_STATE.sessions.filter(
     s => s.week === 1 && s.mesocycle === meso.number
   );
-  const w1WorkoutIds = new Set(w1Sessions.map(s => s.workoutId));
+  const w1WorkoutIds = new Set(w1Sessions.map(s => getBaseWorkoutId(s.workoutId)));
   const allW1Done = WEEK_SCHEDULE.every(wid => w1WorkoutIds.has(wid));
 
   if (!allW1Done) return;
@@ -5358,7 +5505,7 @@ function getTrainingStreak() {
     var weekSessions = APP_STATE.sessions.filter(function(s) {
       return s.week === w && s.mesocycle === meso.number;
     });
-    var workoutIds = new Set(weekSessions.map(function(s) { return s.workoutId; }));
+    var workoutIds = new Set(weekSessions.map(function(s) { return getBaseWorkoutId(s.workoutId); }));
     var allDone = WEEK_SCHEDULE.every(function(wid) { return workoutIds.has(wid); });
     if (allDone) {
       streakWeeks++;
@@ -5375,7 +5522,7 @@ function getTrainingStreak() {
       mesoSessions.forEach(function(s) { if (s.week > maxWeek) maxWeek = s.week; });
       for (var w2 = maxWeek; w2 >= 1; w2--) {
         var ws = mesoSessions.filter(function(s) { return s.week === w2; });
-        var wids = new Set(ws.map(function(s) { return s.workoutId; }));
+        var wids = new Set(ws.map(function(s) { return getBaseWorkoutId(s.workoutId); }));
         if (WEEK_SCHEDULE.every(function(wid) { return wids.has(wid); })) {
           streakWeeks++;
         } else {
