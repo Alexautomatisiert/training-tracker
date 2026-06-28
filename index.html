@@ -90,7 +90,7 @@ a { color: inherit; text-decoration: none; }
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  padding: 16px 16px calc(var(--nav-height) + var(--safe-bottom) + 16px) 16px;
+  padding: 16px 16px calc(var(--nav-height) + var(--safe-bottom) + 24px) 16px;
   padding-top: calc(var(--safe-top) + 16px);
 }
 
@@ -110,14 +110,15 @@ a { color: inherit; text-decoration: none; }
 .bottom-nav {
   position: fixed;
   bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
   width: 100%;
   max-width: 430px;
+  margin: 0 auto;
   display: flex;
   background: #111118;
   border-top: 1px solid var(--border);
-  padding-bottom: var(--safe-bottom);
+  padding-bottom: calc(var(--safe-bottom) + 8px);
   z-index: 100;
 }
 
@@ -934,7 +935,8 @@ const WORKOUT_PLANS = {
     accessories: [
       { id: 'va-a1', name: 'Tricep KB Extensions', sets: 3, reps: '10-12', weight: 16, unit: 'kg', bodyweight: false, group: null, dropWeight: 12, note: 'DropSet 16+12kg' },
       { id: 'va-a2', name: 'DB Lateral Raise', sets: 3, reps: '12-15', weight: 10, unit: 'kg', bodyweight: false, dumbbell: true, group: null, dropWeight: 5, note: 'DropSet 10+5kg' },
-      { id: 'va-a3', name: 'TTB + KTC', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: null }
+      { id: 'va-a3', name: 'TTB', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: 'ss-va-core' },
+      { id: 'va-a3b', name: 'KTC', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: 'ss-va-core' }
     ]
   },
   ra: {
@@ -1017,7 +1019,7 @@ const WORKOUT_PLANS = {
       { id: 'vb-w10', name: '20 Push-ups', duration: '' }
     ],
     strength: [
-      { id: 'vb-s1', name: 'Bulgarian Split Squats', sets: 2, reps: '8-10', weight: 22.5, unit: 'kg', bodyweight: false, dumbbell: true, restSeconds: 120, note: '2x22.5kg DB', bwAdd: 0.65, unilateral: true }
+      { id: 'vb-s1', name: 'Bulgarian Split Squats', sets: 2, reps: '8-10', weight: 22.5, unit: 'kg', bodyweight: false, dumbbell: true, restSeconds: 60, note: '2x22.5kg DB — 1 Min zwischen Beinen', bwAdd: 0.65, unilateral: true }
     ],
     circuits: [
       {
@@ -1048,7 +1050,8 @@ const WORKOUT_PLANS = {
       { id: 'vb-a1', name: 'Tricep KB Extensions', sets: 3, reps: '10-12', weight: 16, unit: 'kg', bodyweight: false, group: null, dropWeight: 12, note: 'DropSet 16+12kg' },
       { id: 'vb-a2', name: 'DB Lou Raises', sets: 3, reps: '12-15', weight: 7.5, unit: 'kg', bodyweight: false, dumbbell: true, group: 'ss-vb-shoulders' },
       { id: 'vb-a2b', name: 'DB Lateral Raise', sets: 3, reps: '12-15', weight: 7.5, unit: 'kg', bodyweight: false, dumbbell: true, group: 'ss-vb-shoulders' },
-      { id: 'vb-a3', name: 'TTB + KTC', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: null }
+      { id: 'vb-a3', name: 'TTB', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: 'ss-vb-core' },
+      { id: 'vb-a3b', name: 'KTC', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: 'ss-vb-core' }
     ]
   },
   rb: {
@@ -1107,6 +1110,139 @@ const WORKOUT_PLANS = {
       { id: 'rb-a3', name: 'Hammer Curls', sets: 3, reps: '10-12', weight: 15, unit: 'kg', bodyweight: false, dumbbell: true, group: null, dropWeight: 10, note: 'DropSet 15+10kg' }
     ]
   },
+  'va-outdoor': {
+    id: 'va-outdoor',
+    name: 'Vorderseite A',
+    subtitle: 'Outdoor',
+    day: 'Mo',
+    dayIndex: 1,
+    variantOf: 'va',
+    muscleSplit: { brust: 40, quads: 25, trizeps: 15, schultern: 20 },
+    warmup: [
+      { id: 'vao-w1', name: 'Iso Aussenrotation R', duration: '30s' },
+      { id: 'vao-w2', name: 'Iso Aussenrotation L', duration: '30s' },
+      { id: 'vao-w3', name: 'Iso Innenrotation R', duration: '30s' },
+      { id: 'vao-w4', name: 'Iso Innenrotation L', duration: '30s' },
+      { id: 'vao-w5', name: 'Aussenrotation R', duration: '45s' },
+      { id: 'vao-w6', name: 'Aussenrotation L', duration: '45s' },
+      { id: 'vao-w7', name: 'Innenrotation R', duration: '45s' },
+      { id: 'vao-w8', name: 'Innenrotation L', duration: '45s' },
+      { id: 'vao-w9', name: 'Plank Rotation', duration: '60s' },
+      { id: 'vao-w10b', name: 'Rev. Planks', duration: '30s' },
+      { id: 'vao-w10', name: '20 Push-ups', duration: '' }
+    ],
+    strength: [
+      { id: 'vao-s1', name: 'Weighted Ring Dips', sets: 10, reps: '6-8', weight: 5, unit: 'kg', bodyweight: false, weightedBW: true, restSeconds: 60, emom: true, emomMinutes: 10, note: 'EMOM 10min BW+5kg' }
+    ],
+    circuits: [
+      {
+        id: 'vao-c1',
+        name: 'Zirkel',
+        type: 'EMOM',
+        rounds: 10,
+        restSeconds: 60,
+        exercises: [
+          { id: 'vao-c1-e1', name: 'Ring Push Ups', reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0.70 },
+          { id: 'vao-c1-e2', name: 'DB Rev. Lunges', reps: '10-12', weight: 22.5, unit: 'kg', bodyweight: false, dumbbell: true, bwAdd: 0.60 }
+        ]
+      }
+    ],
+    accessories: [
+      { id: 'vao-a1', name: 'Tricep KB Extensions', sets: 3, reps: '10-12', weight: 16, unit: 'kg', bodyweight: false, group: null, dropWeight: 12, note: 'DropSet 16+12kg' },
+      { id: 'vao-a2', name: 'DB Lateral Raise', sets: 3, reps: '12-15', weight: 10, unit: 'kg', bodyweight: false, dumbbell: true, group: null, dropWeight: 5, note: 'DropSet 10+5kg' },
+      { id: 'vao-a3', name: 'TTB', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: 'ss-vao-core' },
+      { id: 'vao-a3b', name: 'KTC', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: 'ss-vao-core' }
+    ]
+  },
+  'ra-outdoor': {
+    id: 'ra-outdoor',
+    name: 'Rueckseite A',
+    subtitle: 'Outdoor',
+    day: 'Mi',
+    dayIndex: 3,
+    variantOf: 'ra',
+    muscleSplit: { ruecken: 50, hams: 25, bizeps: 10, core: 15 },
+    warmup: [
+      { id: 'rao-w1', name: 'Iso Aussenrotation R', duration: '30s' },
+      { id: 'rao-w2', name: 'Iso Aussenrotation L', duration: '30s' },
+      { id: 'rao-w3', name: 'Iso Innenrotation R', duration: '30s' },
+      { id: 'rao-w4', name: 'Iso Innenrotation L', duration: '30s' },
+      { id: 'rao-w5', name: 'Aussenrotation R', duration: '45s' },
+      { id: 'rao-w6', name: 'Aussenrotation L', duration: '45s' },
+      { id: 'rao-w7', name: 'Innenrotation R', duration: '45s' },
+      { id: 'rao-w8', name: 'Innenrotation L', duration: '45s' },
+      { id: 'rao-w9', name: 'Plank Rotation', duration: '60s' },
+      { id: 'rao-w10b', name: 'Rev. Planks', duration: '30s' },
+      { id: 'rao-w10', name: '10 Scapula Pull-ups', duration: '' }
+    ],
+    strength: [
+      { id: 'rao-s1', name: 'Australian Rows', sets: 10, reps: '8-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0.50, restSeconds: 60, emom: true, emomMinutes: 10, note: '10min EMOM' }
+    ],
+    circuits: [
+      {
+        id: 'rao-c1',
+        name: 'Zirkel',
+        type: 'EMOM',
+        rounds: 10,
+        restSeconds: 60,
+        exercises: [
+          { id: 'rao-c1-e1', name: 'Pull Ups', reps: '5-8', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 1.0 },
+          { id: 'rao-c1-e2', name: 'Ring Rev Flys', reps: '10-15', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0.25 }
+        ]
+      }
+    ],
+    accessories: [
+      { id: 'rao-a1', name: 'Hyperextensions', sets: 3, reps: '12-15', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0.50, group: null },
+      { id: 'rao-a2', name: 'African Curls', sets: 3, reps: '10-12', weight: 12.5, unit: 'kg', bodyweight: false, group: null, dropWeight: 7.5, note: 'DropSet 12.5+7.5kg' },
+      { id: 'rao-a3', name: 'TTB', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: 'ss-rao-core' },
+      { id: 'rao-a3b', name: 'KTC', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: 'ss-rao-core' }
+    ]
+  },
+  'vb-outdoor': {
+    id: 'vb-outdoor',
+    name: 'Vorderseite B',
+    subtitle: 'Outdoor',
+    day: 'Fr',
+    dayIndex: 5,
+    variantOf: 'vb',
+    muscleSplit: { quads: 40, brust: 25, trizeps: 15, schultern: 20 },
+    warmup: [
+      { id: 'vbo-w1', name: 'Iso Aussenrotation R', duration: '30s' },
+      { id: 'vbo-w2', name: 'Iso Aussenrotation L', duration: '30s' },
+      { id: 'vbo-w3', name: 'Iso Innenrotation R', duration: '30s' },
+      { id: 'vbo-w4', name: 'Iso Innenrotation L', duration: '30s' },
+      { id: 'vbo-w5', name: 'Aussenrotation R', duration: '45s' },
+      { id: 'vbo-w6', name: 'Aussenrotation L', duration: '45s' },
+      { id: 'vbo-w7', name: 'Innenrotation R', duration: '45s' },
+      { id: 'vbo-w8', name: 'Innenrotation L', duration: '45s' },
+      { id: 'vbo-w9', name: 'Plank Rotation', duration: '60s' },
+      { id: 'vbo-w10b', name: 'Rev. Planks', duration: '30s' },
+      { id: 'vbo-w10', name: '20 Push-ups', duration: '' }
+    ],
+    strength: [
+      { id: 'vbo-s1', name: 'Bulgarian Split Squats', sets: 2, reps: '8-10', weight: 22.5, unit: 'kg', bodyweight: false, dumbbell: true, restSeconds: 60, note: '2x22.5kg DB — 1 Min zwischen Beinen', bwAdd: 0.65, unilateral: true }
+    ],
+    circuits: [
+      {
+        id: 'vbo-c1',
+        name: 'Zirkel',
+        type: 'EMOM',
+        rounds: 10,
+        restSeconds: 60,
+        exercises: [
+          { id: 'vbo-c1-e1', name: 'Ring Push Ups', reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0.70 },
+          { id: 'vbo-c1-e2', name: 'DB Walking Lunges', reps: '12-15', weight: 20, unit: 'kg', bodyweight: false, dumbbell: true, bwAdd: 0.60 }
+        ]
+      }
+    ],
+    accessories: [
+      { id: 'vbo-a1', name: 'Tricep KB Extensions', sets: 3, reps: '10-12', weight: 16, unit: 'kg', bodyweight: false, group: null, dropWeight: 12, note: 'DropSet 16+12kg' },
+      { id: 'vbo-a2', name: 'DB Lou Raises', sets: 3, reps: '12-15', weight: 7.5, unit: 'kg', bodyweight: false, dumbbell: true, group: 'ss-vbo-shoulders' },
+      { id: 'vbo-a2b', name: 'DB Lateral Raise', sets: 3, reps: '12-15', weight: 7.5, unit: 'kg', bodyweight: false, dumbbell: true, group: 'ss-vbo-shoulders' },
+      { id: 'vbo-a3', name: 'TTB', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: 'ss-vbo-core' },
+      { id: 'vbo-a3b', name: 'KTC', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: 'ss-vbo-core' }
+    ]
+  },
   'rb-outdoor': {
     id: 'rb-outdoor',
     name: 'Rueckseite B',
@@ -1147,7 +1283,8 @@ const WORKOUT_PLANS = {
     accessories: [
       { id: 'rbo-a1', name: 'Hyperextensions', sets: 3, reps: '12-15', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0.50, group: null },
       { id: 'rbo-a2', name: 'Hammer Curls', sets: 3, reps: '10-12', weight: 15, unit: 'kg', bodyweight: false, dumbbell: true, group: null },
-      { id: 'rbo-a3', name: 'TTB + KTC', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: null }
+      { id: 'rbo-a3', name: 'TTB', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: 'ss-rbo-core' },
+      { id: 'rbo-a3b', name: 'KTC', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: 'ss-rbo-core' }
     ]
   }
 };
@@ -1210,7 +1347,35 @@ const EXERCISE_MUSCLE = {
   'rbo-c1-e2': 'ruecken', // Ring Rev Flys
   'rbo-a1': 'hams',       // Hyperextensions (erectors → hams category)
   'rbo-a2': 'bizeps',     // Hammer Curls
-  'rbo-a3': 'core'        // TTB + KTC
+  'rbo-a3': 'core',       // TTB
+  'rbo-a3b': 'core',      // KTC
+  'va-a3b': 'core',       // KTC (VA)
+  'vb-a3b': 'core',       // KTC (VB)
+  // Vorderseite A Outdoor
+  'vao-s1': 'brust',      // Weighted Ring Dips
+  'vao-c1-e1': 'brust',   // Ring Push Ups
+  'vao-c1-e2': 'quads',   // DB Rev. Lunges
+  'vao-a1': 'trizeps',    // Tricep KB Extensions
+  'vao-a2': 'schultern',  // DB Lateral Raise
+  'vao-a3': 'core',       // TTB
+  'vao-a3b': 'core',      // KTC
+  // Rueckseite A Outdoor
+  'rao-s1': 'ruecken',    // Australian Rows
+  'rao-c1-e1': 'ruecken', // Pull Ups
+  'rao-c1-e2': 'ruecken', // Ring Rev Flys
+  'rao-a1': 'hams',       // Hyperextensions
+  'rao-a2': 'bizeps',     // African Curls
+  'rao-a3': 'core',       // TTB
+  'rao-a3b': 'core',      // KTC
+  // Vorderseite B Outdoor
+  'vbo-s1': 'quads',      // Bulgarian Split Squats
+  'vbo-c1-e1': 'brust',   // Ring Push Ups
+  'vbo-c1-e2': 'quads',   // DB Walking Lunges
+  'vbo-a1': 'trizeps',    // Tricep KB Extensions
+  'vbo-a2': 'schultern',  // DB Lou Raises
+  'vbo-a2b': 'schultern', // DB Lateral Raise
+  'vbo-a3': 'core',       // TTB
+  'vbo-a3b': 'core'       // KTC
 };
 
 var WORKOUT_TARGET_MUSCLES = {
@@ -1218,6 +1383,9 @@ var WORKOUT_TARGET_MUSCLES = {
   vb: ['Beine', 'Brust'],
   ra: ['Rücken', 'Hamstrings'],
   rb: ['Rücken', 'Hamstrings'],
+  'va-outdoor': ['Brust', 'Beine'],
+  'ra-outdoor': ['Rücken', 'Hamstrings'],
+  'vb-outdoor': ['Beine', 'Brust'],
   'rb-outdoor': ['Rücken', 'Hamstrings']
 };
 
@@ -1250,7 +1418,16 @@ const EXERCISE_SUB_MUSCLE = {
   // Rueckseite B Outdoor
   'rbo-s1': 'oberer_ruecken',   // Australian Rows (horizontal pull → upper back)
   'rbo-c1-e1': 'lats',          // Neutral Grip Pull Ups (vertical pull → lats)
-  'rbo-c1-e2': 'oberer_ruecken' // Ring Rev Flys (rear delts/rhomboids)
+  'rbo-c1-e2': 'oberer_ruecken', // Ring Rev Flys (rear delts/rhomboids)
+  // Vorderseite A Outdoor
+  'vao-s1': 'untere_brust',     // Weighted Ring Dips
+  'vao-c1-e1': 'beide_brust',   // Ring Push Ups
+  // Rueckseite A Outdoor
+  'rao-s1': 'oberer_ruecken',   // Australian Rows
+  'rao-c1-e1': 'lats',          // Pull Ups
+  'rao-c1-e2': 'oberer_ruecken',// Ring Rev Flys
+  // Vorderseite B Outdoor
+  'vbo-c1-e1': 'beide_brust',   // Ring Push Ups
 };
 
 // Sub-muscle config: which sub-groups exist for each muscle, and what 'beide' resolves to
@@ -1514,24 +1691,31 @@ function detectAllPRs(sessions) {
 
 function checkPR(exerciseId, weight, reps, setIndex) {
   const volume = weight * reps;
+  if (volume <= 0) return false;
   let best = 0;
+  let found = false;
   APP_STATE.sessions.forEach(s => {
     const sets = s.sets[exerciseId] || [];
     if (typeof setIndex === 'number' && setIndex >= 0) {
       // Compare against same set index from previous sessions
       if (sets[setIndex]) {
+        found = true;
         const v = sets[setIndex].weight * sets[setIndex].reps;
         if (v > best) best = v;
       }
     } else {
       // Fallback: compare against all sets
       sets.forEach(set => {
+        found = true;
         const v = set.weight * set.reps;
         if (v > best) best = v;
       });
     }
   });
-  return volume > best && best > 0;
+  // PR if we beat previous best, OR if this is the very first time at this set index
+  // (but only if there are previous sessions with this exercise at all)
+  if (!found) return false;
+  return volume > best;
 }
 
 // Reverse alias lookup: given an old exercise ID, find the current ID
@@ -2356,6 +2540,25 @@ function getLastSessionSets(exerciseId) {
   if (alias) {
     for (const s of sorted) {
       if (s.sets[alias]) return s.sets[alias];
+    }
+  }
+  // Fallback 2: check variant workouts for same exercise name
+  if (activeWorkoutId) {
+    var exInfo = getExerciseInfo(exerciseId);
+    if (exInfo) {
+      var variants = getWorkoutVariants(getBaseWorkoutId(activeWorkoutId));
+      for (var vi = 0; vi < variants.length; vi++) {
+        var vPlan = WORKOUT_PLANS[variants[vi]];
+        if (!vPlan) continue;
+        var allEx = (vPlan.strength || []).concat(vPlan.accessories || []);
+        for (var ei = 0; ei < allEx.length; ei++) {
+          if (allEx[ei].id !== exerciseId && allEx[ei].name === exInfo.name) {
+            for (var si = 0; si < sorted.length; si++) {
+              if (sorted[si].sets[allEx[ei].id]) return sorted[si].sets[allEx[ei].id];
+            }
+          }
+        }
+      }
     }
   }
   return null;
@@ -3421,26 +3624,24 @@ function renderStrengthTab(plan) {
     const isEMOM = !!ex.emom;
     const dbLabel = ex.dumbbell ? ' (pro DB)' : '';
 
-    // Build subtitle line
-    let subtitleText = '';
+    // Build target range tag
+    let targetTag = '';
     if (isEMOM) {
-      subtitleText = `EMOM ${ex.emomMinutes}min @ ${ex.weight}kg${dbLabel}`;
+      targetTag = `EMOM ${ex.emomMinutes}min`;
     } else if (hasPyramid) {
-      subtitleText = `Pyramid ${ex.sets}x${ex.reps} | ${ex.pyramidWeights.join('-')}kg${dbLabel}`;
-    } else if (ex.pyramidWeights && ex.pyramidWeights.length === ex.sets) {
-      subtitleText = `${ex.sets}x${ex.reps} | ${ex.pyramidWeights.join('-')}kg${dbLabel}`;
+      targetTag = `${ex.sets}x${ex.reps}`;
     } else {
-      subtitleText = `${ex.sets}x${ex.reps} @ ${ex.weight}kg${dbLabel}`;
+      targetTag = `${ex.sets}x${ex.reps}`;
     }
-    // Only append note if it adds new info (skip if EMOM/pyramid already says it all)
-    if (ex.note && !isEMOM && !hasPyramid) subtitleText += ` (${ex.note})`;
 
     html += `<div class="exercise-card">
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <div class="exercise-name">${ex.name}</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="exercise-name" style="margin:0">${ex.name}</div>
+          <span style="font-size:11px;color:var(--orange);background:rgba(232,114,12,0.12);padding:2px 6px;border-radius:4px;white-space:nowrap">${targetTag}</span>
+        </div>
         <button id="peek-icon-${ex.id}" onclick="event.stopPropagation();toggleHistoryPeek('${ex.id}')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 6px;font-size:12px;color:var(--text-ter);cursor:pointer">📊</button>
       </div>
-      <div class="exercise-last">${subtitleText}${lastStr ? ' | Letztes Mal: ' + lastStr : ''}</div>
       <div id="peek-${ex.id}" style="display:none">${renderHistoryPeek(ex.id)}</div>`;
 
     // To Beat display
@@ -4878,46 +5079,90 @@ function renderDoneTab(plan) {
     prHtml += '</div>';
   }
 
-  // Compare with last session — per muscle group
+  // Compare with last session — expandable per muscle → exercise → sets
   const allVariants = getWorkoutVariants(getBaseWorkoutId(session.workoutId));
   const lastSession = APP_STATE.sessions.find(
     s => allVariants.indexOf(s.workoutId) !== -1 && s.id !== session.id && s.date < session.date
   );
   let improvHtml = '';
   if (lastSession) {
-    // Calculate last session muscles
-    var lastMuscles = {};
-    Object.entries(lastSession.sets || {}).forEach(function(entry) {
+    // Build per-exercise comparison data grouped by muscle
+    var muscleExercises = {}; // { muscle: [{ exId, name, curSets, lastSets, curVol, lastVol }] }
+    Object.entries(session.sets || {}).forEach(function(entry) {
       var exId = entry[0], sets = entry[1];
       var resolved = resolveExerciseId(exId);
-      if (resolved && lastSession.sets[resolved]) return;
+      if (resolved && session.sets[resolved]) return;
       var muscle = EXERCISE_MUSCLE[exId];
       if (!muscle) return;
       var exInfo = getExerciseInfo(exId);
       if (exInfo && exInfo.noVolume) return;
-      if (!lastMuscles[muscle]) lastMuscles[muscle] = 0;
-      sets.forEach(function(set) {
-        lastMuscles[muscle] += getVolumeWeight(exId, Number(set.weight) || 0) * (Number(set.reps) || 0) * getRepMultiplier(exId);
-      });
+      var exName = getExerciseName(exId) || exId;
+      var curVol = 0;
+      sets.forEach(function(s) { curVol += getVolumeWeight(exId, Number(s.weight)||0) * (Number(s.reps)||0) * getRepMultiplier(exId); });
+      var lastSets = lastSession.sets[exId] || [];
+      var lastVol = 0;
+      lastSets.forEach(function(s) { lastVol += getVolumeWeight(exId, Number(s.weight)||0) * (Number(s.reps)||0) * getRepMultiplier(exId); });
+      if (!muscleExercises[muscle]) muscleExercises[muscle] = [];
+      muscleExercises[muscle].push({ exId: exId, name: exName, curSets: sets, lastSets: lastSets, curVol: curVol, lastVol: lastVol });
     });
 
     var muscleRows = '';
-    Object.entries(sessionMuscles).forEach(function(entry) {
-      var muscle = entry[0], data = entry[1];
-      var lastVol = lastMuscles[muscle] || 0;
-      var change = data.vol - lastVol;
-      var pct = lastVol > 0 ? Math.round(change / lastVol * 100) : (data.vol > 0 ? 100 : 0);
-      var cls = change >= 0 ? 'up' : 'down';
-      var sign = change >= 0 ? '+' : '';
-      muscleRows += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">' +
-        '<span style="font-size:13px">' + (muscleLabels[muscle] || muscle) + '</span>' +
-        '<span class="volume-change ' + cls + '" style="font-size:13px">' + sign + pct + '% (' + sign + (change/1000).toFixed(1) + 't)</span>' +
+    var totalCurVol = 0, totalLastVol = 0;
+    Object.entries(muscleExercises).forEach(function(entry) {
+      var muscle = entry[0], exercises = entry[1];
+      var mCurVol = 0, mLastVol = 0;
+      exercises.forEach(function(e) { mCurVol += e.curVol; mLastVol += e.lastVol; });
+      totalCurVol += mCurVol; totalLastVol += mLastVol;
+      var mChange = mCurVol - mLastVol;
+      var mPct = mLastVol > 0 ? Math.round(mChange / mLastVol * 100) : (mCurVol > 0 ? 100 : 0);
+      var mCls = mChange >= 0 ? 'up' : 'down';
+      var mSign = mChange >= 0 ? '+' : '';
+      var muscleId = 'done-muscle-' + muscle;
+
+      // Exercise details (hidden by default)
+      var exRows = '';
+      exercises.forEach(function(e) {
+        var eChange = e.curVol - e.lastVol;
+        var ePct = e.lastVol > 0 ? Math.round(eChange / e.lastVol * 100) : (e.curVol > 0 ? 100 : 0);
+        var eCls = eChange >= 0 ? 'up' : 'down';
+        var eSign = eChange >= 0 ? '+' : '';
+        var exDetailId = 'done-ex-' + e.exId;
+
+        // Per-set comparison
+        var setRows = '';
+        var maxLen = Math.max(e.curSets.length, e.lastSets.length);
+        for (var si = 0; si < maxLen; si++) {
+          var cur = e.curSets[si];
+          var last = e.lastSets[si];
+          var curStr = cur ? cur.weight + 'kg×' + cur.reps : '–';
+          var lastStr = last ? last.weight + 'kg×' + last.reps : '–';
+          var repDiff = (cur && last) ? cur.reps - last.reps : 0;
+          var diffStr = repDiff !== 0 ? '<span style="color:' + (repDiff > 0 ? 'var(--green)' : 'var(--red)') + ';font-size:11px;margin-left:4px">' + (repDiff > 0 ? '+' : '') + repDiff + '</span>' : '';
+          setRows += '<div style="display:flex;justify-content:space-between;padding:2px 0 2px 16px;font-size:11px;color:var(--text-ter)">' +
+            '<span>S' + (si+1) + (cur && cur.type === 'drop' ? ' Drop' : '') + '</span>' +
+            '<span>' + curStr + ' vs ' + lastStr + diffStr + '</span></div>';
+        }
+
+        exRows += '<div style="padding:3px 0 3px 12px;border-bottom:1px solid var(--border)">' +
+          '<div onclick="document.getElementById(\'' + exDetailId + '\').style.display=document.getElementById(\'' + exDetailId + '\').style.display===\'none\'?\'block\':\'none\'" style="display:flex;justify-content:space-between;cursor:pointer;padding:2px 0">' +
+            '<span style="font-size:12px;color:var(--text-sec)">' + e.name + '</span>' +
+            '<span class="volume-change ' + eCls + '" style="font-size:12px">' + eSign + ePct + '%</span>' +
+          '</div>' +
+          '<div id="' + exDetailId + '" style="display:none">' + setRows + '</div>' +
+        '</div>';
+      });
+
+      muscleRows += '<div style="border-bottom:1px solid var(--border)">' +
+        '<div onclick="document.getElementById(\'' + muscleId + '\').style.display=document.getElementById(\'' + muscleId + '\').style.display===\'none\'?\'block\':\'none\'" style="display:flex;justify-content:space-between;padding:6px 0;cursor:pointer">' +
+          '<span style="font-size:13px;font-weight:600">' + (muscleLabels[muscle] || muscle) + ' ▸</span>' +
+          '<span class="volume-change ' + mCls + '" style="font-size:13px">' + mSign + mPct + '% (' + mSign + (mChange/1000).toFixed(1) + 't)</span>' +
+        '</div>' +
+        '<div id="' + muscleId + '" style="display:none">' + exRows + '</div>' +
       '</div>';
     });
 
-    var totalLast = calcSessionVolume(lastSession);
-    var totalChange = totalVol - totalLast;
-    var totalPct = totalLast > 0 ? Math.round(totalChange / totalLast * 100) : 0;
+    var totalChange = totalCurVol - totalLastVol;
+    var totalPct = totalLastVol > 0 ? Math.round(totalChange / totalLastVol * 100) : 0;
     var totalSign = totalChange >= 0 ? '+' : '';
     var totalCls = totalChange >= 0 ? 'up' : 'down';
 
@@ -4959,6 +5204,50 @@ function renderDoneTab(plan) {
     <div class="done-stats">${statsBoxes}</div>
 
     ${prHtml}
+
+    ${(function() {
+      var wplan = WORKOUT_PLANS[session.workoutId];
+      if (!wplan) return '';
+      var sections = [];
+      // Strength
+      if (wplan.strength && wplan.strength.length > 0) {
+        var sHtml = '';
+        wplan.strength.forEach(function(ex) {
+          var sets = session.sets[ex.id] || [];
+          if (sets.length === 0) return;
+          var setsStr = sets.map(function(s, i) {
+            return '<span style="color:' + (s.type === 'drop' ? 'var(--orange)' : 'var(--text-sec)') + '">' + s.weight + 'kg×' + s.reps + (s.type === 'drop' ? 'D' : '') + '</span>';
+          }).join(' · ');
+          sHtml += '<div style="padding:4px 0;border-bottom:1px solid var(--border)"><div style="font-size:12px;font-weight:600">' + ex.name + '</div><div style="font-size:11px;margin-top:2px">' + setsStr + '</div></div>';
+        });
+        if (sHtml) sections.push({ label: 'Strength', html: sHtml });
+      }
+      // Circuits
+      if (wplan.circuits) wplan.circuits.forEach(function(c) {
+        var rounds = session.circuitRounds && session.circuitRounds[c.id] ? session.circuitRounds[c.id] : [];
+        if (rounds.length === 0) return;
+        var cHtml = '<div style="font-size:11px;color:var(--text-ter);padding:2px 0">' + rounds.length + ' Runden</div>';
+        sections.push({ label: c.name, html: cHtml });
+      });
+      // Accessories
+      if (wplan.accessories && wplan.accessories.length > 0) {
+        var aHtml = '';
+        wplan.accessories.forEach(function(ex) {
+          var sets = session.sets[ex.id] || [];
+          if (sets.length === 0) return;
+          var setsStr = sets.map(function(s) {
+            return '<span style="color:' + (s.type === 'drop' ? 'var(--orange)' : 'var(--text-sec)') + '">' + s.weight + 'kg×' + s.reps + (s.type === 'drop' ? 'D' : '') + '</span>';
+          }).join(' · ');
+          aHtml += '<div style="padding:4px 0;border-bottom:1px solid var(--border)"><div style="font-size:12px;font-weight:600">' + ex.name + '</div><div style="font-size:11px;margin-top:2px">' + setsStr + '</div></div>';
+        });
+        if (aHtml) sections.push({ label: 'Accessories', html: aHtml });
+      }
+      if (sections.length === 0) return '';
+      var allSections = sections.map(function(sec) {
+        return '<div style="margin-top:8px"><div style="font-size:11px;color:var(--orange);font-weight:600;text-transform:uppercase;margin-bottom:4px">' + sec.label + '</div>' + sec.html + '</div>';
+      }).join('');
+      return '<div class="card"><div onclick="var el=document.getElementById(\'done-ex-overview\');el.style.display=el.style.display===\'none\'?\'block\':\'none\'" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center"><h3>Uebersicht</h3><span style="font-size:12px;color:var(--text-ter)">▸</span></div><div id="done-ex-overview" style="display:none">' + allSections + '</div></div>';
+    })()}
 
     ${improvHtml}
 
@@ -5553,18 +5842,20 @@ function renderHistoryPeek(exId) {
   var html = '<div style="padding:6px 0">';
   sessions.forEach(function(s, i) {
     var sets = getSessionSetsForEx(s, exId);
-    var bestSet = null, best1RM = 0;
-    sets.forEach(function(set) {
-      var est = estimate1RM(set, ex);
-      if (est > best1RM) { best1RM = est; bestSet = set; }
-    });
-    if (!bestSet) return;
-    var wLabel = isBW ? 'BW' : isDbl ? bestSet.weight + 'kg/DB' : isWBW ? '+' + bestSet.weight + 'kg' : bestSet.weight + 'kg';
+    if (!sets || sets.length === 0) return;
     var dateStr = s.date ? s.date.substring(5).replace('-', '.') : '?';
     var isLast = i === sessions.length - 1;
-    html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;font-size:11px;color:' + (isLast ? 'var(--orange)' : 'var(--text-ter)') + ';font-weight:' + (isLast ? '600' : '400') + '">' +
-      '<span>' + dateStr + ' · W' + (s.week || '?') + '</span>' +
-      '<span>' + wLabel + ' × ' + bestSet.reps + ' (' + sets.length + ' sets)</span></div>';
+    var color = isLast ? 'var(--orange)' : 'var(--text-ter)';
+    var fw = isLast ? '600' : '400';
+    // Show all sets in compact format
+    var setsStr = sets.map(function(set) {
+      var w = isBW ? 'BW' : isDbl ? set.weight + '/DB' : isWBW ? '+' + set.weight : set.weight + 'kg';
+      var dropTag = set.type === 'drop' ? 'D' : '';
+      return w + '×' + set.reps + dropTag;
+    }).join(' · ');
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;font-size:11px;color:' + color + ';font-weight:' + fw + '">' +
+      '<span>' + dateStr + ' W' + (s.week || '?') + '</span>' +
+      '<span style="text-align:right">' + setsStr + '</span></div>';
   });
   html += '</div>';
   return html;
@@ -6494,7 +6785,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '6.5';
+const APP_VERSION = '6.6';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
