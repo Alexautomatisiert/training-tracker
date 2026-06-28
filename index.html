@@ -1193,7 +1193,7 @@ const WORKOUT_PLANS = {
     ],
     accessories: [
       { id: 'rao-a1', name: 'Hyperextensions', sets: 3, reps: '12-15', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0.50, group: null },
-      { id: 'rao-a2', name: 'African Curls', sets: 3, reps: '10-12', weight: 12.5, unit: 'kg', bodyweight: false, group: null, dropWeight: 7.5, note: 'DropSet 12.5+7.5kg' },
+      { id: 'rao-a2', name: 'Towel KB Hammer Curls', sets: 3, reps: '10-12', weight: 16, unit: 'kg', bodyweight: false, group: null },
       { id: 'rao-a3', name: 'TTB', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: 'ss-rao-core' },
       { id: 'rao-a3b', name: 'KTC', sets: 3, reps: '10-12', weight: 0, unit: 'kg', bodyweight: true, bwFraction: 0, group: 'ss-rao-core' }
     ]
@@ -1364,7 +1364,7 @@ const EXERCISE_MUSCLE = {
   'rao-c1-e1': 'ruecken', // Pull Ups
   'rao-c1-e2': 'ruecken', // Ring Rev Flys
   'rao-a1': 'hams',       // Hyperextensions
-  'rao-a2': 'bizeps',     // African Curls
+  'rao-a2': 'bizeps',     // Towel KB Hammer Curls
   'rao-a3': 'core',       // TTB
   'rao-a3b': 'core',      // KTC
   // Vorderseite B Outdoor
@@ -2542,22 +2542,22 @@ function getLastSessionSets(exerciseId) {
       if (s.sets[alias]) return s.sets[alias];
     }
   }
-  // Fallback 2: check variant workouts for same exercise name
-  if (activeWorkoutId) {
-    var exInfo = getExerciseInfo(exerciseId);
-    if (exInfo) {
-      var variants = getWorkoutVariants(getBaseWorkoutId(activeWorkoutId));
-      for (var vi = 0; vi < variants.length; vi++) {
-        var vPlan = WORKOUT_PLANS[variants[vi]];
-        if (!vPlan) continue;
-        var allEx = (vPlan.strength || []).concat(vPlan.accessories || []);
-        for (var ei = 0; ei < allEx.length; ei++) {
-          if (allEx[ei].id !== exerciseId && allEx[ei].name === exInfo.name) {
-            for (var si = 0; si < sorted.length; si++) {
-              if (sorted[si].sets[allEx[ei].id]) return sorted[si].sets[allEx[ei].id];
-            }
-          }
+  // Fallback 2: check ALL workouts for same exercise name (cross-variant support)
+  var exInfo = getExerciseInfo(exerciseId);
+  if (exInfo) {
+    var matchIds = [];
+    Object.keys(WORKOUT_PLANS).forEach(function(wid) {
+      var wp = WORKOUT_PLANS[wid];
+      var allEx = (wp.strength || []).concat(wp.accessories || []);
+      allEx.forEach(function(e) {
+        if (e.id !== exerciseId && e.name === exInfo.name && matchIds.indexOf(e.id) === -1) {
+          matchIds.push(e.id);
         }
+      });
+    });
+    for (var mi = 0; mi < matchIds.length; mi++) {
+      for (var si = 0; si < sorted.length; si++) {
+        if (sorted[si].sets[matchIds[mi]]) return sorted[si].sets[matchIds[mi]];
       }
     }
   }
@@ -4570,14 +4570,17 @@ function finishAccSet(exId, isBW) {
   activeSession.sets[exId].push({ weight, reps, type: 'working' });
   const workingSetIdx = activeSession.sets[exId].length - 1;
 
-  // Check for drop set
-  const dropWeightEl = document.getElementById('adw-' + exId);
-  const dropRepsEl = document.getElementById('adr-' + exId);
-  if (dropWeightEl && dropRepsEl) {
-    const dw = parseFloat((dropWeightEl.value || '0').replace(',', '.')) || 0;
-    const dr = parseInt(dropRepsEl.value) || 0;
-    if (dw > 0 && dr > 0) {
-      activeSession.sets[exId].push({ weight: dw, reps: dr, type: 'drop' });
+  // Check for drop set — only if the drop row is visible
+  const dropRow = document.getElementById('acc-drop-row-' + exId);
+  if (dropRow && dropRow.style.display !== 'none') {
+    const dropWeightEl = document.getElementById('adw-' + exId);
+    const dropRepsEl = document.getElementById('adr-' + exId);
+    if (dropWeightEl && dropRepsEl) {
+      const dw = parseFloat((dropWeightEl.value || '0').replace(',', '.')) || 0;
+      const dr = parseInt(dropRepsEl.value) || 0;
+      if (dw > 0 && dr > 0) {
+        activeSession.sets[exId].push({ weight: dw, reps: dr, type: 'drop' });
+      }
     }
   }
 
@@ -5081,9 +5084,24 @@ function renderDoneTab(plan) {
 
   // Compare with last session — expandable per muscle → exercise → sets
   const allVariants = getWorkoutVariants(getBaseWorkoutId(session.workoutId));
-  const lastSession = APP_STATE.sessions.find(
+  var lastSession = APP_STATE.sessions.find(
     s => allVariants.indexOf(s.workoutId) !== -1 && s.id !== session.id && s.date < session.date
   );
+  // Fallback: if no variant-match, find any session with overlapping exercise names
+  if (!lastSession) {
+    var curPlan = WORKOUT_PLANS[session.workoutId];
+    if (curPlan) {
+      var curExNames = (curPlan.strength||[]).concat(curPlan.accessories||[]).map(function(e){return e.name;});
+      var sorted = [...APP_STATE.sessions].filter(function(s){return s.id !== session.id && s.date < session.date;}).sort(function(a,b){return b.date.localeCompare(a.date);});
+      for (var fi = 0; fi < sorted.length; fi++) {
+        var sPlan = WORKOUT_PLANS[sorted[fi].workoutId];
+        if (!sPlan) continue;
+        var sExNames = (sPlan.strength||[]).concat(sPlan.accessories||[]).map(function(e){return e.name;});
+        var overlap = curExNames.filter(function(n){return sExNames.indexOf(n) !== -1;}).length;
+        if (overlap >= 2) { lastSession = sorted[fi]; break; }
+      }
+    }
+  }
   let improvHtml = '';
   if (lastSession) {
     // Build per-exercise comparison data grouped by muscle
@@ -5099,9 +5117,24 @@ function renderDoneTab(plan) {
       var exName = getExerciseName(exId) || exId;
       var curVol = 0;
       sets.forEach(function(s) { curVol += getVolumeWeight(exId, Number(s.weight)||0) * (Number(s.reps)||0) * getRepMultiplier(exId); });
+      // Find matching sets in lastSession (by ID, alias, or exercise name)
       var lastSets = lastSession.sets[exId] || [];
+      if (lastSets.length === 0) {
+        // Try alias
+        var aliasId = EXERCISE_ID_ALIASES[exId];
+        if (aliasId && lastSession.sets[aliasId]) lastSets = lastSession.sets[aliasId];
+      }
+      if (lastSets.length === 0 && exName) {
+        // Try matching by exercise name across all exercises in lastSession
+        Object.keys(lastSession.sets).forEach(function(lsExId) {
+          if (lastSets.length > 0) return;
+          var lsName = getExerciseName(lsExId);
+          if (lsName === exName) lastSets = lastSession.sets[lsExId];
+        });
+      }
       var lastVol = 0;
-      lastSets.forEach(function(s) { lastVol += getVolumeWeight(exId, Number(s.weight)||0) * (Number(s.reps)||0) * getRepMultiplier(exId); });
+      var lastExId = exId; // for volume calc use current exercise's properties
+      lastSets.forEach(function(s) { lastVol += getVolumeWeight(lastExId, Number(s.weight)||0) * (Number(s.reps)||0) * getRepMultiplier(lastExId); });
       if (!muscleExercises[muscle]) muscleExercises[muscle] = [];
       muscleExercises[muscle].push({ exId: exId, name: exName, curSets: sets, lastSets: lastSets, curVol: curVol, lastVol: lastVol });
     });
@@ -5224,9 +5257,17 @@ function renderDoneTab(plan) {
       }
       // Circuits
       if (wplan.circuits) wplan.circuits.forEach(function(c) {
-        var rounds = session.circuitRounds && session.circuitRounds[c.id] ? session.circuitRounds[c.id] : [];
-        if (rounds.length === 0) return;
-        var cHtml = '<div style="font-size:11px;color:var(--text-ter);padding:2px 0">' + rounds.length + ' Runden</div>';
+        var roundCount = session.circuitRounds && session.circuitRounds[c.id] ? session.circuitRounds[c.id] : 0;
+        if (roundCount === 0) return;
+        var cHtml = '<div style="font-size:11px;color:var(--text-ter);padding:2px 0;margin-bottom:4px">' + roundCount + ' Runden</div>';
+        c.exercises.forEach(function(cex) {
+          var csets = session.sets[cex.id] || [];
+          if (csets.length === 0) return;
+          var csetsStr = csets.map(function(s) {
+            return '<span style="color:var(--text-sec)">' + s.weight + 'kg×' + s.reps + '</span>';
+          }).join(' · ');
+          cHtml += '<div style="padding:3px 0;border-bottom:1px solid var(--border)"><div style="font-size:12px;font-weight:600">' + cex.name + '</div><div style="font-size:11px;margin-top:2px">' + csetsStr + '</div></div>';
+        });
         sections.push({ label: c.name, html: cHtml });
       });
       // Accessories
@@ -5246,7 +5287,7 @@ function renderDoneTab(plan) {
       var allSections = sections.map(function(sec) {
         return '<div style="margin-top:8px"><div style="font-size:11px;color:var(--orange);font-weight:600;text-transform:uppercase;margin-bottom:4px">' + sec.label + '</div>' + sec.html + '</div>';
       }).join('');
-      return '<div class="card"><div onclick="var el=document.getElementById(\'done-ex-overview\');el.style.display=el.style.display===\'none\'?\'block\':\'none\'" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center"><h3>Uebersicht</h3><span style="font-size:12px;color:var(--text-ter)">▸</span></div><div id="done-ex-overview" style="display:none">' + allSections + '</div></div>';
+      return '<div class="card"><div onclick="var el=document.getElementById(\'done-ex-overview\');el.style.display=el.style.display===\'none\'?\'block\':\'none\'" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center"><h3>Uebersicht</h3><span style="font-size:12px;color:var(--text-ter)">▾</span></div><div id="done-ex-overview">' + allSections + '</div></div>';
     })()}
 
     ${improvHtml}
@@ -6785,7 +6826,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '6.6';
+const APP_VERSION = '6.7';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
