@@ -834,6 +834,13 @@ h3 { font-size: 15px; font-weight: 600; }
   </div>
 
   <!-- =============================================
+       CALENDAR PAGE
+       ============================================= -->
+  <div id="page-calendar" class="page">
+    <div id="calendar-content"></div>
+  </div>
+
+  <!-- =============================================
        SETTINGS PAGE
        ============================================= -->
   <div id="page-settings" class="page">
@@ -864,6 +871,15 @@ h3 { font-size: 15px; font-weight: 600; }
         <rect x="17" y="3" width="4" height="18" rx="1"/>
       </svg>
       <span>Stats</span>
+    </button>
+    <button class="nav-item" data-page="calendar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/>
+        <line x1="8" y1="2" x2="8" y2="6"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+      </svg>
+      <span>Kalender</span>
     </button>
     <button class="nav-item" data-page="settings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -2715,6 +2731,7 @@ function renderPage(page) {
     case 'home': renderHomePage(); break;
     case 'training': renderTrainingPage(); break;
     case 'stats': renderStatsPage(); break;
+    case 'calendar': renderCalendarPage(); break;
     case 'settings': renderSettingsPage(); break;
   }
 }
@@ -3018,7 +3035,10 @@ function renderHomePage() {
     <!-- A) Compact Header -->
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
       <span style="font-size:16px;font-weight:700">${dateStr}</span>
-      <span style="font-size:14px;font-weight:600;color:var(--orange)">${nextWorkoutLabel}</span>
+      <div style="display:flex;align-items:center;gap:10px">
+        <button style="background:none;border:none;color:var(--text-sec);font-size:12px;cursor:pointer;padding:2px" onclick="navigateTo('calendar')">Kalender</button>
+        <span style="font-size:14px;font-weight:600;color:var(--orange)">${nextWorkoutLabel}</span>
+      </div>
     </div>
     <div style="font-size:12px;color:var(--text-sec);margin-bottom:16px">${subtitleLine}</div>
 
@@ -4882,6 +4902,9 @@ function finishWorkout() {
 
   saveState();
 
+  // Auto-sync to cloud after workout
+  autoCloudPush();
+
   activeSubTab = 'done';
   renderWorkoutDetail();
 }
@@ -5402,7 +5425,10 @@ function renderDoneTab(plan) {
       </div>
     </div>
 
-    <button class="btn btn-outline" style="margin-top:12px" onclick="backToWeekOverview()">Zurueck zur Uebersicht</button>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-outline" style="flex:1" onclick="backToWeekOverview()">Zurueck zur Uebersicht</button>
+      <button class="btn btn-outline" style="flex:0 0 auto;padding:8px 14px" onclick="showChangeDateDialog('${session.id}')">Datum aendern</button>
+    </div>
   `;
 }
 
@@ -6618,6 +6644,217 @@ function renderSubMuscleBreakdown(muscle) {
 }
 
 // =============================================
+// CALENDAR PAGE
+// =============================================
+
+var calendarMonth = new Date().getMonth();
+var calendarYear = new Date().getFullYear();
+
+function renderCalendarPage() {
+  var container = document.getElementById('calendar-content');
+  var monthNames = ['Januar', 'Februar', 'Maerz', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+  var dayNames = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+
+  // Get sessions for this month
+  var sessionsThisMonth = {};
+  APP_STATE.sessions.forEach(function(s) {
+    var d = new Date(s.date);
+    if (d.getMonth() === calendarMonth && d.getFullYear() === calendarYear) {
+      var day = d.getDate();
+      if (!sessionsThisMonth[day]) sessionsThisMonth[day] = [];
+      sessionsThisMonth[day].push(s);
+    }
+  });
+
+  // Build calendar grid
+  var firstDay = new Date(calendarYear, calendarMonth, 1);
+  var lastDay = new Date(calendarYear, calendarMonth + 1, 0);
+  var startDow = firstDay.getDay();
+  startDow = startDow === 0 ? 6 : startDow - 1; // Monday = 0
+  var totalDays = lastDay.getDate();
+  var today = new Date();
+  var todayStr = today.toISOString().split('T')[0];
+
+  var html = '<div style="padding:16px 16px 8px">';
+  // Header with nav
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">';
+  html += '<button class="btn btn-outline" style="padding:6px 12px;font-size:18px" onclick="calendarNav(-1)">&larr;</button>';
+  html += '<div style="font-size:17px;font-weight:600">' + monthNames[calendarMonth] + ' ' + calendarYear + '</div>';
+  html += '<button class="btn btn-outline" style="padding:6px 12px;font-size:18px" onclick="calendarNav(1)">&rarr;</button>';
+  html += '</div>';
+
+  // Day name headers
+  html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">';
+  dayNames.forEach(function(dn) {
+    html += '<div style="text-align:center;font-size:11px;color:var(--text-ter);padding:4px 0">' + dn + '</div>';
+  });
+  html += '</div>';
+
+  // Day cells
+  html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">';
+  // Empty cells before first day
+  for (var e = 0; e < startDow; e++) {
+    html += '<div style="aspect-ratio:1;padding:2px"></div>';
+  }
+
+  for (var d = 1; d <= totalDays; d++) {
+    var dateStr = calendarYear + '-' + String(calendarMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    var isToday = dateStr === todayStr;
+    var sessions = sessionsThisMonth[d] || [];
+    var hasSession = sessions.length > 0;
+
+    var cellStyle = 'aspect-ratio:1;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative;';
+    if (isToday) cellStyle += 'border:2px solid var(--orange);';
+    if (hasSession) cellStyle += 'background:rgba(232,114,12,0.15);';
+
+    html += '<div style="' + cellStyle + '" onclick="calendarDayTap(\'' + dateStr + '\')">';
+    html += '<div style="font-size:13px;font-weight:' + (isToday ? '700' : '400') + ';color:' + (isToday ? 'var(--orange)' : 'var(--text)') + '">' + d + '</div>';
+
+    if (hasSession) {
+      // Dots for each session
+      var dotHtml = '<div style="display:flex;gap:2px;margin-top:2px">';
+      sessions.forEach(function(s) {
+        var plan = WORKOUT_PLANS[s.workoutId];
+        var color = 'var(--orange)';
+        if (plan && plan.isFree) color = '#8B5CF6';
+        dotHtml += '<div style="width:5px;height:5px;border-radius:50%;background:' + color + '"></div>';
+      });
+      dotHtml += '</div>';
+      html += dotHtml;
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // Sessions list for selected day or current month summary
+  html += '<div id="calendar-day-detail" style="margin-top:16px"></div>';
+  html += '</div>';
+
+  container.innerHTML = html;
+}
+
+function calendarNav(delta) {
+  calendarMonth += delta;
+  if (calendarMonth > 11) { calendarMonth = 0; calendarYear++; }
+  if (calendarMonth < 0) { calendarMonth = 11; calendarYear--; }
+  renderCalendarPage();
+}
+
+function calendarDayTap(dateStr) {
+  var sessions = APP_STATE.sessions.filter(function(s) { return s.date === dateStr; });
+  var detail = document.getElementById('calendar-day-detail');
+  if (!detail) return;
+
+  var parts = dateStr.split('-');
+  var dayLabel = parseInt(parts[2]) + '.' + parseInt(parts[1]) + '.' + parts[0];
+
+  if (sessions.length === 0) {
+    detail.innerHTML = '<div class="card" style="padding:16px;text-align:center;color:var(--text-ter)">' +
+      '<div style="font-size:13px">' + dayLabel + '</div>' +
+      '<div style="margin-top:4px">Kein Training</div></div>';
+    return;
+  }
+
+  var html = '';
+  sessions.forEach(function(s) {
+    var plan = WORKOUT_PLANS[s.workoutId];
+    var name = plan ? plan.name : s.workoutId;
+    var dur = s.duration ? Math.round(s.duration / 60) + ' Min' : '';
+    var setCount = 0;
+    Object.keys(s.sets || {}).forEach(function(k) { setCount += (s.sets[k] || []).length; });
+    var isFree = plan && plan.isFree;
+    var badge = isFree ? '<span style="background:#8B5CF6;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;margin-left:6px">Free</span>' : '';
+    var mesoWeek = 'M' + (s.mesocycle || '?') + ' W' + (s.week || '?');
+
+    html += '<div class="card" style="padding:14px;margin-bottom:8px">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+    html += '<div style="font-weight:600;font-size:14px">' + name + badge + '</div>';
+    html += '<div style="font-size:11px;color:var(--text-ter)">' + mesoWeek + '</div>';
+    html += '</div>';
+    html += '<div style="display:flex;gap:12px;font-size:12px;color:var(--text-sec);margin-bottom:10px">';
+    html += '<span>' + dayLabel + '</span>';
+    if (dur) html += '<span>' + dur + '</span>';
+    html += '<span>' + setCount + ' Sets</span>';
+    html += '</div>';
+    html += '<div style="display:flex;gap:8px">';
+    html += '<button class="btn btn-outline" style="flex:1;font-size:12px;padding:6px" onclick="showChangeDateDialog(\'' + s.id + '\')">Datum aendern</button>';
+    html += '<button class="btn btn-outline" style="flex:1;font-size:12px;padding:6px" onclick="openSessionFromCalendar(\'' + s.id + '\')">Details</button>';
+    html += '</div>';
+    html += '</div>';
+  });
+
+  detail.innerHTML = html;
+}
+
+function openSessionFromCalendar(sessionId) {
+  var session = APP_STATE.sessions.find(function(s) { return s.id === sessionId; });
+  if (!session) return;
+  var plan = WORKOUT_PLANS[session.workoutId];
+  if (!plan) return;
+
+  if (plan.isFree) {
+    openFreeSession(sessionId);
+  } else {
+    activeWorkoutId = session.workoutId;
+    activeSession = Object.assign({}, session, { _completed: true, _readinessDone: true });
+    activeSubTab = 'done';
+    trainingView = 'workout-detail';
+    navigateTo('training');
+  }
+}
+
+function showChangeDateDialog(sessionId) {
+  var session = APP_STATE.sessions.find(function(s) { return s.id === sessionId; });
+  if (!session) return;
+
+  showModal(
+    '<div style="padding:20px">' +
+    '<h3 style="margin-bottom:16px;font-size:16px">Datum aendern</h3>' +
+    '<div style="font-size:12px;color:var(--text-sec);margin-bottom:4px">Aktuell: ' + session.date + '</div>' +
+    '<input type="date" class="input-field" id="change-date-input" value="' + session.date + '" style="width:100%;font-size:14px;padding:8px;margin-bottom:16px">' +
+    '<div style="display:flex;gap:8px">' +
+    '<button class="btn btn-outline" style="flex:1" onclick="closeModal()">Abbrechen</button>' +
+    '<button class="btn btn-orange" style="flex:1" onclick="confirmChangeDate(\'' + sessionId + '\')">Speichern</button>' +
+    '</div>' +
+    '</div>'
+  );
+}
+
+function confirmChangeDate(sessionId) {
+  var newDate = document.getElementById('change-date-input').value;
+  if (!newDate) return;
+
+  var session = APP_STATE.sessions.find(function(s) { return s.id === sessionId; });
+  if (!session) return;
+
+  session.date = newDate;
+
+  // Recalculate week based on meso startDate
+  var meso = APP_STATE.settings.mesocycle;
+  if (meso.startDate) {
+    var startMs = new Date(meso.startDate).getTime();
+    var dateMs = new Date(newDate).getTime();
+    var diffDays = Math.floor((dateMs - startMs) / 86400000);
+    if (diffDays >= 0) {
+      session.week = Math.floor(diffDays / 7) + 1;
+    }
+  }
+
+  saveState();
+  closeModal();
+  showToast('Datum geaendert: ' + newDate);
+
+  // Re-render calendar if we're on it
+  if (currentPage === 'calendar') {
+    var d = new Date(newDate);
+    calendarMonth = d.getMonth();
+    calendarYear = d.getFullYear();
+    renderCalendarPage();
+    calendarDayTap(newDate);
+  }
+}
+
+// =============================================
 // SETTINGS PAGE RENDER
 // =============================================
 
@@ -6817,6 +7054,22 @@ function renderSettingsPage() {
       </div>
     </div>
 
+    <div class="card" style="padding:16px;margin-bottom:16px">
+      <div style="font-weight:600;margin-bottom:12px;font-size:15px">Cloud Sync</div>
+      <div style="margin-bottom:10px">
+        <div style="font-size:12px;color:var(--text-sec);margin-bottom:4px">Sync-Key</div>
+        <div style="display:flex;gap:8px">
+          <input type="text" class="input-field" id="sync-key-input" value="${getSyncKey()}" placeholder="Min. 4 Zeichen" style="flex:1;font-size:14px;padding:8px">
+          <button class="btn btn-orange" style="padding:6px 14px;font-size:13px" onclick="saveSyncKey()">OK</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="btn btn-outline" style="flex:1;font-size:13px;padding:8px" onclick="cloudPush()">Hochladen ↑</button>
+        <button class="btn btn-outline" style="flex:1;font-size:13px;padding:8px" onclick="cloudPull()">Herunterladen ↓</button>
+      </div>
+      <div id="sync-status" style="font-size:11px;color:var(--text-ter);text-align:center">${getSyncStatusText()}</div>
+    </div>
+
     <div style="text-align:center;padding:20px 0;color:var(--text-ter);font-size:12px">
       Training Tracker v${APP_VERSION}
     </div>
@@ -6892,7 +7145,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '7.1';
+const APP_VERSION = '7.3';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
@@ -6941,6 +7194,120 @@ function importData(input) {
     }
   };
   reader.readAsText(file);
+}
+
+// =============================================
+// CLOUD SYNC
+// =============================================
+
+var SYNC_KEY_STORAGE = 'training-sync-key';
+var SYNC_TS_STORAGE = 'training-sync-ts';
+
+function getSyncKey() {
+  return localStorage.getItem(SYNC_KEY_STORAGE) || '';
+}
+
+function saveSyncKey() {
+  var key = document.getElementById('sync-key-input').value.trim();
+  if (key && key.length < 4) {
+    showToast('Sync-Key muss mind. 4 Zeichen haben');
+    return;
+  }
+  localStorage.setItem(SYNC_KEY_STORAGE, key);
+  showToast(key ? 'Sync-Key gespeichert' : 'Sync-Key entfernt');
+}
+
+function getSyncStatusText() {
+  var ts = localStorage.getItem(SYNC_TS_STORAGE);
+  if (!ts) return 'Noch nie synchronisiert';
+  var d = new Date(parseInt(ts));
+  var mins = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (mins < 1) return 'Letzter Sync: gerade eben';
+  if (mins < 60) return 'Letzter Sync: vor ' + mins + ' Min';
+  var hours = Math.floor(mins / 60);
+  if (hours < 24) return 'Letzter Sync: vor ' + hours + 'h';
+  return 'Letzter Sync: ' + d.toLocaleDateString('de-DE') + ' ' + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+}
+
+function updateSyncStatus(text) {
+  var el = document.getElementById('sync-status');
+  if (el) el.textContent = text;
+}
+
+function cloudPush() {
+  var key = getSyncKey();
+  if (!key) { showToast('Bitte zuerst Sync-Key eingeben'); return; }
+
+  updateSyncStatus('Hochladen...');
+  var data = JSON.stringify(APP_STATE);
+
+  fetch('/api/sync?key=' + encodeURIComponent(key), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: data
+  })
+  .then(function(res) {
+    if (!res.ok) throw new Error('Server: ' + res.status);
+    return res.json();
+  })
+  .then(function(result) {
+    localStorage.setItem(SYNC_TS_STORAGE, String(Date.now()));
+    updateSyncStatus(getSyncStatusText());
+    showToast('Daten hochgeladen (' + APP_STATE.sessions.length + ' Sessions)');
+  })
+  .catch(function(err) {
+    updateSyncStatus('Fehler beim Hochladen');
+    showToast('Sync-Fehler: ' + err.message);
+  });
+}
+
+function cloudPull() {
+  var key = getSyncKey();
+  if (!key) { showToast('Bitte zuerst Sync-Key eingeben'); return; }
+
+  updateSyncStatus('Herunterladen...');
+
+  fetch('/api/sync?key=' + encodeURIComponent(key))
+  .then(function(res) {
+    if (res.status === 404) throw new Error('Keine Cloud-Daten fuer diesen Key');
+    if (!res.ok) throw new Error('Server: ' + res.status);
+    return res.json();
+  })
+  .then(function(data) {
+    if (!data.sessions || !Array.isArray(data.sessions)) {
+      throw new Error('Ungueltige Daten');
+    }
+    var count = data.sessions.length;
+    if (!confirm('Cloud: ' + count + ' Sessions gefunden. Lokale Daten ersetzen?')) {
+      updateSyncStatus(getSyncStatusText());
+      return;
+    }
+    APP_STATE = data;
+    APP_STATE._appVersion = APP_VERSION;
+    saveState();
+    localStorage.setItem(SYNC_TS_STORAGE, String(Date.now()));
+    showToast(count + ' Sessions aus Cloud geladen');
+    setTimeout(function() { location.reload(); }, 500);
+  })
+  .catch(function(err) {
+    updateSyncStatus('Fehler beim Herunterladen');
+    showToast('Sync-Fehler: ' + err.message);
+  });
+}
+
+function autoCloudPush() {
+  var key = getSyncKey();
+  if (!key) return;
+  // Silent push — no toast, just update timestamp
+  fetch('/api/sync?key=' + encodeURIComponent(key), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(APP_STATE)
+  })
+  .then(function(res) {
+    if (res.ok) localStorage.setItem(SYNC_TS_STORAGE, String(Date.now()));
+  })
+  .catch(function() { /* silent fail */ });
 }
 
 function exportCSV() {
