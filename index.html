@@ -1474,7 +1474,7 @@ function getDefaultState() {
     settings: {
       bodyWeight: 77.5,
       weightHistory: [],
-      mesocycle: { number: 1, currentWeek: 1, weeksHard: 5, weeksDeload: 1 },
+      mesocycle: { number: 1, currentWeek: 1, weeksHard: 5, weeksDeload: 1, startDate: null },
       goals: { weeklyVolume: 0, ruecken: 0, brust: 0, quads: 0, hams: 0 },
       goalsAutoSet: false
     },
@@ -1482,7 +1482,8 @@ function getDefaultState() {
     activeWorkout: null,
     prs: [],
     customWeights: {}, // user overrides for default exercise weights
-    learnings: [] // { id, date, workoutId, text, mesocycle, week }
+    learnings: [], // { id, date, workoutId, text, mesocycle, week }
+    exerciseCatalog: {} // name→{muscle, bodyweight, dumbbell, unilateral, weight}
   };
 }
 
@@ -1530,6 +1531,20 @@ function loadState() {
       if (migrated) {
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
       }
+      // Migrate: add startDate to mesocycle if missing
+      if (state.settings && state.settings.mesocycle && !state.settings.mesocycle.startDate) {
+        var mesoSessions = (state.sessions || []).filter(function(s) {
+          return s.mesocycle === state.settings.mesocycle.number && s.week === 1;
+        });
+        if (mesoSessions.length > 0) {
+          mesoSessions.sort(function(a, b) { return a.date.localeCompare(b.date); });
+          var d = new Date(mesoSessions[0].date);
+          var day = d.getDay();
+          var diff = day === 0 ? -6 : 1 - day;
+          d.setDate(d.getDate() + diff);
+          state.settings.mesocycle.startDate = d.toISOString().split('T')[0];
+        }
+      }
       return state;
     }
   } catch (e) {
@@ -1552,7 +1567,7 @@ function saveState() {
 
 function generateSampleData() {
   const state = getDefaultState();
-  const baseDate = new Date('2026-05-11'); // Week 1 start (Monday)
+  const baseDate = new Date(APP_STATE.settings.mesocycle.startDate || '2026-05-11');
   const bw = state.settings.bodyWeight;
 
   // Generate 3 complete weeks + partial week 4
@@ -2585,7 +2600,8 @@ function calcTotalVolume(sets) {
 // =============================================
 
 function getWeekDateRange(week) {
-  const baseDate = new Date('2026-05-11'); // Meso 2, Week 1 start
+  var startDateStr = APP_STATE.settings.mesocycle.startDate;
+  var baseDate = startDateStr ? new Date(startDateStr) : new Date('2026-05-11');
   const start = new Date(baseDate);
   start.setDate(start.getDate() + (week - 1) * 7);
   const end = new Date(start);
@@ -3091,6 +3107,8 @@ function toggleExpand(el) {
 function renderTrainingPage() {
   if (trainingView === 'workout-detail') {
     renderWorkoutDetail();
+  } else if (trainingView === 'free-designer') {
+    renderFreeDesigner();
   } else {
     renderWeekOverview();
   }
@@ -3136,6 +3154,26 @@ function renderWeekOverview() {
       </div>`;
   });
 
+  // Free workout sessions for this week
+  var freeSessions = APP_STATE.sessions.filter(function(s) {
+    return s.week === selectedWeek && s.mesocycle === meso.number && s.workoutId && s.workoutId.indexOf('free-') === 0;
+  });
+  var freeRows = '';
+  freeSessions.forEach(function(session) {
+    var fp = WORKOUT_PLANS[session.workoutId];
+    var name = fp ? fp.name : 'Freies Workout';
+    var volStr = Math.round(calcSessionVolume(session) / 1000) + 't';
+    freeRows += '<div class="workout-row" onclick="openFreeSession(\'' + session.id + '\')">' +
+      '<div class="workout-status done">' + ICONS.check + '</div>' +
+      '<div class="workout-info">' +
+      '<div class="workout-name">' + name + '</div>' +
+      '<div class="workout-sub">Free - ' + volStr + '</div>' +
+      '</div>' +
+      '<div class="workout-day">' + session.date.split('-').slice(1).reverse().join('.') + '</div>' +
+      '</div>';
+  });
+  var freeSessionsCard = freeRows ? '<div class="card" style="margin-top:8px">' + freeRows + '</div>' : '';
+
   // Weekly summary
   const weekSessions = APP_STATE.sessions.filter(s => s.week === selectedWeek && s.mesocycle === meso.number);
   const weekVol = weekSessions.reduce((sum, s) => sum + calcSessionVolume(s), 0);
@@ -3144,6 +3182,7 @@ function renderWeekOverview() {
   const nextBtn = selectedWeek === cw
     ? `<button class="btn btn-orange" style="margin:16px 0" onclick="startNextWorkout()">Naechstes Training starten</button>`
     : '';
+  const freeBtn = `<button class="btn btn-outline" style="margin:0 0 16px 0;color:var(--orange);border-color:var(--orange)" onclick="openFreeDesigner()">Freies Workout</button>`;
 
   document.getElementById('training-content').innerHTML = `
     <h1>Training</h1>
@@ -3157,14 +3196,16 @@ function renderWeekOverview() {
     </div>
 
     ${nextBtn}
+    ${freeBtn}
 
     <div class="card">${workoutRows}</div>
+    ${freeSessionsCard}
 
     <div class="card">
       <div style="display:flex;justify-content:space-between">
         <div>
           <div style="font-size:12px;color:var(--text-sec)">Sessions</div>
-          <div style="font-size:20px;font-weight:700">${weekSessions.length}/4</div>
+          <div style="font-size:20px;font-weight:700">${weekSessions.length}</div>
         </div>
         <div style="text-align:right">
           <div style="font-size:12px;color:var(--text-sec)">Volumen</div>
@@ -3286,7 +3327,15 @@ function renderWorkoutDetail() {
   const isCompleted = activeSession && activeSession._completed;
 
   // Sub tabs - always show all tabs so user can view rounds even when completed
-  const tabs = ['prep', 'warmup', 'strength', 'zirkel', 'acc', 'done'];
+  var tabs;
+  if (plan.isFree) {
+    tabs = [];
+    if (plan.strength && plan.strength.length > 0) tabs.push('strength');
+    if (plan.circuits && plan.circuits.length > 0) tabs.push('zirkel');
+    tabs.push('done');
+  } else {
+    tabs = ['prep', 'warmup', 'strength', 'zirkel', 'acc', 'done'];
+  }
 
   let tabsHtml = tabs.map(t => {
     const labels = { prep: 'Prep', warmup: 'Warmup', strength: 'Strength', zirkel: 'Zirkel', acc: 'Acc', done: 'Done' };
@@ -6682,15 +6731,26 @@ function renderSettingsPage() {
     <div class="card">${planRows}</div>
 
     <!-- Mesocycle -->
-    <div class="section-title">Mesozyklus</div>
+    <div class="section-title">Mesozyklus ${meso.number}</div>
     <div class="card">
       <div class="settings-row">
-        <div class="settings-label">Zykluslaenge</div>
-        <div class="settings-value">${meso.weeksHard}+${meso.weeksDeload}</div>
+        <div class="settings-label">Startdatum</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="date" class="input-field" style="width:140px;text-align:right;font-size:13px;padding:4px 8px" value="${meso.startDate || ''}" id="meso-start-date">
+          <button class="btn btn-sm btn-orange" style="padding:4px 10px;min-height:28px;font-size:12px" onclick="saveMesoStartDate()">OK</button>
+        </div>
       </div>
       <div class="settings-row">
-        <div class="settings-label">Aktueller Zyklus</div>
-        <div class="settings-value">${meso.number}</div>
+        <div class="settings-label">Harte Wochen</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="btn btn-sm btn-outline" style="padding:4px 10px;min-height:28px" onclick="changeMesoWeeks(-1)">-</button>
+          <span class="settings-value">${meso.weeksHard}</span>
+          <button class="btn btn-sm btn-outline" style="padding:4px 10px;min-height:28px" onclick="changeMesoWeeks(1)">+</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-label">Deload Wochen</div>
+        <div class="settings-value">${meso.weeksDeload}</div>
       </div>
       <div class="settings-row">
         <div class="settings-label">Aktuelle Woche</div>
@@ -6702,7 +6762,7 @@ function renderSettingsPage() {
       </div>
       <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:8px">
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <div class="settings-label">Ziele (W5 Targets)</div>
+          <div class="settings-label">Ziele (W${meso.weeksHard} Targets)</div>
           ${s.goalsAutoSet ? '<span style="font-size:11px;color:var(--green)">Auto-gesetzt nach W1</span>' : '<span style="font-size:11px;color:var(--text-ter)">Werden nach W1 automatisch gesetzt</span>'}
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
@@ -6747,7 +6807,7 @@ function renderSettingsPage() {
         <div class="settings-label">CSV Export (Google Sheets)</div>
         <span style="color:var(--text-sec);font-size:18px">&rarr;</span>
       </div>
-      <div class="settings-row" onclick="startNewMesocycle()" style="cursor:pointer">
+      <div class="settings-row" onclick="showNewMesoDialog()" style="cursor:pointer">
         <div class="settings-label" style="color:var(--orange)">Neuen Mesozyklus starten</div>
         <span style="color:var(--orange);font-size:18px">&rarr;</span>
       </div>
@@ -6758,7 +6818,7 @@ function renderSettingsPage() {
     </div>
 
     <div style="text-align:center;padding:20px 0;color:var(--text-ter);font-size:12px">
-      Training Tracker v6.4
+      Training Tracker v${APP_VERSION}
     </div>
   `;
 }
@@ -6779,7 +6839,13 @@ function updateBodyWeight() {
 function changeWeek(delta) {
   const meso = APP_STATE.settings.mesocycle;
   const totalWeeks = meso.weeksHard + meso.weeksDeload;
-  meso.currentWeek = Math.max(1, Math.min(totalWeeks, meso.currentWeek + delta));
+  var newWeek = meso.currentWeek + delta;
+  if (newWeek < 1) newWeek = 1;
+  // Allow extending beyond original plan — auto-extend weeksHard
+  if (newWeek > totalWeeks) {
+    meso.weeksHard = newWeek - meso.weeksDeload;
+  }
+  meso.currentWeek = newWeek;
   selectedWeek = meso.currentWeek;
   saveState();
   renderSettingsPage();
@@ -6826,7 +6892,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '6.7';
+const APP_VERSION = '7.1';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
@@ -6948,17 +7014,677 @@ function confirmDeleteData() {
   }
 }
 
-function startNewMesocycle() {
-  if (!confirm('Neuen Mesozyklus starten? Bestehende Daten bleiben erhalten, aber Ziele werden zurueckgesetzt.')) return;
-  const meso = APP_STATE.settings.mesocycle;
+function saveMesoStartDate() {
+  var val = document.getElementById('meso-start-date').value;
+  if (val) {
+    APP_STATE.settings.mesocycle.startDate = val;
+    saveState();
+    showToast('Startdatum gespeichert');
+    renderSettingsPage();
+  }
+}
+
+function changeMesoWeeks(delta) {
+  var meso = APP_STATE.settings.mesocycle;
+  var newVal = meso.weeksHard + delta;
+  if (newVal < 1) return;
+  meso.weeksHard = newVal;
+  saveState();
+  renderSettingsPage();
+}
+
+function showNewMesoDialog() {
+  // Calculate next Monday as default start date
+  var today = new Date();
+  var dayOfWeek = today.getDay();
+  var daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek);
+  var nextMonday = new Date(today);
+  nextMonday.setDate(today.getDate() + daysUntilMonday);
+  var defaultDate = nextMonday.toISOString().split('T')[0];
+  var meso = APP_STATE.settings.mesocycle;
+
+  var overlay = document.createElement('div');
+  overlay.id = 'meso-dialog-overlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.innerHTML = '<div style="background:var(--card);border-radius:16px;padding:20px;width:100%;max-width:340px">' +
+    '<h3 style="margin-bottom:16px;font-size:16px">Neuer Mesozyklus ' + (meso.number + 1) + '</h3>' +
+    '<div style="margin-bottom:12px">' +
+    '<div style="font-size:12px;color:var(--text-sec);margin-bottom:4px">Startdatum</div>' +
+    '<input type="date" class="input-field" id="new-meso-date" value="' + defaultDate + '" style="width:100%;font-size:14px;padding:8px">' +
+    '</div>' +
+    '<div style="margin-bottom:12px">' +
+    '<div style="font-size:12px;color:var(--text-sec);margin-bottom:4px">Harte Wochen</div>' +
+    '<input type="number" inputmode="numeric" class="input-field" id="new-meso-weeks" value="5" min="1" max="12" style="width:100%;font-size:14px;padding:8px">' +
+    '</div>' +
+    '<div style="margin-bottom:16px">' +
+    '<div style="font-size:12px;color:var(--text-sec);margin-bottom:4px">Deload Wochen</div>' +
+    '<input type="number" inputmode="numeric" class="input-field" id="new-meso-deload" value="1" min="0" max="3" style="width:100%;font-size:14px;padding:8px">' +
+    '</div>' +
+    '<p style="font-size:12px;color:var(--text-sec);margin-bottom:16px">Bestehende Daten bleiben erhalten. Ziele werden zurueckgesetzt.</p>' +
+    '<div style="display:flex;gap:8px">' +
+    '<button class="btn btn-outline" style="flex:1" onclick="closeNewMesoDialog()">Abbrechen</button>' +
+    '<button class="btn btn-orange" style="flex:1" onclick="confirmNewMeso()">Starten</button>' +
+    '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) closeNewMesoDialog();
+  });
+}
+
+function closeNewMesoDialog() {
+  var overlay = document.getElementById('meso-dialog-overlay');
+  if (overlay) overlay.remove();
+}
+
+function confirmNewMeso() {
+  var startDate = document.getElementById('new-meso-date').value;
+  var weeksHard = parseInt(document.getElementById('new-meso-weeks').value) || 5;
+  var weeksDeload = parseInt(document.getElementById('new-meso-deload').value) || 1;
+  if (!startDate) { showToast('Bitte Startdatum waehlen'); return; }
+
+  var meso = APP_STATE.settings.mesocycle;
   meso.number += 1;
   meso.currentWeek = 1;
+  meso.weeksHard = weeksHard;
+  meso.weeksDeload = weeksDeload;
+  meso.startDate = startDate;
   APP_STATE.settings.goals = { weeklyVolume: 0, ruecken: 0, brust: 0, quads: 0, hams: 0 };
   APP_STATE.settings.goalsAutoSet = false;
   delete APP_STATE.settings.goalsBaseline;
   saveState();
+  closeNewMesoDialog();
+  showToast('Mesozyklus ' + meso.number + ' gestartet!');
   navigateTo('home');
 }
+
+// =============================================
+// FREE WORKOUT DESIGNER
+// =============================================
+
+var freeDesignerState = null;
+var freeDesignerCounter = 0;
+
+function openFreeDesigner() {
+  freeDesignerCounter = 0;
+  freeDesignerState = {
+    date: new Date().toISOString().split('T')[0],
+    name: '',
+    blocks: []
+  };
+  trainingView = 'free-designer';
+  renderTrainingPage();
+}
+
+function closeFreeDesigner() {
+  freeDesignerState = null;
+  trainingView = 'week-overview';
+  renderTrainingPage();
+}
+
+function renderFreeDesigner() {
+  var ds = freeDesignerState;
+  if (!ds) return;
+
+  var blocksHtml = '';
+  ds.blocks.forEach(function(block, bi) {
+    var typeLabel = block.type === 'circuit' ? 'Zirkel' : (block.emom ? 'EMOM' : 'Saetze');
+    var typeColor = block.type === 'circuit' ? '#3498DB' : (block.emom ? '#9B59B6' : 'var(--orange)');
+
+    // Block header
+    var headerHtml = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
+      '<div style="display:flex;align-items:center;gap:8px">' +
+      '<span style="background:' + typeColor + ';color:#fff;font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px">' + typeLabel + '</span>' +
+      '<span style="color:#fff;font-size:14px;font-weight:500">Block ' + (bi + 1) + '</span>' +
+      '</div>' +
+      '<button style="color:var(--red);font-size:13px;background:none;border:none;padding:4px 8px" onclick="removeDesignerBlock(' + bi + ')">Loeschen</button>' +
+      '</div>';
+
+    // Type toggle row (for single blocks)
+    var typeToggle = '';
+    if (block.type === 'single') {
+      typeToggle = '<div style="display:flex;gap:6px;margin-bottom:8px">' +
+        '<button class="btn btn-sm ' + (!block.emom ? 'btn-orange' : 'btn-outline') + '" style="padding:4px 10px;font-size:11px;min-height:24px" onclick="setBlockStyle(' + bi + ',false)">Saetze</button>' +
+        '<button class="btn btn-sm ' + (block.emom ? 'btn-orange' : 'btn-outline') + '" style="padding:4px 10px;font-size:11px;min-height:24px;' + (block.emom ? 'background:#9B59B6;border-color:#9B59B6' : '') + '" onclick="setBlockStyle(' + bi + ',true)">EMOM</button>' +
+        '</div>';
+      if (block.emom) {
+        typeToggle += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">' +
+          '<span style="color:var(--text-sec);font-size:12px">Dauer:</span>' +
+          '<input type="number" inputmode="numeric" class="input-field" style="width:50px;font-size:13px;padding:4px 6px;text-align:center" value="' + (block.emomMinutes || 10) + '" onchange="setBlockEmom(' + bi + ',this.value)">' +
+          '<span style="color:var(--text-sec);font-size:12px">min</span>' +
+          '</div>';
+      }
+    }
+
+    // Circuit rounds
+    var roundsHtml = '';
+    if (block.type === 'circuit') {
+      roundsHtml = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">' +
+        '<span style="color:var(--text-sec);font-size:12px">Runden:</span>' +
+        '<button class="btn btn-sm btn-outline" style="padding:2px 8px;min-height:24px;font-size:12px" onclick="setBlockRounds(' + bi + ',-1)">-</button>' +
+        '<span style="color:#fff;font-size:14px;font-weight:500">' + (block.rounds || 4) + '</span>' +
+        '<button class="btn btn-sm btn-outline" style="padding:2px 8px;min-height:24px;font-size:12px" onclick="setBlockRounds(' + bi + ',1)">+</button>' +
+        '</div>';
+    }
+
+    // Exercise rows
+    var exHtml = '';
+    block.exercises.forEach(function(ex, ei) {
+      var weightDisplay = ex.bodyweight ? 'BW' : (ex.dumbbell ? ex.weight + '/DB' : ex.weight + 'kg');
+      var setsDisplay = block.type === 'single' && !block.emom ? ex.sets + 'x' + ex.reps : 'x' + ex.reps;
+      exHtml += '<div style="background:var(--bg);border-radius:8px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+        '<div style="flex:1">' +
+        '<div style="color:#fff;font-size:13px">' + (ex.name || 'Uebung') + '</div>' +
+        '<div style="color:var(--text-sec);font-size:11px">' + weightDisplay + ' · ' + setsDisplay + (ex.unilateral ? '/Seite' : '') + '</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:4px">' +
+        '<button style="color:var(--text-sec);font-size:14px;background:none;border:none;padding:4px" onclick="editDesignerExercise(' + bi + ',' + ei + ')">&#9998;</button>' +
+        '<button style="color:var(--red);font-size:14px;background:none;border:none;padding:4px" onclick="removeExFromBlock(' + bi + ',' + ei + ')">&times;</button>' +
+        '</div>' +
+        '</div>';
+    });
+
+    // Add exercise button
+    exHtml += '<div style="border:1px dashed var(--border);border-radius:8px;padding:8px;text-align:center;cursor:pointer" onclick="showAddExerciseForm(' + bi + ')">' +
+      '<span style="color:var(--text-ter);font-size:12px">+ Uebung hinzufuegen</span>' +
+      '</div>';
+
+    blocksHtml += '<div class="card" style="margin-bottom:12px">' + headerHtml + typeToggle + roundsHtml + exHtml + '</div>';
+  });
+
+  // Add block buttons
+  var addBlockHtml = '<div style="display:flex;gap:8px;margin-bottom:16px">' +
+    '<button class="btn btn-outline" style="flex:1;border-style:dashed;color:var(--orange);border-color:var(--orange)" onclick="addDesignerBlock(\'single\')">+ Einzeluebung</button>' +
+    '<button class="btn btn-outline" style="flex:1;border-style:dashed;color:#3498DB;border-color:#3498DB" onclick="addDesignerBlock(\'circuit\')">+ Zirkel</button>' +
+    '</div>';
+
+  // Start button
+  var hasExercises = ds.blocks.some(function(b) { return b.exercises.length > 0; });
+  var startBtn = hasExercises
+    ? '<button class="btn btn-orange" style="width:100%;margin-top:8px" onclick="startFreeWorkout()">Training starten</button>'
+    : '<button class="btn btn-outline" style="width:100%;margin-top:8px;opacity:0.4" disabled>Fuege mindestens eine Uebung hinzu</button>';
+
+  document.getElementById('training-content').innerHTML =
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">' +
+    '<button style="color:var(--text-sec);font-size:20px;background:none;border:none;padding:4px" onclick="closeFreeDesigner()">&larr;</button>' +
+    '<div>' +
+    '<h1 style="font-size:18px;margin:0">Freies Workout</h1>' +
+    '</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;margin-bottom:16px">' +
+    '<div style="flex:1">' +
+    '<div style="font-size:11px;color:var(--text-sec);margin-bottom:4px">Datum</div>' +
+    '<input type="date" class="input-field" style="width:100%;font-size:13px;padding:6px 8px" value="' + ds.date + '" onchange="freeDesignerState.date=this.value">' +
+    '</div>' +
+    '<div style="flex:1">' +
+    '<div style="font-size:11px;color:var(--text-sec);margin-bottom:4px">Name (optional)</div>' +
+    '<input type="text" class="input-field" style="width:100%;font-size:13px;padding:6px 8px" value="' + (ds.name || '') + '" placeholder="z.B. Spanien Push" onchange="freeDesignerState.name=this.value">' +
+    '</div>' +
+    '</div>' +
+    blocksHtml +
+    addBlockHtml +
+    startBtn;
+}
+
+function addDesignerBlock(type) {
+  freeDesignerState.blocks.push({
+    id: 'db-' + (++freeDesignerCounter),
+    type: type,
+    emom: false,
+    emomMinutes: 10,
+    rounds: 4,
+    exercises: []
+  });
+  renderFreeDesigner();
+}
+
+function removeDesignerBlock(bi) {
+  freeDesignerState.blocks.splice(bi, 1);
+  renderFreeDesigner();
+}
+
+function setBlockStyle(bi, isEmom) {
+  freeDesignerState.blocks[bi].emom = isEmom;
+  renderFreeDesigner();
+}
+
+function setBlockEmom(bi, val) {
+  freeDesignerState.blocks[bi].emomMinutes = parseInt(val) || 10;
+}
+
+function setBlockRounds(bi, delta) {
+  var block = freeDesignerState.blocks[bi];
+  block.rounds = Math.max(1, (block.rounds || 4) + delta);
+  renderFreeDesigner();
+}
+
+function removeExFromBlock(bi, ei) {
+  freeDesignerState.blocks[bi].exercises.splice(ei, 1);
+  renderFreeDesigner();
+}
+
+var FREE_MUSCLE_OPTIONS = [
+  { value: 'brust', label: 'Brust' },
+  { value: 'ruecken', label: 'Ruecken' },
+  { value: 'quads', label: 'Quads' },
+  { value: 'hams', label: 'Hams' },
+  { value: 'schultern', label: 'Schultern' },
+  { value: 'trizeps', label: 'Trizeps' },
+  { value: 'bizeps', label: 'Bizeps' },
+  { value: 'core', label: 'Core' }
+];
+
+function getExerciseCatalog() {
+  return APP_STATE.exerciseCatalog || {};
+}
+
+function getCatalogEntry(name) {
+  var catalog = getExerciseCatalog();
+  var key = name.toLowerCase().trim();
+  return catalog[key] || null;
+}
+
+function saveCatalogEntry(name, muscle, opts) {
+  if (!APP_STATE.exerciseCatalog) APP_STATE.exerciseCatalog = {};
+  var key = name.toLowerCase().trim();
+  APP_STATE.exerciseCatalog[key] = {
+    name: name,
+    muscle: muscle,
+    bodyweight: opts.bodyweight || false,
+    dumbbell: opts.dumbbell || false,
+    unilateral: opts.unilateral || false,
+    weight: opts.weight || 0
+  };
+}
+
+function buildMuscleSelector(selectedMuscle) {
+  var html = '<div style="display:flex;flex-wrap:wrap;gap:4px" id="free-ex-muscle-wrap">';
+  FREE_MUSCLE_OPTIONS.forEach(function(m) {
+    var sel = selectedMuscle === m.value;
+    html += '<button type="button" class="btn btn-sm ' + (sel ? 'btn-orange' : 'btn-outline') + '" style="padding:4px 10px;font-size:11px;min-height:24px" onclick="selectFreeMuscle(\'' + m.value + '\')" data-muscle="' + m.value + '">' + m.label + '</button>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function selectFreeMuscle(muscle) {
+  document.getElementById('free-ex-muscle').value = muscle;
+  var wrap = document.getElementById('free-ex-muscle-wrap');
+  if (wrap) {
+    wrap.querySelectorAll('button').forEach(function(btn) {
+      if (btn.dataset.muscle === muscle) {
+        btn.className = 'btn btn-sm btn-orange';
+      } else {
+        btn.className = 'btn btn-sm btn-outline';
+      }
+    });
+  }
+}
+
+function showAddExerciseForm(blockIndex) {
+  var block = freeDesignerState.blocks[blockIndex];
+  var isCircuit = block.type === 'circuit';
+
+  var overlay = document.createElement('div');
+  overlay.id = 'add-ex-overlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.innerHTML = '<div style="background:var(--card);border-radius:16px;padding:20px;width:100%;max-width:340px;max-height:90vh;overflow-y:auto">' +
+    '<h3 style="margin-bottom:16px;font-size:16px">Uebung hinzufuegen</h3>' +
+    '<div style="margin-bottom:10px">' +
+    '<div style="font-size:12px;color:var(--text-sec);margin-bottom:4px">Name</div>' +
+    '<input type="text" class="input-field" id="free-ex-name" style="width:100%;font-size:14px;padding:8px" placeholder="z.B. Ring Dips" oninput="onFreeExNameInput(this.value)">' +
+    '</div>' +
+    '<div style="margin-bottom:10px">' +
+    '<div style="font-size:12px;color:var(--text-sec);margin-bottom:4px">Muskelgruppe</div>' +
+    buildMuscleSelector('') +
+    '<input type="hidden" id="free-ex-muscle" value="">' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;margin-bottom:10px">' +
+    '<div style="flex:1">' +
+    '<div style="font-size:12px;color:var(--text-sec);margin-bottom:4px">Gewicht</div>' +
+    '<input type="number" inputmode="decimal" class="input-field" id="free-ex-weight" value="0" style="width:100%;font-size:14px;padding:8px">' +
+    '</div>' +
+    (!isCircuit ? '<div style="flex:1"><div style="font-size:12px;color:var(--text-sec);margin-bottom:4px">Saetze</div><input type="number" inputmode="numeric" class="input-field" id="free-ex-sets" value="3" style="width:100%;font-size:14px;padding:8px"></div>' : '') +
+    '<div style="flex:1">' +
+    '<div style="font-size:12px;color:var(--text-sec);margin-bottom:4px">Reps</div>' +
+    '<input type="number" inputmode="numeric" class="input-field" id="free-ex-reps" value="10" style="width:100%;font-size:14px;padding:8px">' +
+    '</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">' +
+    '<label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-sec)"><input type="checkbox" id="free-ex-bw"> Bodyweight</label>' +
+    '<label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-sec)"><input type="checkbox" id="free-ex-db"> Dumbbell</label>' +
+    '<label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-sec)"><input type="checkbox" id="free-ex-uni"> Unilateral</label>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<button class="btn btn-outline" style="flex:1" onclick="closeAddExForm()">Abbrechen</button>' +
+    '<button class="btn btn-orange" style="flex:1" onclick="confirmAddExercise(' + blockIndex + ')">Hinzufuegen</button>' +
+    '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) closeAddExForm();
+  });
+  setTimeout(function() { document.getElementById('free-ex-name').focus(); }, 100);
+}
+
+function onFreeExNameInput(name) {
+  var entry = getCatalogEntry(name);
+  if (entry) {
+    if (entry.muscle) selectFreeMuscle(entry.muscle);
+    if (entry.weight) document.getElementById('free-ex-weight').value = entry.weight;
+    document.getElementById('free-ex-bw').checked = !!entry.bodyweight;
+    document.getElementById('free-ex-db').checked = !!entry.dumbbell;
+    document.getElementById('free-ex-uni').checked = !!entry.unilateral;
+  }
+}
+
+function closeAddExForm() {
+  var overlay = document.getElementById('add-ex-overlay');
+  if (overlay) overlay.remove();
+}
+
+function confirmAddExercise(blockIndex) {
+  var name = document.getElementById('free-ex-name').value.trim();
+  if (!name) { showToast('Bitte Name eingeben'); return; }
+  var muscle = document.getElementById('free-ex-muscle').value;
+  var weight = parseFloat(document.getElementById('free-ex-weight').value) || 0;
+  var setsEl = document.getElementById('free-ex-sets');
+  var sets = setsEl ? (parseInt(setsEl.value) || 3) : 3;
+  var reps = parseInt(document.getElementById('free-ex-reps').value) || 10;
+  var bw = document.getElementById('free-ex-bw').checked;
+  var db = document.getElementById('free-ex-db').checked;
+  var uni = document.getElementById('free-ex-uni').checked;
+
+  freeDesignerState.blocks[blockIndex].exercises.push({
+    id: 'fe-' + (++freeDesignerCounter),
+    name: name,
+    muscle: muscle,
+    weight: weight,
+    sets: sets,
+    reps: reps,
+    bodyweight: bw,
+    dumbbell: db,
+    unilateral: uni
+  });
+
+  // Save to catalog for future auto-fill
+  if (muscle) {
+    saveCatalogEntry(name, muscle, { bodyweight: bw, dumbbell: db, unilateral: uni, weight: weight });
+    saveState();
+  }
+
+  closeAddExForm();
+  renderFreeDesigner();
+}
+
+function editDesignerExercise(bi, ei) {
+  var ex = freeDesignerState.blocks[bi].exercises[ei];
+  var block = freeDesignerState.blocks[bi];
+  var isCircuit = block.type === 'circuit';
+  var currentMuscle = ex.muscle || '';
+
+  var overlay = document.createElement('div');
+  overlay.id = 'add-ex-overlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.innerHTML = '<div style="background:var(--card);border-radius:16px;padding:20px;width:100%;max-width:340px;max-height:90vh;overflow-y:auto">' +
+    '<h3 style="margin-bottom:16px;font-size:16px">Uebung bearbeiten</h3>' +
+    '<div style="margin-bottom:10px">' +
+    '<div style="font-size:12px;color:var(--text-sec);margin-bottom:4px">Name</div>' +
+    '<input type="text" class="input-field" id="free-ex-name" style="width:100%;font-size:14px;padding:8px" value="' + ex.name + '" oninput="onFreeExNameInput(this.value)">' +
+    '</div>' +
+    '<div style="margin-bottom:10px">' +
+    '<div style="font-size:12px;color:var(--text-sec);margin-bottom:4px">Muskelgruppe</div>' +
+    buildMuscleSelector(currentMuscle) +
+    '<input type="hidden" id="free-ex-muscle" value="' + currentMuscle + '">' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;margin-bottom:10px">' +
+    '<div style="flex:1">' +
+    '<div style="font-size:12px;color:var(--text-sec);margin-bottom:4px">Gewicht</div>' +
+    '<input type="number" inputmode="decimal" class="input-field" id="free-ex-weight" value="' + ex.weight + '" style="width:100%;font-size:14px;padding:8px">' +
+    '</div>' +
+    (!isCircuit ? '<div style="flex:1"><div style="font-size:12px;color:var(--text-sec);margin-bottom:4px">Saetze</div><input type="number" inputmode="numeric" class="input-field" id="free-ex-sets" value="' + ex.sets + '" style="width:100%;font-size:14px;padding:8px"></div>' : '') +
+    '<div style="flex:1">' +
+    '<div style="font-size:12px;color:var(--text-sec);margin-bottom:4px">Reps</div>' +
+    '<input type="number" inputmode="numeric" class="input-field" id="free-ex-reps" value="' + ex.reps + '" style="width:100%;font-size:14px;padding:8px">' +
+    '</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">' +
+    '<label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-sec)"><input type="checkbox" id="free-ex-bw" ' + (ex.bodyweight ? 'checked' : '') + '> Bodyweight</label>' +
+    '<label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-sec)"><input type="checkbox" id="free-ex-db" ' + (ex.dumbbell ? 'checked' : '') + '> Dumbbell</label>' +
+    '<label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-sec)"><input type="checkbox" id="free-ex-uni" ' + (ex.unilateral ? 'checked' : '') + '> Unilateral</label>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<button class="btn btn-outline" style="flex:1" onclick="closeAddExForm()">Abbrechen</button>' +
+    '<button class="btn btn-orange" style="flex:1" onclick="confirmEditExercise(' + bi + ',' + ei + ')">Speichern</button>' +
+    '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) closeAddExForm();
+  });
+}
+
+function confirmEditExercise(bi, ei) {
+  var ex = freeDesignerState.blocks[bi].exercises[ei];
+  ex.name = document.getElementById('free-ex-name').value.trim() || ex.name;
+  ex.muscle = document.getElementById('free-ex-muscle').value;
+  ex.weight = parseFloat(document.getElementById('free-ex-weight').value) || 0;
+  var setsEl = document.getElementById('free-ex-sets');
+  if (setsEl) ex.sets = parseInt(setsEl.value) || 3;
+  ex.reps = parseInt(document.getElementById('free-ex-reps').value) || 10;
+  ex.bodyweight = document.getElementById('free-ex-bw').checked;
+  ex.dumbbell = document.getElementById('free-ex-db').checked;
+  ex.unilateral = document.getElementById('free-ex-uni').checked;
+
+  // Update catalog
+  if (ex.muscle) {
+    saveCatalogEntry(ex.name, ex.muscle, { bodyweight: ex.bodyweight, dumbbell: ex.dumbbell, unilateral: ex.unilateral, weight: ex.weight });
+    saveState();
+  }
+
+  closeAddExForm();
+  renderFreeDesigner();
+}
+
+function startFreeWorkout() {
+  var ds = freeDesignerState;
+  if (!ds) return;
+
+  // Validate
+  var totalEx = 0;
+  ds.blocks.forEach(function(b) { totalEx += b.exercises.length; });
+  if (totalEx === 0) { showToast('Keine Uebungen hinzugefuegt'); return; }
+
+  // Generate unique workout ID
+  var freeId = 'free-' + Date.now();
+  var workoutName = ds.name || 'Freies Workout';
+
+  // Build WORKOUT_PLAN from designer state
+  var strengthExercises = [];
+  var circuits = [];
+  var circuitCounter = 0;
+
+  ds.blocks.forEach(function(block, bi) {
+    if (block.type === 'single') {
+      block.exercises.forEach(function(ex) {
+        var exId = freeId + '-s' + strengthExercises.length;
+        var exObj = {
+          id: exId,
+          name: ex.name,
+          sets: ex.sets || 3,
+          reps: ex.reps || 10,
+          weight: ex.weight || 0,
+          restSeconds: 120,
+          bodyweight: ex.bodyweight || false,
+          dumbbell: ex.dumbbell || false,
+          unilateral: ex.unilateral || false
+        };
+        if (block.emom) {
+          exObj.emom = true;
+          exObj.emomMinutes = block.emomMinutes || 10;
+        }
+        strengthExercises.push(exObj);
+      });
+    } else if (block.type === 'circuit') {
+      var circuitId = freeId + '-c' + (circuitCounter++);
+      var circuitExercises = block.exercises.map(function(ex, ei) {
+        return {
+          id: circuitId + '-e' + ei,
+          name: ex.name,
+          reps: ex.reps || 10,
+          weight: ex.weight || 0,
+          bodyweight: ex.bodyweight || false,
+          dumbbell: ex.dumbbell || false,
+          unilateral: ex.unilateral || false
+        };
+      });
+      circuits.push({
+        id: circuitId,
+        rounds: [block.rounds || 4, block.rounds || 4],
+        restSeconds: 0,
+        exercises: circuitExercises
+      });
+    }
+  });
+
+  // Create the workout plan
+  var plan = {
+    name: workoutName,
+    subtitle: 'Free',
+    day: ds.date.split('-').slice(1).reverse().join('.'),
+    isFree: true,
+    strength: strengthExercises,
+    circuits: circuits,
+    accessories: [],
+    warmup: []
+  };
+
+  // Register muscle mappings from designer exercises
+  ds.blocks.forEach(function(block) {
+    block.exercises.forEach(function(ex) {
+      if (ex.muscle) {
+        // Find the actual exercise ID in the plan
+        var allPlanExercises = strengthExercises.concat([]);
+        circuits.forEach(function(c) { allPlanExercises = allPlanExercises.concat(c.exercises); });
+        var match = allPlanExercises.find(function(pe) { return pe.name === ex.name; });
+        if (match && match.id) {
+          EXERCISE_MUSCLE[match.id] = ex.muscle;
+        }
+      }
+    });
+  });
+
+  // Register the plan
+  WORKOUT_PLANS[freeId] = plan;
+
+  // Store muscle mappings on the plan for persistence
+  var muscleMappings = {};
+  ds.blocks.forEach(function(block) {
+    block.exercises.forEach(function(ex) {
+      if (ex.muscle) muscleMappings[ex.name] = ex.muscle;
+    });
+  });
+  plan._muscleMappings = muscleMappings;
+
+  // Persist the plan for future reference
+  if (!APP_STATE.freeWorkoutPlans) APP_STATE.freeWorkoutPlans = {};
+  APP_STATE.freeWorkoutPlans[freeId] = plan;
+
+  // Determine mesocycle week from date
+  var meso = APP_STATE.settings.mesocycle;
+  var week = meso.currentWeek;
+  if (meso.startDate) {
+    var startMs = new Date(meso.startDate).getTime();
+    var dateMs = new Date(ds.date).getTime();
+    var diffDays = Math.floor((dateMs - startMs) / 86400000);
+    if (diffDays >= 0) {
+      week = Math.floor(diffDays / 7) + 1;
+    }
+  }
+
+  // Create session
+  activeWorkoutId = freeId;
+  trainingView = 'workout-detail';
+  activeSubTab = strengthExercises.length > 0 ? 'strength' : 'zirkel';
+  warmupChecked = {};
+
+  activeSession = {
+    id: uuid(),
+    workoutId: freeId,
+    date: ds.date,
+    week: week,
+    mesocycle: meso.number,
+    duration: 0,
+    feeling: null,
+    readiness: null,
+    sets: {},
+    warmupDone: true,
+    circuitRounds: {},
+    notes: '',
+    _startTime: Date.now(),
+    _currentStrengthSet: {},
+    _currentCircuitRound: {},
+    _completed: false,
+    _circuitDone: {},
+    _readinessDone: true
+  };
+
+  freeDesignerState = null;
+  resetSessionTimer();
+  startSessionTimer();
+  navigateTo('training');
+}
+
+function openFreeSession(sessionId) {
+  var session = APP_STATE.sessions.find(function(s) { return s.id === sessionId; });
+  if (!session) return;
+  var plan = WORKOUT_PLANS[session.workoutId];
+  if (!plan) return;
+
+  activeWorkoutId = session.workoutId;
+  trainingView = 'workout-detail';
+  activeSubTab = 'done';
+  warmupChecked = {};
+  activeSession = JSON.parse(JSON.stringify(session));
+  activeSession._completed = true;
+  navigateTo('training');
+}
+
+// Restore free workout plans + muscle mappings from APP_STATE on load
+(function() {
+  var plans = APP_STATE.freeWorkoutPlans || {};
+  Object.keys(plans).forEach(function(id) {
+    WORKOUT_PLANS[id] = plans[id];
+    // Restore muscle mappings for volume tracking
+    var mappings = plans[id]._muscleMappings;
+    if (mappings) {
+      var allEx = (plans[id].strength || []).concat([]);
+      (plans[id].circuits || []).forEach(function(c) { allEx = allEx.concat(c.exercises || []); });
+      allEx.forEach(function(ex) {
+        if (mappings[ex.name]) {
+          EXERCISE_MUSCLE[ex.id] = mappings[ex.name];
+        }
+      });
+    }
+  });
+
+  // Also restore from exercise catalog
+  var catalog = APP_STATE.exerciseCatalog || {};
+  Object.keys(catalog).forEach(function(key) {
+    var entry = catalog[key];
+    // Catalog entries apply to any free exercise with matching name
+    Object.keys(plans).forEach(function(planId) {
+      var plan = plans[planId];
+      var allEx = (plan.strength || []).concat([]);
+      (plan.circuits || []).forEach(function(c) { allEx = allEx.concat(c.exercises || []); });
+      allEx.forEach(function(ex) {
+        if (ex.name.toLowerCase().trim() === key && entry.muscle && !EXERCISE_MUSCLE[ex.id]) {
+          EXERCISE_MUSCLE[ex.id] = entry.muscle;
+        }
+      });
+    });
+  });
+})();
 
 // =============================================
 // SWIPE TO DELETE
