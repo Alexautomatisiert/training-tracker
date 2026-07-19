@@ -7427,7 +7427,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '7.6';
+const APP_VERSION = '7.7';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
@@ -7789,20 +7789,14 @@ function renderFreeDesigner() {
       '<button style="color:var(--red);font-size:13px;background:none;border:none;padding:4px 8px" onclick="removeDesignerBlock(' + bi + ')">Loeschen</button>' +
       '</div>';
 
-    // Type toggle row (for single blocks)
+    // EMOM duration config (for EMOM blocks)
     var typeToggle = '';
-    if (block.type === 'single') {
-      typeToggle = '<div style="display:flex;gap:6px;margin-bottom:8px">' +
-        '<button class="btn btn-sm ' + (!block.emom ? 'btn-orange' : 'btn-outline') + '" style="padding:4px 10px;font-size:11px;min-height:24px" onclick="setBlockStyle(' + bi + ',false)">Saetze</button>' +
-        '<button class="btn btn-sm ' + (block.emom ? 'btn-orange' : 'btn-outline') + '" style="padding:4px 10px;font-size:11px;min-height:24px;' + (block.emom ? 'background:#9B59B6;border-color:#9B59B6' : '') + '" onclick="setBlockStyle(' + bi + ',true)">EMOM</button>' +
+    if (block.type === 'single' && block.emom) {
+      typeToggle = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">' +
+        '<span style="color:var(--text-sec);font-size:12px">Dauer:</span>' +
+        '<input type="number" inputmode="numeric" class="input-field" style="width:50px;font-size:13px;padding:4px 6px;text-align:center" value="' + (block.emomMinutes || 10) + '" onchange="setBlockEmom(' + bi + ',this.value)">' +
+        '<span style="color:var(--text-sec);font-size:12px">min</span>' +
         '</div>';
-      if (block.emom) {
-        typeToggle += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">' +
-          '<span style="color:var(--text-sec);font-size:12px">Dauer:</span>' +
-          '<input type="number" inputmode="numeric" class="input-field" style="width:50px;font-size:13px;padding:4px 6px;text-align:center" value="' + (block.emomMinutes || 10) + '" onchange="setBlockEmom(' + bi + ',this.value)">' +
-          '<span style="color:var(--text-sec);font-size:12px">min</span>' +
-          '</div>';
-      }
     }
 
     // Circuit rounds
@@ -7819,12 +7813,20 @@ function renderFreeDesigner() {
     // Exercise rows
     var exHtml = '';
     block.exercises.forEach(function(ex, ei) {
-      var weightDisplay = ex.bodyweight ? 'BW' : (ex.dumbbell ? ex.weight + '/DB' : ex.weight + 'kg');
-      var setsDisplay = block.type === 'single' && !block.emom ? ex.sets + 'x' + ex.reps : 'x' + ex.reps;
+      var tags = [];
+      if (ex.bodyweight) tags.push('BW');
+      if (ex.dumbbell) tags.push('DB');
+      if (ex.unilateral) tags.push('Uni');
+      var muscleLabel = '';
+      FREE_MUSCLE_OPTIONS.forEach(function(m) { if (m.value === ex.muscle) muscleLabel = m.label; });
+      var subParts = [];
+      if (muscleLabel) subParts.push(muscleLabel);
+      if (tags.length > 0) subParts.push(tags.join(' · '));
+      var subText = subParts.join(' · ');
       exHtml += '<div style="background:var(--bg);border-radius:8px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
         '<div style="flex:1">' +
         '<div style="color:#fff;font-size:13px">' + (ex.name || 'Uebung') + '</div>' +
-        '<div style="color:var(--text-sec);font-size:11px">' + weightDisplay + ' · ' + setsDisplay + (ex.unilateral ? '/Seite' : '') + '</div>' +
+        (subText ? '<div style="color:var(--text-ter);font-size:11px">' + subText + '</div>' : '') +
         '</div>' +
         '<div style="display:flex;gap:4px">' +
         '<button style="color:var(--text-sec);font-size:14px;background:none;border:none;padding:4px" onclick="editDesignerExercise(' + bi + ',' + ei + ')">&#9998;</button>' +
@@ -7842,9 +7844,10 @@ function renderFreeDesigner() {
   });
 
   // Add block buttons
-  var addBlockHtml = '<div style="display:flex;gap:8px;margin-bottom:16px">' +
-    '<button class="btn btn-outline" style="flex:1;border-style:dashed;color:var(--orange);border-color:var(--orange)" onclick="addDesignerBlock(\'single\')">+ Einzeluebung</button>' +
-    '<button class="btn btn-outline" style="flex:1;border-style:dashed;color:#3498DB;border-color:#3498DB" onclick="addDesignerBlock(\'circuit\')">+ Zirkel</button>' +
+  var addBlockHtml = '<div style="display:flex;gap:6px;margin-bottom:16px">' +
+    '<button class="btn btn-outline" style="flex:1;border-style:dashed;color:var(--orange);border-color:var(--orange);font-size:12px;padding:8px 4px" onclick="addDesignerBlock(\'single\')">+ Saetze</button>' +
+    '<button class="btn btn-outline" style="flex:1;border-style:dashed;color:#9B59B6;border-color:#9B59B6;font-size:12px;padding:8px 4px" onclick="addDesignerBlock(\'emom\')">+ EMOM</button>' +
+    '<button class="btn btn-outline" style="flex:1;border-style:dashed;color:#3498DB;border-color:#3498DB;font-size:12px;padding:8px 4px" onclick="addDesignerBlock(\'circuit\')">+ Zirkel</button>' +
     '</div>';
 
   // Start button
@@ -7876,10 +7879,12 @@ function renderFreeDesigner() {
 }
 
 function addDesignerBlock(type) {
+  var isEmom = type === 'emom';
+  var blockType = isEmom ? 'single' : type;
   freeDesignerState.blocks.push({
     id: 'db-' + (++freeDesignerCounter),
-    type: type,
-    emom: false,
+    type: blockType,
+    emom: isEmom,
     emomMinutes: 10,
     rounds: 4,
     exercises: []
@@ -7971,14 +7976,37 @@ function selectFreeMuscle(muscle) {
 }
 
 function showAddExerciseForm(blockIndex) {
-  var block = freeDesignerState.blocks[blockIndex];
-  var isCircuit = block.type === 'circuit';
+  // Build catalog suggestions (recent/saved exercises)
+  var catalog = getExerciseCatalog();
+  var catalogKeys = Object.keys(catalog);
+  var suggestionsHtml = '';
+  if (catalogKeys.length > 0) {
+    suggestionsHtml = '<div style="margin-bottom:12px">' +
+      '<div style="font-size:12px;color:var(--text-sec);margin-bottom:6px">Gespeicherte Uebungen</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:4px;max-height:120px;overflow-y:auto" id="catalog-suggestions">';
+    catalogKeys.forEach(function(key) {
+      var entry = catalog[key];
+      var muscleLabel = '';
+      FREE_MUSCLE_OPTIONS.forEach(function(m) { if (m.value === entry.muscle) muscleLabel = m.label; });
+      var tags = [];
+      if (entry.bodyweight) tags.push('BW');
+      if (entry.dumbbell) tags.push('DB');
+      var tagStr = tags.length > 0 ? ' · ' + tags.join('/') : '';
+      suggestionsHtml += '<button type="button" class="btn btn-outline" style="padding:4px 10px;font-size:11px;min-height:24px" ' +
+        'onclick="quickAddCatalogExercise(' + blockIndex + ',\'' + key.replace(/'/g, "\\'") + '\')">' +
+        entry.name + (muscleLabel ? ' <span style=&quot;color:var(--text-ter)&quot;>(' + muscleLabel + tagStr + ')</span>' : '') +
+        '</button>';
+    });
+    suggestionsHtml += '</div></div>';
+    suggestionsHtml += '<div style="border-top:1px solid var(--border);margin-bottom:12px;padding-top:12px;font-size:12px;color:var(--text-ter)">Oder neue Uebung anlegen:</div>';
+  }
 
   var overlay = document.createElement('div');
   overlay.id = 'add-ex-overlay';
   overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
   overlay.innerHTML = '<div style="background:var(--card);border-radius:16px;padding:20px;width:100%;max-width:340px;max-height:90vh;overflow-y:auto">' +
-    '<h3 style="margin-bottom:16px;font-size:16px">Uebung hinzufuegen</h3>' +
+    '<h3 style="margin-bottom:12px;font-size:16px">Uebung hinzufuegen</h3>' +
+    suggestionsHtml +
     '<div style="margin-bottom:10px">' +
     '<div style="font-size:12px;color:var(--text-sec);margin-bottom:4px">Name</div>' +
     '<input type="text" class="input-field" id="free-ex-name" style="width:100%;font-size:14px;padding:8px" placeholder="z.B. Ring Dips" oninput="onFreeExNameInput(this.value)">' +
@@ -7988,19 +8016,8 @@ function showAddExerciseForm(blockIndex) {
     buildMuscleSelector('') +
     '<input type="hidden" id="free-ex-muscle" value="">' +
     '</div>' +
-    '<div style="display:flex;gap:8px;margin-bottom:10px">' +
-    '<div style="flex:1">' +
-    '<div style="font-size:12px;color:var(--text-sec);margin-bottom:4px">Gewicht</div>' +
-    '<input type="number" inputmode="decimal" class="input-field" id="free-ex-weight" value="0" style="width:100%;font-size:14px;padding:8px">' +
-    '</div>' +
-    (!isCircuit ? '<div style="flex:1"><div style="font-size:12px;color:var(--text-sec);margin-bottom:4px">Saetze</div><input type="number" inputmode="numeric" class="input-field" id="free-ex-sets" value="3" style="width:100%;font-size:14px;padding:8px"></div>' : '') +
-    '<div style="flex:1">' +
-    '<div style="font-size:12px;color:var(--text-sec);margin-bottom:4px">Reps</div>' +
-    '<input type="number" inputmode="numeric" class="input-field" id="free-ex-reps" value="10" style="width:100%;font-size:14px;padding:8px">' +
-    '</div>' +
-    '</div>' +
     '<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">' +
-    '<label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-sec)"><input type="checkbox" id="free-ex-bw"> Bodyweight</label>' +
+    '<label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-sec)"><input type="checkbox" id="free-ex-bw" onchange="onFreeBwToggle()"> Bodyweight</label>' +
     '<label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-sec)"><input type="checkbox" id="free-ex-db"> Dumbbell</label>' +
     '<label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-sec)"><input type="checkbox" id="free-ex-uni"> Unilateral</label>' +
     '</div>' +
@@ -8016,11 +8033,35 @@ function showAddExerciseForm(blockIndex) {
   setTimeout(function() { document.getElementById('free-ex-name').focus(); }, 100);
 }
 
+function onFreeBwToggle() {
+  // No-op for now; BW weight is resolved during workout
+}
+
+function quickAddCatalogExercise(blockIndex, catalogKey) {
+  var catalog = getExerciseCatalog();
+  var entry = catalog[catalogKey];
+  if (!entry) return;
+
+  freeDesignerState.blocks[blockIndex].exercises.push({
+    id: 'fe-' + (++freeDesignerCounter),
+    name: entry.name,
+    muscle: entry.muscle || '',
+    weight: entry.bodyweight ? (APP_STATE.settings.bodyWeight || 78) : (entry.weight || 0),
+    sets: 3,
+    reps: 10,
+    bodyweight: !!entry.bodyweight,
+    dumbbell: !!entry.dumbbell,
+    unilateral: !!entry.unilateral
+  });
+
+  closeAddExForm();
+  renderFreeDesigner();
+}
+
 function onFreeExNameInput(name) {
   var entry = getCatalogEntry(name);
   if (entry) {
     if (entry.muscle) selectFreeMuscle(entry.muscle);
-    if (entry.weight) document.getElementById('free-ex-weight').value = entry.weight;
     document.getElementById('free-ex-bw').checked = !!entry.bodyweight;
     document.getElementById('free-ex-db').checked = !!entry.dumbbell;
     document.getElementById('free-ex-uni').checked = !!entry.unilateral;
@@ -8036,31 +8077,26 @@ function confirmAddExercise(blockIndex) {
   var name = document.getElementById('free-ex-name').value.trim();
   if (!name) { showToast('Bitte Name eingeben'); return; }
   var muscle = document.getElementById('free-ex-muscle').value;
-  var weight = parseFloat(document.getElementById('free-ex-weight').value) || 0;
-  var setsEl = document.getElementById('free-ex-sets');
-  var sets = setsEl ? (parseInt(setsEl.value) || 3) : 3;
-  var reps = parseInt(document.getElementById('free-ex-reps').value) || 10;
   var bw = document.getElementById('free-ex-bw').checked;
   var db = document.getElementById('free-ex-db').checked;
   var uni = document.getElementById('free-ex-uni').checked;
+  var weight = bw ? (APP_STATE.settings.bodyWeight || 78) : 0;
 
   freeDesignerState.blocks[blockIndex].exercises.push({
     id: 'fe-' + (++freeDesignerCounter),
     name: name,
     muscle: muscle,
     weight: weight,
-    sets: sets,
-    reps: reps,
+    sets: 3,
+    reps: 10,
     bodyweight: bw,
     dumbbell: db,
     unilateral: uni
   });
 
   // Save to catalog for future auto-fill
-  if (muscle) {
-    saveCatalogEntry(name, muscle, { bodyweight: bw, dumbbell: db, unilateral: uni, weight: weight });
-    saveState();
-  }
+  saveCatalogEntry(name, muscle, { bodyweight: bw, dumbbell: db, unilateral: uni, weight: 0 });
+  saveState();
 
   closeAddExForm();
   renderFreeDesigner();
@@ -8068,8 +8104,6 @@ function confirmAddExercise(blockIndex) {
 
 function editDesignerExercise(bi, ei) {
   var ex = freeDesignerState.blocks[bi].exercises[ei];
-  var block = freeDesignerState.blocks[bi];
-  var isCircuit = block.type === 'circuit';
   var currentMuscle = ex.muscle || '';
 
   var overlay = document.createElement('div');
@@ -8085,17 +8119,6 @@ function editDesignerExercise(bi, ei) {
     '<div style="font-size:12px;color:var(--text-sec);margin-bottom:4px">Muskelgruppe</div>' +
     buildMuscleSelector(currentMuscle) +
     '<input type="hidden" id="free-ex-muscle" value="' + currentMuscle + '">' +
-    '</div>' +
-    '<div style="display:flex;gap:8px;margin-bottom:10px">' +
-    '<div style="flex:1">' +
-    '<div style="font-size:12px;color:var(--text-sec);margin-bottom:4px">Gewicht</div>' +
-    '<input type="number" inputmode="decimal" class="input-field" id="free-ex-weight" value="' + ex.weight + '" style="width:100%;font-size:14px;padding:8px">' +
-    '</div>' +
-    (!isCircuit ? '<div style="flex:1"><div style="font-size:12px;color:var(--text-sec);margin-bottom:4px">Saetze</div><input type="number" inputmode="numeric" class="input-field" id="free-ex-sets" value="' + ex.sets + '" style="width:100%;font-size:14px;padding:8px"></div>' : '') +
-    '<div style="flex:1">' +
-    '<div style="font-size:12px;color:var(--text-sec);margin-bottom:4px">Reps</div>' +
-    '<input type="number" inputmode="numeric" class="input-field" id="free-ex-reps" value="' + ex.reps + '" style="width:100%;font-size:14px;padding:8px">' +
-    '</div>' +
     '</div>' +
     '<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">' +
     '<label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-sec)"><input type="checkbox" id="free-ex-bw" ' + (ex.bodyweight ? 'checked' : '') + '> Bodyweight</label>' +
@@ -8117,19 +8140,14 @@ function confirmEditExercise(bi, ei) {
   var ex = freeDesignerState.blocks[bi].exercises[ei];
   ex.name = document.getElementById('free-ex-name').value.trim() || ex.name;
   ex.muscle = document.getElementById('free-ex-muscle').value;
-  ex.weight = parseFloat(document.getElementById('free-ex-weight').value) || 0;
-  var setsEl = document.getElementById('free-ex-sets');
-  if (setsEl) ex.sets = parseInt(setsEl.value) || 3;
-  ex.reps = parseInt(document.getElementById('free-ex-reps').value) || 10;
   ex.bodyweight = document.getElementById('free-ex-bw').checked;
   ex.dumbbell = document.getElementById('free-ex-db').checked;
   ex.unilateral = document.getElementById('free-ex-uni').checked;
+  if (ex.bodyweight) ex.weight = APP_STATE.settings.bodyWeight || 78;
 
   // Update catalog
-  if (ex.muscle) {
-    saveCatalogEntry(ex.name, ex.muscle, { bodyweight: ex.bodyweight, dumbbell: ex.dumbbell, unilateral: ex.unilateral, weight: ex.weight });
-    saveState();
-  }
+  saveCatalogEntry(ex.name, ex.muscle, { bodyweight: ex.bodyweight, dumbbell: ex.dumbbell, unilateral: ex.unilateral, weight: 0 });
+  saveState();
 
   closeAddExForm();
   renderFreeDesigner();
