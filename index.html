@@ -3818,7 +3818,7 @@ function renderStrengthTab(plan) {
       : sessionSets.length;
     const hasPyramid = ex.pyramidWeights && ex.pyramidWeights.length > 0;
     const isEMOM = !!ex.emom;
-    const dbLabel = ex.dumbbell ? ' (pro DB)' : '';
+    const dbLabel = ex.dumbbell ? ' (pro DB)' : (ex.unilateral ? ' (pro Seite)' : '');
 
     // Build target range tag
     let targetTag = '';
@@ -4084,7 +4084,9 @@ function renderStrengthTab(plan) {
 
   if (allDone) {
     html += renderRPESelector('strength');
-    html += '<button class="btn btn-green" style="margin-top:12px" onclick="switchSubTab(\'zirkel\')">Weiter: Zirkel</button>';
+    if (!plan._isFreeBlock) {
+      html += '<button class="btn btn-green" style="margin-top:12px" onclick="switchSubTab(\'zirkel\')">Weiter: Zirkel</button>';
+    }
   }
 
   return html;
@@ -5453,46 +5455,54 @@ function renderDoneTab(plan) {
       var wplan = WORKOUT_PLANS[session.workoutId];
       if (!wplan) return '';
       var sections = [];
-      // Strength
-      if (wplan.strength && wplan.strength.length > 0) {
-        var sHtml = '';
-        wplan.strength.forEach(function(ex) {
-          var sets = session.sets[ex.id] || [];
-          if (sets.length === 0) return;
-          var setsStr = sets.map(function(s, i) {
-            return '<span style="color:' + (s.type === 'drop' ? 'var(--orange)' : 'var(--text-sec)') + '">' + s.weight + 'kg×' + s.reps + (s.type === 'drop' ? 'D' : '') + '</span>';
-          }).join(' · ');
-          sHtml += '<div style="padding:4px 0;border-bottom:1px solid var(--border)"><div style="font-size:12px;font-weight:600">' + ex.name + '</div><div style="font-size:11px;margin-top:2px">' + setsStr + '</div></div>';
-        });
-        if (sHtml) sections.push({ label: 'Strength', html: sHtml });
+
+      function _renderExSets(ex) {
+        var sets = session.sets[ex.id] || [];
+        if (sets.length === 0) return '';
+        var setsStr = sets.map(function(s) {
+          return '<span style="color:' + (s.type === 'drop' ? 'var(--orange)' : 'var(--text-sec)') + '">' + s.weight + 'kg×' + s.reps + (s.type === 'drop' ? 'D' : '') + '</span>';
+        }).join(' · ');
+        return '<div style="padding:4px 0;border-bottom:1px solid var(--border)"><div style="font-size:12px;font-weight:600">' + ex.name + '</div><div style="font-size:11px;margin-top:2px">' + setsStr + '</div></div>';
       }
-      // Circuits
-      if (wplan.circuits) wplan.circuits.forEach(function(c) {
-        var roundCount = session.circuitRounds && session.circuitRounds[c.id] ? session.circuitRounds[c.id] : 0;
-        if (roundCount === 0) return;
-        var cHtml = '<div style="font-size:11px;color:var(--text-ter);padding:2px 0;margin-bottom:4px">' + roundCount + ' Runden</div>';
-        c.exercises.forEach(function(cex) {
-          var csets = session.sets[cex.id] || [];
-          if (csets.length === 0) return;
-          var csetsStr = csets.map(function(s) {
-            return '<span style="color:var(--text-sec)">' + s.weight + 'kg×' + s.reps + '</span>';
-          }).join(' · ');
-          cHtml += '<div style="padding:3px 0;border-bottom:1px solid var(--border)"><div style="font-size:12px;font-weight:600">' + cex.name + '</div><div style="font-size:11px;margin-top:2px">' + csetsStr + '</div></div>';
+
+      if (wplan.isFree && wplan.freeBlocks) {
+        // Free workout: group by freeBlocks
+        wplan.freeBlocks.forEach(function(fb) {
+          var bHtml = '';
+          if (fb.type === 'circuit' && fb.circuitId) {
+            var circuit = (wplan.circuits || []).find(function(c) { return c.id === fb.circuitId; });
+            if (circuit) {
+              var roundCount = session.circuitRounds && session.circuitRounds[circuit.id] ? session.circuitRounds[circuit.id] : 0;
+              if (roundCount > 0) bHtml += '<div style="font-size:11px;color:var(--text-ter);padding:2px 0;margin-bottom:4px">' + roundCount + ' Runden</div>';
+              circuit.exercises.forEach(function(cex) { bHtml += _renderExSets(cex); });
+            }
+          } else {
+            fb.exerciseIds.forEach(function(eid) {
+              var ex = (wplan.strength || []).find(function(e) { return e.id === eid; });
+              if (ex) bHtml += _renderExSets(ex);
+            });
+          }
+          if (bHtml) sections.push({ label: fb.label, html: bHtml });
         });
-        sections.push({ label: c.name, html: cHtml });
-      });
-      // Accessories
-      if (wplan.accessories && wplan.accessories.length > 0) {
-        var aHtml = '';
-        wplan.accessories.forEach(function(ex) {
-          var sets = session.sets[ex.id] || [];
-          if (sets.length === 0) return;
-          var setsStr = sets.map(function(s) {
-            return '<span style="color:' + (s.type === 'drop' ? 'var(--orange)' : 'var(--text-sec)') + '">' + s.weight + 'kg×' + s.reps + (s.type === 'drop' ? 'D' : '') + '</span>';
-          }).join(' · ');
-          aHtml += '<div style="padding:4px 0;border-bottom:1px solid var(--border)"><div style="font-size:12px;font-weight:600">' + ex.name + '</div><div style="font-size:11px;margin-top:2px">' + setsStr + '</div></div>';
+      } else {
+        // Regular workout: Strength / Circuits / Accessories
+        if (wplan.strength && wplan.strength.length > 0) {
+          var sHtml = '';
+          wplan.strength.forEach(function(ex) { sHtml += _renderExSets(ex); });
+          if (sHtml) sections.push({ label: 'Strength', html: sHtml });
+        }
+        if (wplan.circuits) wplan.circuits.forEach(function(c) {
+          var roundCount = session.circuitRounds && session.circuitRounds[c.id] ? session.circuitRounds[c.id] : 0;
+          if (roundCount === 0) return;
+          var cHtml = '<div style="font-size:11px;color:var(--text-ter);padding:2px 0;margin-bottom:4px">' + roundCount + ' Runden</div>';
+          c.exercises.forEach(function(cex) { cHtml += _renderExSets(cex); });
+          sections.push({ label: c.name, html: cHtml });
         });
-        if (aHtml) sections.push({ label: 'Accessories', html: aHtml });
+        if (wplan.accessories && wplan.accessories.length > 0) {
+          var aHtml = '';
+          wplan.accessories.forEach(function(ex) { aHtml += _renderExSets(ex); });
+          if (aHtml) sections.push({ label: 'Accessories', html: aHtml });
+        }
       }
       if (sections.length === 0) return '';
       var allSections = sections.map(function(sec) {
@@ -5564,9 +5574,9 @@ function renderDoneTab(plan) {
       </div>
     </div>
 
-    <div style="display:flex;gap:8px;margin-top:12px">
-      <button class="btn btn-outline" style="flex:1" onclick="backToWeekOverview()">Zurueck zur Uebersicht</button>
-      <button class="btn btn-outline" style="flex:0 0 auto;padding:8px 14px" onclick="showChangeDateDialog('${session.id}')">Datum aendern</button>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-orange" style="flex:1" onclick="backToWeekOverview()">Fertig</button>
+      <button class="btn btn-outline" style="flex:0 0 auto;padding:8px 14px;font-size:12px;color:var(--text-ter);border-color:var(--border)" onclick="showChangeDateDialog('${session.id}')">📅 Datum</button>
     </div>
   `;
 }
@@ -7532,7 +7542,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '8.2';
+const APP_VERSION = '8.3';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
@@ -8287,7 +8297,7 @@ function renderFreeBlockTab(plan, blockIdx) {
       return block.exerciseIds.indexOf(ex.id) !== -1;
     });
     if (blockExercises.length > 0) {
-      var tempPlan = { strength: blockExercises };
+      var tempPlan = { strength: blockExercises, _isFreeBlock: true };
       html = renderStrengthTab(tempPlan);
     }
   }
