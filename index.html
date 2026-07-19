@@ -6685,6 +6685,76 @@ var calendarMonth = new Date().getMonth();
 var calendarYear = new Date().getFullYear();
 var calendarSelectedDate = null;
 
+// Meso colors: subtle tinted backgrounds for calendar shading
+var MESO_COLORS = [
+  { bg: 'rgba(45,125,70,0.08)',  border: 'rgba(45,125,70,0.25)',  text: '#2D7D46', label: 'M1' },  // green
+  { bg: 'rgba(68,136,255,0.08)', border: 'rgba(68,136,255,0.25)', text: '#4488FF', label: 'M2' },  // blue
+  { bg: 'rgba(155,89,182,0.08)', border: 'rgba(155,89,182,0.25)', text: '#9B59B6', label: 'M3' },  // purple
+  { bg: 'rgba(232,114,12,0.08)', border: 'rgba(232,114,12,0.25)', text: '#E8720C', label: 'M4' },  // orange
+  { bg: 'rgba(231,76,60,0.08)',  border: 'rgba(231,76,60,0.25)',  text: '#E74C3C', label: 'M5' }   // red
+];
+
+function getCalendarMesoRanges() {
+  // Derive date ranges per mesocycle from session data + current meso startDate
+  var mesoSessions = {};
+  APP_STATE.sessions.forEach(function(s) {
+    if (!s.mesocycle || !s.date) return;
+    if (!mesoSessions[s.mesocycle]) mesoSessions[s.mesocycle] = [];
+    mesoSessions[s.mesocycle].push(s.date);
+  });
+
+  var ranges = {};
+  var mesoNums = Object.keys(mesoSessions).map(Number).sort(function(a,b){return a-b;});
+
+  mesoNums.forEach(function(mn) {
+    var dates = mesoSessions[mn].sort();
+    var startStr = dates[0];
+    // For current meso, use official startDate if available
+    var meso = APP_STATE.settings.mesocycle;
+    if (mn === meso.number && meso.startDate && meso.startDate < startStr) {
+      startStr = meso.startDate;
+    }
+    // Start from Monday of the start week
+    var startD = new Date(startStr);
+    var dow = startD.getDay();
+    dow = dow === 0 ? 6 : dow - 1;
+    startD.setDate(startD.getDate() - dow);
+
+    // End: use last session date + extend to Sunday of that week
+    var endStr = dates[dates.length - 1];
+    // For current meso, extend to end of current week
+    if (mn === meso.number) {
+      var totalWeeks = meso.weeksHard + meso.weeksDeload;
+      var endD = new Date(startD);
+      endD.setDate(endD.getDate() + totalWeeks * 7 - 1);
+      endStr = endD.toISOString().split('T')[0];
+    } else {
+      var endD2 = new Date(endStr);
+      var edow = endD2.getDay();
+      edow = edow === 0 ? 6 : edow - 1;
+      endD2.setDate(endD2.getDate() + (6 - edow));
+      endStr = endD2.toISOString().split('T')[0];
+    }
+
+    ranges[mn] = {
+      start: startStr.replace(/-/g,''),
+      end: endStr.replace(/-/g,''),
+      color: MESO_COLORS[(mn - 1) % MESO_COLORS.length]
+    };
+  });
+  return ranges;
+}
+
+function getMesoForDate(dateStr, mesoRanges) {
+  var ds = dateStr.replace(/-/g, '');
+  var result = null;
+  Object.keys(mesoRanges).forEach(function(mn) {
+    var r = mesoRanges[mn];
+    if (ds >= r.start && ds <= r.end) result = { num: Number(mn), color: r.color };
+  });
+  return result;
+}
+
 function renderCalendarPage() {
   var container = document.getElementById('calendar-content');
   var monthNames = ['Januar', 'Februar', 'Maerz', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
@@ -6702,6 +6772,9 @@ function renderCalendarPage() {
       monthSessionCount++;
     }
   });
+
+  // Build meso date ranges for shading
+  var mesoRanges = getCalendarMesoRanges();
 
   var firstDay = new Date(calendarYear, calendarMonth, 1);
   var lastDay = new Date(calendarYear, calendarMonth + 1, 0);
@@ -6727,6 +6800,20 @@ function renderCalendarPage() {
   });
   html += '</div>';
 
+  // Find first day of each meso visible this month (for labels)
+  var mesoFirstDays = {};
+  Object.keys(mesoRanges).forEach(function(mn) {
+    var r = mesoRanges[mn];
+    var startStr = r.start.substring(0,4) + '-' + r.start.substring(4,6) + '-' + r.start.substring(6,8);
+    var sd = new Date(startStr);
+    // If meso starts before this month, first day in this month is day 1
+    var monthStart = new Date(calendarYear, calendarMonth, 1);
+    var monthEnd = new Date(calendarYear, calendarMonth + 1, 0);
+    if (sd >= monthStart && sd <= monthEnd) {
+      mesoFirstDays[sd.getDate()] = { num: Number(mn), color: r.color };
+    }
+  });
+
   // Day cells
   html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">';
   for (var e = 0; e < startDow; e++) {
@@ -6739,16 +6826,29 @@ function renderCalendarPage() {
     var isSelected = dateStr === calendarSelectedDate;
     var sessions = sessionsThisMonth[d] || [];
     var hasSession = sessions.length > 0;
+    var mesoInfo = getMesoForDate(dateStr, mesoRanges);
 
-    var cellStyle = 'aspect-ratio:1;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;';
-    if (isSelected) cellStyle += 'background:var(--orange);';
-    else if (hasSession) cellStyle += 'background:rgba(232,114,12,0.15);';
+    var cellStyle = 'aspect-ratio:1;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative;';
+    if (isSelected) {
+      cellStyle += 'background:var(--orange);';
+    } else if (hasSession) {
+      cellStyle += 'background:rgba(232,114,12,0.15);';
+    } else if (mesoInfo) {
+      cellStyle += 'background:' + mesoInfo.color.bg + ';';
+    }
     if (isToday && !isSelected) cellStyle += 'border:2px solid var(--orange);';
 
     var textColor = isSelected ? '#fff' : (isToday ? 'var(--orange)' : 'var(--text)');
     var fontWeight = (isToday || isSelected) ? '700' : '400';
 
     html += '<div style="' + cellStyle + '" onclick="calendarDayTap(\'' + dateStr + '\')">';
+
+    // Meso start label
+    if (mesoFirstDays[d] && !isSelected) {
+      var mfd = mesoFirstDays[d];
+      html += '<div style="position:absolute;top:1px;right:2px;font-size:7px;font-weight:700;color:' + mfd.color.text + ';opacity:0.7">' + mfd.color.label + '</div>';
+    }
+
     html += '<div style="font-size:13px;font-weight:' + fontWeight + ';color:' + textColor + '">' + d + '</div>';
 
     if (hasSession) {
@@ -6771,6 +6871,29 @@ function renderCalendarPage() {
   html += '<span>' + monthSessionCount + ' Sessions</span>';
   html += '<span>' + trainDays + ' Trainingstage</span>';
   html += '</div>';
+
+  // Meso legend (only if multiple mesos visible this month)
+  var visibleMesos = [];
+  Object.keys(mesoRanges).forEach(function(mn) {
+    var r = mesoRanges[mn];
+    var mStart = calendarYear * 10000 + (calendarMonth + 1) * 100 + 1;
+    var mEnd = calendarYear * 10000 + (calendarMonth + 1) * 100 + totalDays;
+    var rStart = parseInt(r.start);
+    var rEnd = parseInt(r.end);
+    if (rEnd >= mStart && rStart <= mEnd) {
+      visibleMesos.push({ num: Number(mn), color: r.color });
+    }
+  });
+  if (visibleMesos.length > 0) {
+    html += '<div style="display:flex;justify-content:center;gap:12px;margin-top:6px">';
+    visibleMesos.forEach(function(vm) {
+      html += '<div style="display:flex;align-items:center;gap:3px;font-size:10px;color:' + vm.color.text + '">';
+      html += '<div style="width:8px;height:8px;border-radius:2px;background:' + vm.color.bg + ';border:1px solid ' + vm.color.border + '"></div>';
+      html += 'Meso ' + vm.num;
+      html += '</div>';
+    });
+    html += '</div>';
+  }
 
   // Detail area
   html += '<div id="calendar-day-detail" style="margin-top:12px"></div>';
@@ -7294,7 +7417,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '7.4';
+const APP_VERSION = '7.5';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
