@@ -3382,7 +3382,11 @@ function renderWorkoutDetail() {
 
   // Sub tabs - always show all tabs so user can view rounds even when completed
   var tabs;
-  if (plan.isFree) {
+  if (plan.isFree && plan.freeBlocks) {
+    tabs = ['prep', 'warmup'];
+    plan.freeBlocks.forEach(function(b, i) { tabs.push('block-' + i); });
+    tabs.push('done');
+  } else if (plan.isFree) {
     tabs = [];
     if (plan.strength && plan.strength.length > 0) tabs.push('strength');
     if (plan.circuits && plan.circuits.length > 0) tabs.push('zirkel');
@@ -3391,9 +3395,16 @@ function renderWorkoutDetail() {
     tabs = ['prep', 'warmup', 'strength', 'zirkel', 'acc', 'done'];
   }
 
+  var defaultLabels = { prep: 'Prep', warmup: 'Warmup', strength: 'Strength', zirkel: 'Zirkel', acc: 'Acc', done: 'Done' };
   let tabsHtml = tabs.map(t => {
-    const labels = { prep: 'Prep', warmup: 'Warmup', strength: 'Strength', zirkel: 'Zirkel', acc: 'Acc', done: 'Done' };
-    return `<button class="sub-tab ${activeSubTab === t ? 'active' : ''}" onclick="switchSubTab('${t}')">${labels[t]}</button>`;
+    var label;
+    if (t.indexOf('block-') === 0 && plan.freeBlocks) {
+      var bi = parseInt(t.split('-')[1]);
+      label = plan.freeBlocks[bi].label;
+    } else {
+      label = defaultLabels[t];
+    }
+    return `<button class="sub-tab ${activeSubTab === t ? 'active' : ''}" onclick="switchSubTab('${t}')">${label}</button>`;
   }).join('');
 
   // Session timer bar (shown during active workout)
@@ -3407,20 +3418,25 @@ function renderWorkoutDetail() {
   }
 
   let content = '';
-  switch (activeSubTab) {
-    case 'prep': content = renderPrepTab(plan); break;
-    case 'warmup': content = renderWarmupTab(plan); break;
-    case 'strength': content = renderStrengthTab(plan); break;
-    case 'zirkel': content = renderZirkelTab(plan); break;
-    case 'acc': content = renderAccTab(plan); break;
-    case 'done': content = renderDoneTab(plan); break;
+  if (activeSubTab.indexOf('block-') === 0 && plan.freeBlocks) {
+    var blockIdx = parseInt(activeSubTab.split('-')[1]);
+    content = renderFreeBlockTab(plan, blockIdx);
+  } else {
+    switch (activeSubTab) {
+      case 'prep': content = renderPrepTab(plan); break;
+      case 'warmup': content = renderWarmupTab(plan); break;
+      case 'strength': content = renderStrengthTab(plan); break;
+      case 'zirkel': content = renderZirkelTab(plan); break;
+      case 'acc': content = renderAccTab(plan); break;
+      case 'done': content = renderDoneTab(plan); break;
+    }
   }
 
   const learningBtn = activeSession && !activeSession._completed
     ? '<button onclick="openLearningModal()" style="position:fixed;bottom:calc(var(--nav-height) + var(--safe-bottom) + 16px);right:16px;width:48px;height:48px;border-radius:50%;background:var(--card);border:1px solid var(--border);font-size:20px;z-index:100;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.3)" id="learning-fab">💡</button>'
     : '';
 
-  const cadenceBtn = activeSession && !activeSession._completed && (activeSubTab === 'strength' || activeSubTab === 'zirkel' || activeSubTab === 'acc')
+  const cadenceBtn = activeSession && !activeSession._completed && (activeSubTab === 'strength' || activeSubTab === 'zirkel' || activeSubTab === 'acc' || activeSubTab.indexOf('block-') === 0)
     ? '<button onclick="startCadence()" style="position:fixed;bottom:calc(var(--nav-height) + var(--safe-bottom) + 16px);left:16px;height:40px;border-radius:20px;background:' + (cadenceState.active ? 'var(--orange)' : 'var(--card)') + ';border:1px solid var(--border);font-size:12px;font-weight:600;color:' + (cadenceState.active ? '#fff' : 'var(--text-sec)') + ';z-index:100;display:flex;align-items:center;justify-content:center;padding:0 14px;gap:6px;box-shadow:0 2px 8px rgba(0,0,0,0.3)">♫ Kadenz</button>'
     : '';
 
@@ -3515,81 +3531,107 @@ function confirmReadiness() {
 function renderPrepTab(plan) {
   var html = '';
 
-  // Variant switch button (only if variants exist for this workout's base)
-  var baseId = getBaseWorkoutId(plan.id);
-  var variants = getWorkoutVariants(baseId);
-  if (variants.length > 1) {
-    // Build variant options (exclude current)
-    var otherVariants = variants.filter(function(v) { return v !== plan.id; });
-    if (otherVariants.length > 0) {
-      var btns = '';
-      otherVariants.forEach(function(vid) {
-        var vplan = WORKOUT_PLANS[vid];
-        btns += '<div onclick="switchToVariant(\'' + vid + '\')" style="' +
-          'display:flex;align-items:center;justify-content:space-between;' +
-          'background:var(--card);border:1px solid var(--orange);border-radius:10px;' +
-          'padding:10px 14px;cursor:pointer;margin-bottom:8px">' +
-          '<div><div style="font-size:13px;font-weight:600;color:var(--orange)">' + vplan.subtitle + '</div>' +
-          '<div style="font-size:11px;color:var(--text-sec)">' + vplan.strength[0].name + ' + ' + vplan.circuits[0].exercises.map(function(e){return e.name}).join(' + ') + '</div></div>' +
-          '<span style="color:var(--orange);font-size:16px">&rarr;</span></div>';
-      });
-      html += '<div style="margin-bottom:12px">' +
-        '<div style="font-size:11px;color:var(--text-ter);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Alternatives Training</div>' +
-        btns + '</div>';
+  // Variant switch button (only for regular workouts)
+  if (!plan.isFree) {
+    var baseId = getBaseWorkoutId(plan.id);
+    var variants = getWorkoutVariants(baseId);
+    if (variants.length > 1) {
+      var otherVariants = variants.filter(function(v) { return v !== plan.id; });
+      if (otherVariants.length > 0) {
+        var btns = '';
+        otherVariants.forEach(function(vid) {
+          var vplan = WORKOUT_PLANS[vid];
+          btns += '<div onclick="switchToVariant(\'' + vid + '\')" style="' +
+            'display:flex;align-items:center;justify-content:space-between;' +
+            'background:var(--card);border:1px solid var(--orange);border-radius:10px;' +
+            'padding:10px 14px;cursor:pointer;margin-bottom:8px">' +
+            '<div><div style="font-size:13px;font-weight:600;color:var(--orange)">' + vplan.subtitle + '</div>' +
+            '<div style="font-size:11px;color:var(--text-sec)">' + vplan.strength[0].name + ' + ' + vplan.circuits[0].exercises.map(function(e){return e.name}).join(' + ') + '</div></div>' +
+            '<span style="color:var(--orange);font-size:16px">&rarr;</span></div>';
+        });
+        html += '<div style="margin-bottom:12px">' +
+          '<div style="font-size:11px;color:var(--text-ter);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Alternatives Training</div>' +
+          btns + '</div>';
+      }
     }
   }
 
   // Recovery Check
   html += renderReadinessCheck();
 
-  // Estimated Duration
-  var dur = getEstimatedDuration(plan.id);
-  if (dur) {
-    html += '<div class="card" style="padding:12px;margin-bottom:12px;text-align:center">';
-    html += '<div style="font-size:12px;color:var(--text-ter)">Geschätzte Dauer</div>';
-    html += '<div style="font-size:20px;font-weight:700;color:var(--orange)">' + formatTime(dur) + '</div>';
-    html += '</div>';
+  // Estimated Duration (skip for free workouts — no history)
+  if (!plan.isFree) {
+    var dur = getEstimatedDuration(plan.id);
+    if (dur) {
+      html += '<div class="card" style="padding:12px;margin-bottom:12px;text-align:center">';
+      html += '<div style="font-size:12px;color:var(--text-ter)">Geschätzte Dauer</div>';
+      html += '<div style="font-size:20px;font-weight:700;color:var(--orange)">' + formatTime(dur) + '</div>';
+      html += '</div>';
+    }
   }
 
   // Exercise Overview
   html += '<div class="card" style="padding:12px;margin-bottom:12px">';
   html += '<div style="font-size:14px;font-weight:700;margin-bottom:10px">Übersicht</div>';
 
-  // Strength
-  html += '<div style="font-size:12px;font-weight:600;color:var(--orange);margin-bottom:4px">Strength</div>';
-  plan.strength.forEach(function(ex) {
-    var dbLbl = ex.dumbbell ? ' (DB)' : '';
-    var wLbl = ex.bodyweight ? 'BW' : ex.weight + 'kg' + dbLbl;
-    html += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid var(--border)">' +
-      '<span>' + ex.name + '</span>' +
-      '<span style="color:var(--text-sec)">' + ex.sets + '×' + ex.reps + ' @ ' + wLbl + '</span>' +
-    '</div>';
-  });
-
-  // Circuits
-  plan.circuits.forEach(function(circuit) {
-    var targetR = getTargetRounds(circuit.rounds, activeSession ? activeSession.week : APP_STATE.settings.mesocycle.currentWeek);
-    html += '<div style="font-size:12px;font-weight:600;color:var(--orange);margin-top:10px;margin-bottom:4px">' + circuit.name + ' (' + targetR + ' Runden)</div>';
-    circuit.exercises.forEach(function(ex) {
+  if (plan.isFree && plan.freeBlocks) {
+    // Free workout: show blocks overview
+    plan.freeBlocks.forEach(function(block, bi) {
+      var blockColor = block.emom ? '#9B59B6' : (block.type === 'circuit' ? '#3498DB' : 'var(--orange)');
+      html += '<div style="font-size:12px;font-weight:600;color:' + blockColor + ';margin-top:' + (bi > 0 ? '10px' : '0') + ';margin-bottom:4px">' + block.label + '</div>';
+      if (block.type === 'circuit' && block.circuitId) {
+        var circuit = plan.circuits.find(function(c) { return c.id === block.circuitId; });
+        if (circuit) {
+          circuit.exercises.forEach(function(ex) {
+            var wLbl = ex.bodyweight ? 'BW' : ex.weight + 'kg';
+            html += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid var(--border)">' +
+              '<span>' + ex.name + '</span>' +
+              '<span style="color:var(--text-sec)">' + ex.reps + ' Reps @ ' + wLbl + '</span></div>';
+          });
+        }
+      } else {
+        var blockExercises = plan.strength.filter(function(ex) { return block.exerciseIds.indexOf(ex.id) !== -1; });
+        blockExercises.forEach(function(ex) {
+          var wLbl = ex.bodyweight ? 'BW' : ex.weight + 'kg';
+          var setInfo = ex.emom ? 'EMOM ' + ex.emomMinutes + 'min' : ex.sets + '×' + ex.reps;
+          html += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid var(--border)">' +
+            '<span>' + ex.name + '</span>' +
+            '<span style="color:var(--text-sec)">' + setInfo + ' @ ' + wLbl + '</span></div>';
+        });
+      }
+    });
+  } else {
+    // Regular workout overview
+    html += '<div style="font-size:12px;font-weight:600;color:var(--orange);margin-bottom:4px">Strength</div>';
+    plan.strength.forEach(function(ex) {
       var dbLbl = ex.dumbbell ? ' (DB)' : '';
       var wLbl = ex.bodyweight ? 'BW' : ex.weight + 'kg' + dbLbl;
       html += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid var(--border)">' +
         '<span>' + ex.name + '</span>' +
-        '<span style="color:var(--text-sec)">' + ex.reps + ' @ ' + wLbl + '</span>' +
-      '</div>';
+        '<span style="color:var(--text-sec)">' + ex.sets + '×' + ex.reps + ' @ ' + wLbl + '</span></div>';
     });
-  });
 
-  // Accessories
-  html += '<div style="font-size:12px;font-weight:600;color:var(--orange);margin-top:10px;margin-bottom:4px">Accessories</div>';
-  plan.accessories.forEach(function(ex) {
-    var dbLbl = ex.dumbbell ? ' (DB)' : '';
-    var wLbl = ex.bodyweight ? 'BW' : (ex.weight || '-') + 'kg' + dbLbl;
-    html += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid var(--border)">' +
-      '<span>' + ex.name + '</span>' +
-      '<span style="color:var(--text-sec)">' + ex.sets + '×' + ex.reps + ' @ ' + wLbl + '</span>' +
-    '</div>';
-  });
+    plan.circuits.forEach(function(circuit) {
+      var targetR = getTargetRounds(circuit.rounds, activeSession ? activeSession.week : APP_STATE.settings.mesocycle.currentWeek);
+      html += '<div style="font-size:12px;font-weight:600;color:var(--orange);margin-top:10px;margin-bottom:4px">' + circuit.name + ' (' + targetR + ' Runden)</div>';
+      circuit.exercises.forEach(function(ex) {
+        var dbLbl = ex.dumbbell ? ' (DB)' : '';
+        var wLbl = ex.bodyweight ? 'BW' : ex.weight + 'kg' + dbLbl;
+        html += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid var(--border)">' +
+          '<span>' + ex.name + '</span>' +
+          '<span style="color:var(--text-sec)">' + ex.reps + ' @ ' + wLbl + '</span></div>';
+      });
+    });
+
+    html += '<div style="font-size:12px;font-weight:600;color:var(--orange);margin-top:10px;margin-bottom:4px">Accessories</div>';
+    plan.accessories.forEach(function(ex) {
+      var dbLbl = ex.dumbbell ? ' (DB)' : '';
+      var wLbl = ex.bodyweight ? 'BW' : (ex.weight || '-') + 'kg' + dbLbl;
+      html += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid var(--border)">' +
+        '<span>' + ex.name + '</span>' +
+        '<span style="color:var(--text-sec)">' + ex.sets + '×' + ex.reps + ' @ ' + wLbl + '</span></div>';
+    });
+  }
   html += '</div>';
 
   // Start button
@@ -3644,7 +3686,7 @@ function renderWarmupTab(plan) {
       ${totalWarmupTime > 0 ? `<div style="font-size:10px;color:var(--text-ter);margin-top:2px">Auto-Check bis ${formatTime(totalWarmupTime)}</div>` : ''}
     </div>
     <div class="card" id="warmup-scroll-container" style="max-height:45vh;overflow-y:auto;-webkit-overflow-scrolling:touch">${items}</div>
-    ${allDone ? '<button class="btn btn-orange" onclick="warmupToStrength()">Weiter: Strength</button>' : ''}
+    ${allDone ? '<button class="btn btn-orange" onclick="warmupToStrength()">Weiter: ' + (plan.isFree && plan.freeBlocks ? plan.freeBlocks[0].label : 'Strength') + '</button>' : ''}
   `;
 }
 
@@ -3674,7 +3716,7 @@ function toggleWarmup(id) {
     if (allDone) {
       // Scroll the "Weiter: Strength" button into view
       var btn = document.querySelector('.btn-orange');
-      if (btn && btn.textContent.indexOf('Strength') !== -1) {
+      if (btn && btn.textContent.indexOf('Weiter') !== -1) {
         btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     } else {
@@ -3707,7 +3749,12 @@ function resetWarmupTimer() {
 function warmupToStrength() {
   // Start session timer if not already started
   if (!sessionTimer.running && !sessionTimer.startTime) startSessionTimer();
-  switchSubTab('strength');
+  var plan = WORKOUT_PLANS[activeWorkoutId];
+  if (plan && plan.isFree && plan.freeBlocks) {
+    switchSubTab('block-0');
+  } else {
+    switchSubTab('strength');
+  }
 }
 
 // =============================================
@@ -7427,7 +7474,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '7.8';
+const APP_VERSION = '8.0';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
@@ -8153,6 +8200,47 @@ function confirmEditExercise(bi, ei) {
   renderFreeDesigner();
 }
 
+// Render a single free workout block tab
+function renderFreeBlockTab(plan, blockIdx) {
+  if (!plan.freeBlocks || !plan.freeBlocks[blockIdx]) return '';
+  var block = plan.freeBlocks[blockIdx];
+  var html = '';
+
+  if (block.type === 'circuit' && block.circuitId) {
+    // Render circuit block using renderZirkelTab with filtered plan
+    var circuit = plan.circuits.find(function(c) { return c.id === block.circuitId; });
+    if (circuit) {
+      var tempPlan = { circuits: [circuit] };
+      html = renderZirkelTab(tempPlan);
+    }
+  } else {
+    // Render single/EMOM block — filter strength exercises to this block only
+    var blockExercises = plan.strength.filter(function(ex) {
+      return block.exerciseIds.indexOf(ex.id) !== -1;
+    });
+    if (blockExercises.length > 0) {
+      var tempPlan = { strength: blockExercises };
+      html = renderStrengthTab(tempPlan);
+    }
+  }
+
+  // "Weiter" button to next block or done
+  if (activeSession && !activeSession._completed) {
+    var nextTabId;
+    var nextLabel;
+    if (blockIdx < plan.freeBlocks.length - 1) {
+      nextTabId = 'block-' + (blockIdx + 1);
+      nextLabel = plan.freeBlocks[blockIdx + 1].label;
+    } else {
+      nextTabId = 'done';
+      nextLabel = 'Done';
+    }
+    html += '<button class="btn btn-orange" style="margin-top:16px" onclick="switchSubTab(\'' + nextTabId + '\')">Weiter: ' + nextLabel + '</button>';
+  }
+
+  return html;
+}
+
 function startFreeWorkout() {
   var ds = freeDesignerState;
   if (!ds) return;
@@ -8170,15 +8258,32 @@ function startFreeWorkout() {
   var strengthExercises = [];
   var circuits = [];
   var circuitCounter = 0;
+  var freeBlocks = [];
+
+  // Count block types for labeling
+  var blockTypeCounts = {};
+  ds.blocks.forEach(function(b) {
+    var tk = b.emom ? 'emom' : b.type;
+    blockTypeCounts[tk] = (blockTypeCounts[tk] || 0) + 1;
+  });
+  var blockTypeRunning = {};
 
   ds.blocks.forEach(function(block, bi) {
+    var typeKey = block.emom ? 'emom' : block.type;
+    blockTypeRunning[typeKey] = (blockTypeRunning[typeKey] || 0) + 1;
+    var typeLabels = { emom: 'EMOM', single: 'Saetze', circuit: 'Zirkel' };
+    var blockLabel = typeLabels[typeKey] || 'Block';
+    if (blockTypeCounts[typeKey] > 1) blockLabel += ' ' + blockTypeRunning[typeKey];
+
+    var blockExIds = [];
+
     if (block.type === 'single') {
       block.exercises.forEach(function(ex) {
         var exId = freeId + '-s' + strengthExercises.length;
         var exObj = {
           id: exId,
           name: ex.name,
-          sets: ex.sets || 3,
+          sets: block.emom ? (block.emomMinutes || 10) : (ex.sets || 3),
           reps: String(ex.reps || 10),
           weight: ex.weight || 0,
           restSeconds: 120,
@@ -8191,12 +8296,22 @@ function startFreeWorkout() {
           exObj.emomMinutes = block.emomMinutes || 10;
         }
         strengthExercises.push(exObj);
+        blockExIds.push(exId);
+      });
+      freeBlocks.push({
+        label: blockLabel,
+        type: 'single',
+        emom: block.emom || false,
+        exerciseIds: blockExIds,
+        circuitId: null
       });
     } else if (block.type === 'circuit') {
       var circuitId = freeId + '-c' + (circuitCounter++);
       var circuitExercises = block.exercises.map(function(ex, ei) {
+        var cExId = circuitId + '-e' + ei;
+        blockExIds.push(cExId);
         return {
-          id: circuitId + '-e' + ei,
+          id: cExId,
           name: ex.name,
           reps: String(ex.reps || 10),
           weight: ex.weight || 0,
@@ -8207,9 +8322,18 @@ function startFreeWorkout() {
       });
       circuits.push({
         id: circuitId,
-        rounds: [block.rounds || 4, block.rounds || 4],
+        name: blockLabel,
+        type: 'Zirkel',
+        rounds: block.rounds || 4,
         restSeconds: 0,
         exercises: circuitExercises
+      });
+      freeBlocks.push({
+        label: blockLabel,
+        type: 'circuit',
+        emom: false,
+        exerciseIds: blockExIds,
+        circuitId: circuitId
       });
     }
   });
@@ -8223,14 +8347,18 @@ function startFreeWorkout() {
     strength: strengthExercises,
     circuits: circuits,
     accessories: [],
-    warmup: []
+    warmup: [
+      { id: freeId + '-w1', name: '5 Min leichtes Cardio', duration: '5m' },
+      { id: freeId + '-w2', name: 'Dynamisches Stretching', duration: '3m' },
+      { id: freeId + '-w3', name: 'Aktivierung / Mobilisierung', duration: '2m' }
+    ],
+    freeBlocks: freeBlocks
   };
 
   // Register muscle mappings from designer exercises
   ds.blocks.forEach(function(block) {
     block.exercises.forEach(function(ex) {
       if (ex.muscle) {
-        // Find the actual exercise ID in the plan
         var allPlanExercises = strengthExercises.concat([]);
         circuits.forEach(function(c) { allPlanExercises = allPlanExercises.concat(c.exercises); });
         var match = allPlanExercises.find(function(pe) { return pe.name === ex.name; });
@@ -8272,7 +8400,7 @@ function startFreeWorkout() {
   // Create session
   activeWorkoutId = freeId;
   trainingView = 'workout-detail';
-  activeSubTab = strengthExercises.length > 0 ? 'strength' : 'zirkel';
+  activeSubTab = 'prep';
   warmupChecked = {};
 
   activeSession = {
@@ -8285,7 +8413,7 @@ function startFreeWorkout() {
     feeling: null,
     readiness: null,
     sets: {},
-    warmupDone: true,
+    warmupDone: false,
     circuitRounds: {},
     notes: '',
     _startTime: Date.now(),
@@ -8293,12 +8421,11 @@ function startFreeWorkout() {
     _currentCircuitRound: {},
     _completed: false,
     _circuitDone: {},
-    _readinessDone: true
+    _readinessDone: false
   };
 
   freeDesignerState = null;
   resetSessionTimer();
-  startSessionTimer();
   navigateTo('training');
 }
 
