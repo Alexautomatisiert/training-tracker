@@ -7427,7 +7427,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '7.7';
+const APP_VERSION = '7.8';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
@@ -8179,7 +8179,7 @@ function startFreeWorkout() {
           id: exId,
           name: ex.name,
           sets: ex.sets || 3,
-          reps: ex.reps || 10,
+          reps: String(ex.reps || 10),
           weight: ex.weight || 0,
           restSeconds: 120,
           bodyweight: ex.bodyweight || false,
@@ -8198,7 +8198,7 @@ function startFreeWorkout() {
         return {
           id: circuitId + '-e' + ei,
           name: ex.name,
-          reps: ex.reps || 10,
+          reps: String(ex.reps || 10),
           weight: ex.weight || 0,
           bodyweight: ex.bodyweight || false,
           dumbbell: ex.dumbbell || false,
