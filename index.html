@@ -1499,7 +1499,8 @@ function getDefaultState() {
     prs: [],
     customWeights: {}, // user overrides for default exercise weights
     learnings: [], // { id, date, workoutId, text, mesocycle, week }
-    exerciseCatalog: {} // name→{muscle, bodyweight, dumbbell, unilateral, weight}
+    exerciseCatalog: {}, // name→{muscle, bodyweight, dumbbell, unilateral, weight}
+    mesoHistory: [] // [{number, startDate, weeksHard, weeksDeload}]
   };
 }
 
@@ -1560,6 +1561,47 @@ function loadState() {
           d.setDate(d.getDate() + diff);
           state.settings.mesocycle.startDate = d.toISOString().split('T')[0];
         }
+      }
+      // Migrate: initialize mesoHistory if missing
+      if (!state.mesoHistory) state.mesoHistory = [];
+      // Ensure current meso is in history
+      if (state.settings && state.settings.mesocycle) {
+        var curMeso = state.settings.mesocycle;
+        var found = state.mesoHistory.some(function(h) { return h.number === curMeso.number; });
+        if (!found) {
+          state.mesoHistory.push({
+            number: curMeso.number,
+            startDate: curMeso.startDate,
+            weeksHard: curMeso.weeksHard,
+            weeksDeload: curMeso.weeksDeload
+          });
+        }
+        // Derive past mesos from sessions that aren't in history yet
+        var allMesoNums = [];
+        (state.sessions || []).forEach(function(s) {
+          if (s.mesocycle && allMesoNums.indexOf(s.mesocycle) === -1) allMesoNums.push(s.mesocycle);
+        });
+        allMesoNums.forEach(function(mn) {
+          var inHistory = state.mesoHistory.some(function(h) { return h.number === mn; });
+          if (!inHistory) {
+            // Derive start date from earliest W1 session
+            var w1Sessions = (state.sessions || []).filter(function(s) { return s.mesocycle === mn && s.week === 1; });
+            var startDate = null;
+            if (w1Sessions.length > 0) {
+              w1Sessions.sort(function(a, b) { return a.date.localeCompare(b.date); });
+              var dd = new Date(w1Sessions[0].date);
+              var dy = dd.getDay();
+              var df = dy === 0 ? -6 : 1 - dy;
+              dd.setDate(dd.getDate() + df);
+              startDate = dd.toISOString().split('T')[0];
+            }
+            // Derive max week from sessions
+            var maxW = 1;
+            (state.sessions || []).forEach(function(s) { if (s.mesocycle === mn && s.week > maxW) maxW = s.week; });
+            state.mesoHistory.push({ number: mn, startDate: startDate, weeksHard: maxW, weeksDeload: 1 });
+          }
+        });
+        state.mesoHistory.sort(function(a, b) { return a.number - b.number; });
       }
       return state;
     }
@@ -1833,6 +1875,52 @@ function formatToBeat(exerciseId) {
   if (!sets) return '';
   const parts = sets.map((s, i) => 'S' + (i+1) + ': ' + s.weight + 'kg×' + s.reps);
   return 'To Beat: ' + parts.join(' | ');
+}
+
+// Get W1 sets from a specific mesocycle for an exercise
+function getMesoW1Sets(exerciseId, mesoNumber) {
+  var exInfo = getExerciseInfo(exerciseId);
+  var matchIds = [exerciseId];
+  var alias = EXERCISE_ID_ALIASES[exerciseId];
+  if (alias) matchIds.push(alias);
+  // Also match by name
+  if (exInfo) {
+    Object.keys(WORKOUT_PLANS).forEach(function(wid) {
+      var wp = WORKOUT_PLANS[wid];
+      var allEx = (wp.strength || []).concat(wp.accessories || []);
+      (wp.circuits || []).forEach(function(c) { allEx = allEx.concat(c.exercises || []); });
+      allEx.forEach(function(e) {
+        if (e.name === exInfo.name && matchIds.indexOf(e.id) === -1) matchIds.push(e.id);
+      });
+    });
+  }
+  // Find W1 sessions from that meso
+  var w1Sessions = APP_STATE.sessions
+    .filter(function(s) { return s.mesocycle === mesoNumber && s.week === 1; })
+    .sort(function(a, b) { return b.date.localeCompare(a.date); });
+  for (var si = 0; si < w1Sessions.length; si++) {
+    for (var mi = 0; mi < matchIds.length; mi++) {
+      var sets = w1Sessions[si].sets[matchIds[mi]];
+      if (sets && sets.length > 0) return sets;
+    }
+  }
+  return null;
+}
+
+// Format cross-meso reference line
+function formatMesoReference(exerciseId) {
+  var currentMeso = APP_STATE.settings.mesocycle.number;
+  if (currentMeso <= 1) return '';
+  var prevMeso = currentMeso - 1;
+  var sets = getMesoW1Sets(exerciseId, prevMeso);
+  if (!sets || sets.length === 0) return '';
+  var ex = getExerciseInfo(exerciseId);
+  var isDbl = ex && ex.dumbbell;
+  var parts = sets.map(function(s, i) {
+    var w = isDbl ? s.weight + '/DB' : s.weight + 'kg';
+    return w + '×' + s.reps;
+  });
+  return 'M' + prevMeso + ' W1: ' + parts.join(' | ');
 }
 
 // Progressive overload: target rounds for current week
@@ -3845,6 +3933,11 @@ function renderStrengthTab(plan) {
     if (toBeatStr) {
       html += `<div class="to-beat">${toBeatStr}</div>`;
     }
+    // Cross-meso reference
+    const mesoRefStr = formatMesoReference(ex.id);
+    if (mesoRefStr) {
+      html += `<div style="font-size:11px;color:var(--text-ter);padding:2px 8px;background:rgba(255,255,255,0.03);border-radius:6px;margin-bottom:6px;display:inline-block">${mesoRefStr}</div>`;
+    }
     // RPE Coaching tip for strength section
     html += renderCoachingTip('strength', activeWorkoutId);
 
@@ -4337,8 +4430,12 @@ function renderZirkelTab(plan) {
             '</div>' +
           '</div>' +
           '<div id="peek-' + ex.id + '" style="display:none">' + renderHistoryPeek(ex.id) + '</div>' +
-          (toBeatStr ? '<div class="to-beat" style="margin-top:4px">' + toBeatStr + '</div>' : '') +
-          renderCoachingTip(circuit.id, activeWorkoutId);
+          (toBeatStr ? '<div class="to-beat" style="margin-top:4px">' + toBeatStr + '</div>' : '');
+        var circMesoRef = formatMesoReference(ex.id);
+        if (circMesoRef) {
+          html += '<div style="font-size:11px;color:var(--text-ter);padding:2px 8px;background:rgba(255,255,255,0.03);border-radius:6px;margin-bottom:4px;display:inline-block">' + circMesoRef + '</div>';
+        }
+        html += renderCoachingTip(circuit.id, activeWorkoutId);
 
         // Show completed sets as done mini-cards (swipe to delete + tap to edit)
         for (var si = 0; si < exSets.length; si++) {
@@ -4762,6 +4859,7 @@ function renderAccExercise(ex) {
       </div>
       <div id="peek-${ex.id}" style="display:none">${renderHistoryPeek(ex.id)}</div>
       ${toBeatStr ? '<div class="to-beat" style="margin-top:6px">' + toBeatStr + '</div>' : ''}
+      ${(function(){ var mr = formatMesoReference(ex.id); return mr ? '<div style="font-size:11px;color:var(--text-ter);padding:2px 8px;background:rgba(255,255,255,0.03);border-radius:6px;margin-bottom:4px;display:inline-block">' + mr + '</div>' : ''; })()}
       ${sessionSets.length > 0 ? '<div style="text-align:center;margin:8px 0"><div class="rest-timer-display" style="font-family:\'SF Mono\',\'Menlo\',monospace;font-size:24px;font-weight:700;color:var(--orange);padding:4px 0">' + formatTime(getTimerSeconds()) + '</div><div class="timer-presets"><button class="timer-preset" onclick="startCountdown(60)">1:00</button><button class="timer-preset" onclick="startCountdown(90)">1:30</button><button class="timer-preset" onclick="startCountdown(120)">2:00</button></div><div class="timer-controls"><button class="timer-btn" onclick="toggleRestTimer(90)">' + (isRestTimerRunning() ? ICONS.pause : ICONS.play) + '</button><button class="timer-btn" onclick="resetRestTimer(); renderWorkoutDetail();">' + ICONS.reset + '</button></div></div>' : ''}
       <div style="margin-top:8px">${setsHtml}</div>
     </div>`;
@@ -4948,6 +5046,7 @@ function renderAccSuperset(exercises) {
       '<span style="font-size:12px;color:var(--text-sec)">' + completedCount + '/' + sets + '</span>' +
     '</div>' +
     (toBeatStr ? '<div class="to-beat" style="margin-top:6px">' + toBeatStr + '</div>' : '') +
+    (function(){ var mr = formatMesoReference(mainEx.id); return mr ? '<div style="font-size:11px;color:var(--text-ter);padding:2px 8px;background:rgba(255,255,255,0.03);border-radius:6px;margin-bottom:4px;display:inline-block">' + mr + '</div>' : ''; })() +
     '<div style="margin-top:8px">' + setsHtml + '</div>' +
   '</div>';
 }
@@ -5575,8 +5674,8 @@ function renderDoneTab(plan) {
     </div>
 
     <div style="display:flex;gap:8px;margin-top:16px">
-      <button class="btn btn-orange" style="flex:1" onclick="backToWeekOverview()">Fertig</button>
-      <button class="btn btn-outline" style="flex:0 0 auto;padding:8px 14px;font-size:12px;color:var(--text-ter);border-color:var(--border)" onclick="showChangeDateDialog('${session.id}')">📅 Datum</button>
+      <button class="btn btn-orange" style="flex:1;min-width:0" onclick="backToWeekOverview()">Fertig</button>
+      <button class="btn btn-outline" style="flex:0 0 auto;padding:8px 12px;font-size:12px;color:var(--text-ter);border-color:var(--border);white-space:nowrap" onclick="showChangeDateDialog('${session.id}')">Datum</button>
     </div>
   `;
 }
@@ -6096,23 +6195,52 @@ function renderCoachingTip(sectionKey, workoutId) {
 function renderHistoryPeek(exId) {
   var ex = getExerciseInfo(exId);
   if (!ex) return '';
+  // Match by exercise name across all IDs (cross-meso support)
+  var matchIds = [exId];
+  var alias = EXERCISE_ID_ALIASES[exId];
+  if (alias && matchIds.indexOf(alias) === -1) matchIds.push(alias);
+  if (ex) {
+    Object.keys(WORKOUT_PLANS).forEach(function(wid) {
+      var wp = WORKOUT_PLANS[wid];
+      var allEx = (wp.strength || []).concat(wp.accessories || []);
+      (wp.circuits || []).forEach(function(c) { allEx = allEx.concat(c.exercises || []); });
+      allEx.forEach(function(e) {
+        if (e.name === ex.name && matchIds.indexOf(e.id) === -1) matchIds.push(e.id);
+      });
+    });
+  }
   var sessions = APP_STATE.sessions
-    .filter(function(s) { return getSessionSetsForEx(s, exId); })
+    .filter(function(s) {
+      for (var i = 0; i < matchIds.length; i++) {
+        if (s.sets[matchIds[i]] && s.sets[matchIds[i]].length > 0) return true;
+      }
+      return false;
+    })
     .sort(function(a, b) { return a.date.localeCompare(b.date); })
-    .slice(-6);
+    .slice(-8);
   if (sessions.length === 0) return '<div style="font-size:12px;color:var(--text-ter);padding:4px 0">Noch keine History</div>';
   var isDbl = !!ex.dumbbell;
   var isWBW = !!ex.weightedBW;
   var isBW = !!ex.bodyweight;
+  var currentMeso = APP_STATE.settings.mesocycle.number;
   var html = '<div style="padding:6px 0">';
+  var lastMeso = -1;
   sessions.forEach(function(s, i) {
-    var sets = getSessionSetsForEx(s, exId);
+    var sets = null;
+    for (var mi = 0; mi < matchIds.length; mi++) {
+      if (s.sets[matchIds[mi]] && s.sets[matchIds[mi]].length > 0) { sets = s.sets[matchIds[mi]]; break; }
+    }
     if (!sets || sets.length === 0) return;
+    // Meso divider
+    var sMeso = s.mesocycle || 1;
+    if (sMeso !== lastMeso && sessions.some(function(ss) { return (ss.mesocycle || 1) !== sMeso; })) {
+      html += '<div style="font-size:10px;color:var(--orange);font-weight:600;padding:4px 0 2px;border-top:1px solid var(--border);margin-top:2px">Meso ' + sMeso + '</div>';
+      lastMeso = sMeso;
+    }
     var dateStr = s.date ? s.date.substring(5).replace('-', '.') : '?';
     var isLast = i === sessions.length - 1;
     var color = isLast ? 'var(--orange)' : 'var(--text-ter)';
     var fw = isLast ? '600' : '400';
-    // Show all sets in compact format
     var setsStr = sets.map(function(set) {
       var w = isBW ? 'BW' : isDbl ? set.weight + '/DB' : isWBW ? '+' + set.weight : set.weight + 'kg';
       var dropTag = set.type === 'drop' ? 'D' : '';
@@ -7365,7 +7493,7 @@ function renderSettingsPage() {
     <div class="card">${planRows}</div>
 
     <!-- Mesocycle -->
-    <div class="section-title">Mesozyklus ${meso.number}</div>
+    <div class="section-title">Mesozyklus ${meso.number} (aktuell)</div>
     <div class="card">
       <div class="settings-row">
         <div class="settings-label">Startdatum</div>
@@ -7424,6 +7552,9 @@ function renderSettingsPage() {
         <button class="btn btn-sm btn-orange" style="margin-top:8px" onclick="saveGoals()">Ziele speichern</button>
       </div>
     </div>
+
+    <!-- Meso History Overview -->
+    ${renderMesoHistorySection()}
 
     <!-- App -->
     <div class="section-title">App</div>
@@ -7542,7 +7673,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '8.3';
+const APP_VERSION = '8.4';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
@@ -7782,10 +7913,20 @@ function saveMesoStartDate() {
   var val = document.getElementById('meso-start-date').value;
   if (val) {
     APP_STATE.settings.mesocycle.startDate = val;
+    syncMesoToHistory(APP_STATE.settings.mesocycle);
     saveState();
     showToast('Startdatum gespeichert');
     renderSettingsPage();
   }
+}
+
+function syncMesoToHistory(meso) {
+  if (!APP_STATE.mesoHistory) APP_STATE.mesoHistory = [];
+  var entry = { number: meso.number, startDate: meso.startDate, weeksHard: meso.weeksHard, weeksDeload: meso.weeksDeload };
+  var idx = APP_STATE.mesoHistory.findIndex(function(h) { return h.number === meso.number; });
+  if (idx >= 0) APP_STATE.mesoHistory[idx] = entry;
+  else APP_STATE.mesoHistory.push(entry);
+  APP_STATE.mesoHistory.sort(function(a, b) { return a.number - b.number; });
 }
 
 function changeMesoWeeks(delta) {
@@ -7793,6 +7934,97 @@ function changeMesoWeeks(delta) {
   var newVal = meso.weeksHard + delta;
   if (newVal < 1) return;
   meso.weeksHard = newVal;
+  syncMesoToHistory(meso);
+  saveState();
+  renderSettingsPage();
+}
+
+function renderMesoHistorySection() {
+  var history = (APP_STATE.mesoHistory || []).slice().sort(function(a, b) { return b.number - a.number; });
+  var currentNum = APP_STATE.settings.mesocycle.number;
+  // Filter out current meso (shown above already)
+  var pastMesos = history.filter(function(h) { return h.number !== currentNum; });
+  if (pastMesos.length === 0) return '';
+
+  var html = '<div class="section-title">Vergangene Mesozyklen</div>';
+  pastMesos.forEach(function(m) {
+    // Count sessions for this meso
+    var mesoSessions = APP_STATE.sessions.filter(function(s) { return s.mesocycle === m.number; });
+    var sessionCount = mesoSessions.length;
+    var maxWeek = 0;
+    mesoSessions.forEach(function(s) { if (s.week > maxWeek) maxWeek = s.week; });
+    var dateRange = '';
+    if (m.startDate) {
+      var sd = new Date(m.startDate);
+      var ed = new Date(m.startDate);
+      ed.setDate(ed.getDate() + ((m.weeksHard + m.weeksDeload) * 7) - 1);
+      dateRange = sd.getDate() + '.' + (sd.getMonth() + 1) + '.' + sd.getFullYear() + ' - ' +
+        ed.getDate() + '.' + (ed.getMonth() + 1) + '.' + ed.getFullYear();
+    }
+
+    html += '<div class="card" style="margin-bottom:8px">' +
+      '<div class="settings-row" style="flex-direction:column;align-items:stretch">' +
+        '<div class="expandable-header" onclick="toggleExpand(this)" style="width:100%">' +
+          '<div>' +
+            '<div class="settings-label">Mesozyklus ' + m.number + '</div>' +
+            '<div style="font-size:12px;color:var(--text-sec)">' + (dateRange || 'Kein Datum') + ' · ' + sessionCount + ' Sessions · ' + maxWeek + ' Wochen</div>' +
+          '</div>' +
+          '<span class="chevron">' + ICONS.chevDown + '</span>' +
+        '</div>' +
+        '<div class="expandable-content">' +
+          '<div style="margin-top:8px">' +
+            '<div class="settings-row">' +
+              '<div class="settings-label" style="font-size:13px">Startdatum</div>' +
+              '<div style="display:flex;align-items:center;gap:8px">' +
+                '<input type="date" class="input-field" style="width:140px;text-align:right;font-size:13px;padding:4px 8px" value="' + (m.startDate || '') + '" id="meso-hist-date-' + m.number + '">' +
+                '<button class="btn btn-sm btn-orange" style="padding:4px 10px;min-height:28px;font-size:12px" onclick="saveMesoHistDate(' + m.number + ')">OK</button>' +
+              '</div>' +
+            '</div>' +
+            '<div class="settings-row">' +
+              '<div class="settings-label" style="font-size:13px">Harte Wochen</div>' +
+              '<div style="display:flex;align-items:center;gap:8px">' +
+                '<button class="btn btn-sm btn-outline" style="padding:4px 10px;min-height:28px" onclick="changeMesoHistWeeks(' + m.number + ',-1)">-</button>' +
+                '<span class="settings-value">' + m.weeksHard + '</span>' +
+                '<button class="btn btn-sm btn-outline" style="padding:4px 10px;min-height:28px" onclick="changeMesoHistWeeks(' + m.number + ',1)">+</button>' +
+              '</div>' +
+            '</div>' +
+            '<div class="settings-row">' +
+              '<div class="settings-label" style="font-size:13px">Deload Wochen</div>' +
+              '<div class="settings-value">' + m.weeksDeload + '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  });
+  return html;
+}
+
+function saveMesoHistDate(mesoNum) {
+  var val = document.getElementById('meso-hist-date-' + mesoNum).value;
+  if (!val) return;
+  var hist = (APP_STATE.mesoHistory || []);
+  for (var i = 0; i < hist.length; i++) {
+    if (hist[i].number === mesoNum) {
+      hist[i].startDate = val;
+      break;
+    }
+  }
+  saveState();
+  showToast('M' + mesoNum + ' Startdatum gespeichert');
+  renderSettingsPage();
+}
+
+function changeMesoHistWeeks(mesoNum, delta) {
+  var hist = (APP_STATE.mesoHistory || []);
+  for (var i = 0; i < hist.length; i++) {
+    if (hist[i].number === mesoNum) {
+      var newVal = hist[i].weeksHard + delta;
+      if (newVal < 1) return;
+      hist[i].weeksHard = newVal;
+      break;
+    }
+  }
   saveState();
   renderSettingsPage();
 }
@@ -7848,11 +8080,22 @@ function confirmNewMeso() {
   if (!startDate) { showToast('Bitte Startdatum waehlen'); return; }
 
   var meso = APP_STATE.settings.mesocycle;
+  // Save current meso to history before advancing
+  if (!APP_STATE.mesoHistory) APP_STATE.mesoHistory = [];
+  var existingIdx = APP_STATE.mesoHistory.findIndex(function(h) { return h.number === meso.number; });
+  var histEntry = { number: meso.number, startDate: meso.startDate, weeksHard: meso.weeksHard, weeksDeload: meso.weeksDeload };
+  if (existingIdx >= 0) APP_STATE.mesoHistory[existingIdx] = histEntry;
+  else APP_STATE.mesoHistory.push(histEntry);
+
   meso.number += 1;
   meso.currentWeek = 1;
   meso.weeksHard = weeksHard;
   meso.weeksDeload = weeksDeload;
   meso.startDate = startDate;
+  // Save new meso to history too
+  APP_STATE.mesoHistory.push({ number: meso.number, startDate: startDate, weeksHard: weeksHard, weeksDeload: weeksDeload });
+  APP_STATE.mesoHistory.sort(function(a, b) { return a.number - b.number; });
+
   APP_STATE.settings.goals = { weeklyVolume: 0, ruecken: 0, brust: 0, quads: 0, hams: 0 };
   APP_STATE.settings.goalsAutoSet = false;
   delete APP_STATE.settings.goalsBaseline;
