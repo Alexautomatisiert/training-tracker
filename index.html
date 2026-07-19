@@ -2580,6 +2580,7 @@ function getLastSessionSets(exerciseId) {
     Object.keys(WORKOUT_PLANS).forEach(function(wid) {
       var wp = WORKOUT_PLANS[wid];
       var allEx = (wp.strength || []).concat(wp.accessories || []);
+      (wp.circuits || []).forEach(function(c) { allEx = allEx.concat(c.exercises || []); });
       allEx.forEach(function(e) {
         if (e.id !== exerciseId && e.name === exInfo.name && matchIds.indexOf(e.id) === -1) {
           matchIds.push(e.id);
@@ -3476,8 +3477,27 @@ function renderReadinessCheck() {
   html += '</div>';
   html += '<div style="font-size:11px;color:var(--text-ter);margin-bottom:12px">Bezogen auf die heutigen Zielmuskelgruppen</div>';
 
-  // Slider 1: Schlaf
-  var muscles = WORKOUT_TARGET_MUSCLES[activeWorkoutId] || ['Muskeln', 'Muskeln'];
+  // Derive target muscles — for free workouts, extract from EXERCISE_MUSCLE mappings
+  var muscles = WORKOUT_TARGET_MUSCLES[activeWorkoutId];
+  if (!muscles) {
+    var _plan = WORKOUT_PLANS[activeWorkoutId];
+    if (_plan) {
+      var _muscleSet = {};
+      var _allEx = (_plan.strength || []).concat([]);
+      (_plan.circuits || []).forEach(function(c) { _allEx = _allEx.concat(c.exercises || []); });
+      _allEx.forEach(function(ex) {
+        var m = EXERCISE_MUSCLE[ex.id];
+        if (m && m !== 'core') {
+          var label = m.charAt(0).toUpperCase() + m.slice(1);
+          _muscleSet[label] = (_muscleSet[label] || 0) + 1;
+        }
+      });
+      var _muscleList = Object.keys(_muscleSet).sort(function(a, b) { return _muscleSet[b] - _muscleSet[a]; });
+      if (_muscleList.length >= 2) muscles = [_muscleList[0], _muscleList[1]];
+      else if (_muscleList.length === 1) muscles = [_muscleList[0], _muscleList[0]];
+    }
+    if (!muscles) muscles = ['Muskeln', 'Muskeln'];
+  }
   html += renderReadinessSlider('sleep', 'Schlaf', rd.sleep || 0, ['😴', '😐', '😊', '😄', '🌟']);
   html += renderReadinessSlider('muscle1', muscles[0], rd.muscle1 || 0, ['🔥', '😣', '😐', '💪', '🦾']);
   html += renderReadinessSlider('muscle2', muscles[1], rd.muscle2 || 0, ['🔥', '😣', '😐', '💪', '🦾']);
@@ -3764,6 +3784,21 @@ function warmupToStrength() {
 function renderStrengthTab(plan) {
   let html = '';
 
+  // Compact sticky rest timer — one per section (non-EMOM only)
+  var _hasNonEmom = plan.strength.some(function(e) { return !e.emom; });
+  if (_hasNonEmom && activeSession && !activeSession._completed) {
+    html += '<div style="position:sticky;top:0;z-index:10;background:var(--bg);padding:6px 0 8px">' +
+      '<div style="display:flex;align-items:center;justify-content:center;gap:12px;background:var(--card);border-radius:10px;padding:8px 16px;border:1px solid var(--border)">' +
+        '<button class="timer-btn" style="width:36px;height:36px" onclick="toggleRestTimer(120)">' + (isRestTimerRunning() ? ICONS.pause : ICONS.play) + '</button>' +
+        '<div class="rest-timer-display" style="font-family:\'SF Mono\',\'Menlo\',monospace;font-size:28px;font-weight:700;color:var(--orange);min-width:80px;text-align:center">' + formatTime(getTimerSeconds()) + '</div>' +
+        '<button class="timer-btn" style="width:36px;height:36px" onclick="resetRestTimer(); renderWorkoutDetail();">' + ICONS.reset + '</button>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:center;gap:4px;margin-top:4px">' +
+        [60, 90, 120, 150, 180].map(function(s) { return '<button class="timer-preset" style="font-size:11px;padding:3px 8px" onclick="startCountdown(' + s + ')">' + formatTime(s) + '</button>'; }).join('') +
+      '</div>' +
+    '</div>';
+  }
+
   plan.strength.forEach(ex => {
     const lastStr = formatLastSession(ex.id);
     const sessionSets = activeSession.sets[ex.id] || [];
@@ -3892,21 +3927,6 @@ function renderStrengthTab(plan) {
           </div>`;
         }
       }
-    } else {
-      // Regular rest timer
-      const restDefault = ex.restSeconds || 120;
-      const restPresets = ex.restSeconds === 75 ? [60, 75, 90] : [120, 150, 180];
-      html += `
-        <div style="text-align:center;margin:12px 0">
-          <div class="rest-timer-display" style="font-family:'SF Mono','Menlo',monospace;font-size:36px;font-weight:700;color:var(--orange);padding:8px 0">${formatTime(getTimerSeconds())}</div>
-          <div class="timer-presets">
-            ${restPresets.map(s => `<button class="timer-preset" onclick="startCountdown(${s})">${formatTime(s)}</button>`).join('')}
-          </div>
-          <div class="timer-controls">
-            <button class="timer-btn" onclick="toggleRestTimer(${restDefault})">${isRestTimerRunning() ? ICONS.pause : ICONS.play}</button>
-            <button class="timer-btn" onclick="resetRestTimer(); renderWorkoutDetail();">${ICONS.reset}</button>
-          </div>
-        </div>`;
     }
 
     // Completed sets with swipe-to-delete + tap-to-edit (skip for EMOM - handled above)
@@ -4153,17 +4173,16 @@ function renderZirkelTab(plan) {
           '</div>';
         }
       } else {
-        // Regular rest timer
+        // Compact sticky rest timer
         var circuitRest = circuit.restSeconds || 90;
-        var timerPresets = circuitRest >= 150 ? [120, 150, 180] : circuitRest >= 90 ? [60, 90, 120] : [45, 60, 90];
-        html += '<div style="text-align:center;margin:4px 0 8px">' +
-            '<div class="timer-presets">' +
-              timerPresets.map(function(s) { return '<button class="timer-preset" onclick="startCountdown(' + s + ')">' + formatTime(s) + '</button>'; }).join('') +
+        html += '<div style="position:sticky;top:0;z-index:10;background:var(--bg);padding:6px 0 8px">' +
+            '<div style="display:flex;align-items:center;justify-content:center;gap:12px;background:var(--card);border-radius:10px;padding:8px 16px;border:1px solid var(--border)">' +
+              '<button class="timer-btn" style="width:36px;height:36px" onclick="toggleRestTimer(' + circuitRest + ')">' + (isRestTimerRunning() ? ICONS.pause : ICONS.play) + '</button>' +
+              '<div class="rest-timer-display" style="font-family:\'SF Mono\',\'Menlo\',monospace;font-size:28px;font-weight:700;color:var(--orange);min-width:80px;text-align:center">' + formatTime(getTimerSeconds()) + '</div>' +
+              '<button class="timer-btn" style="width:36px;height:36px" onclick="resetRestTimer(); renderWorkoutDetail();">' + ICONS.reset + '</button>' +
             '</div>' +
-            '<div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-top:4px">' +
-              '<button class="timer-btn" onclick="toggleRestTimer(' + circuitRest + ')">' + (isRestTimerRunning() ? ICONS.pause : ICONS.play) + '</button>' +
-              '<div class="rest-timer-display" style="font-family:\'SF Mono\',\'Menlo\',monospace;font-size:28px;font-weight:700;color:var(--orange)">' + formatTime(getTimerSeconds()) + '</div>' +
-              '<button class="timer-btn" onclick="resetRestTimer(); renderWorkoutDetail();">' + ICONS.reset + '</button>' +
+            '<div style="display:flex;justify-content:center;gap:4px;margin-top:4px">' +
+              [60, 90, 120, 150, 180].map(function(s) { return '<button class="timer-preset" style="font-size:11px;padding:3px 8px" onclick="startCountdown(' + s + ')">' + formatTime(s) + '</button>'; }).join('') +
             '</div>' +
           '</div>';
       }
@@ -7474,7 +7493,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '8.0';
+const APP_VERSION = '8.1';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
@@ -8348,9 +8367,17 @@ function startFreeWorkout() {
     circuits: circuits,
     accessories: [],
     warmup: [
-      { id: freeId + '-w1', name: '5 Min leichtes Cardio', duration: '5m' },
-      { id: freeId + '-w2', name: 'Dynamisches Stretching', duration: '3m' },
-      { id: freeId + '-w3', name: 'Aktivierung / Mobilisierung', duration: '2m' }
+      { id: freeId + '-w1', name: 'Iso Aussenrotation R', duration: '30s' },
+      { id: freeId + '-w2', name: 'Iso Aussenrotation L', duration: '30s' },
+      { id: freeId + '-w3', name: 'Iso Innenrotation R', duration: '30s' },
+      { id: freeId + '-w4', name: 'Iso Innenrotation L', duration: '30s' },
+      { id: freeId + '-w5', name: 'Aussenrotation R', duration: '45s' },
+      { id: freeId + '-w6', name: 'Aussenrotation L', duration: '45s' },
+      { id: freeId + '-w7', name: 'Innenrotation R', duration: '45s' },
+      { id: freeId + '-w8', name: 'Innenrotation L', duration: '45s' },
+      { id: freeId + '-w9', name: 'Plank Rotation', duration: '60s' },
+      { id: freeId + '-w10b', name: 'Rev. Planks', duration: '30s' },
+      { id: freeId + '-w10', name: '20 Push-ups', duration: '' }
     ],
     freeBlocks: freeBlocks
   };
@@ -8371,6 +8398,26 @@ function startFreeWorkout() {
 
   // Register the plan
   WORKOUT_PLANS[freeId] = plan;
+
+  // Add history aliases: map free exercise IDs → existing exercise IDs with same name
+  var allPlannedEx = [];
+  Object.keys(WORKOUT_PLANS).forEach(function(wid) {
+    if (wid === freeId) return;
+    var wp = WORKOUT_PLANS[wid];
+    (wp.strength || []).forEach(function(e) { allPlannedEx.push(e); });
+    (wp.circuits || []).forEach(function(c) { (c.exercises || []).forEach(function(e) { allPlannedEx.push(e); }); });
+  });
+  var allFreeEx = strengthExercises.concat([]);
+  circuits.forEach(function(c) { allFreeEx = allFreeEx.concat(c.exercises || []); });
+  allFreeEx.forEach(function(freeEx) {
+    var nameLower = freeEx.name.toLowerCase().trim();
+    for (var i = 0; i < allPlannedEx.length; i++) {
+      if (allPlannedEx[i].name.toLowerCase().trim() === nameLower) {
+        EXERCISE_ID_ALIASES[freeEx.id] = allPlannedEx[i].id;
+        break;
+      }
+    }
+  });
 
   // Store muscle mappings on the plan for persistence
   var muscleMappings = {};
