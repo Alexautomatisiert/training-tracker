@@ -3031,6 +3031,27 @@ function renderHomePage() {
     learningsHtml = '<div style="text-align:center;padding:12px;color:var(--text-ter);font-size:13px">Noch keine Learnings</div>';
   }
 
+  // Mesocycle selector: find all distinct meso numbers
+  var allMesoNumbers = [];
+  APP_STATE.sessions.forEach(function(s) {
+    if (s.mesocycle && allMesoNumbers.indexOf(s.mesocycle) === -1) allMesoNumbers.push(s.mesocycle);
+  });
+  if (allMesoNumbers.indexOf(meso.number) === -1) allMesoNumbers.push(meso.number);
+  allMesoNumbers.sort(function(a, b) { return a - b; });
+
+  var mesoSelectorHtml = '';
+  if (allMesoNumbers.length > 1) {
+    var pills = '';
+    allMesoNumbers.forEach(function(mn) {
+      var isActive = mn === meso.number;
+      var style = isActive
+        ? 'background:var(--orange);color:#fff;border:1px solid var(--orange)'
+        : 'background:var(--card);color:var(--text-sec);border:1px solid var(--border)';
+      pills += '<button style="' + style + ';padding:4px 12px;border-radius:16px;font-size:12px;font-weight:600;cursor:pointer" onclick="switchMesocycle(' + mn + ')">M' + mn + '</button>';
+    });
+    mesoSelectorHtml = '<div style="display:flex;gap:6px;margin-bottom:12px">' + pills + '</div>';
+  }
+
   document.getElementById('home-content').innerHTML = `
     <!-- A) Compact Header -->
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
@@ -3042,6 +3063,7 @@ function renderHomePage() {
     </div>
     <div style="font-size:12px;color:var(--text-sec);margin-bottom:16px">${subtitleLine}</div>
 
+    ${mesoSelectorHtml}
     ${deloadBanner}
 
     <!-- C) Mesocycle Card with clickable week pills -->
@@ -3099,6 +3121,18 @@ function renderHomePage() {
 // C) Helper: set current week from pill click
 function setHomeWeek(week) {
   APP_STATE.settings.mesocycle.currentWeek = week;
+  saveState();
+  renderHomePage();
+}
+
+function switchMesocycle(mesoNum) {
+  APP_STATE.settings.mesocycle.number = mesoNum;
+  // Find the max week recorded for this meso
+  var maxWeek = 1;
+  APP_STATE.sessions.forEach(function(s) {
+    if (s.mesocycle === mesoNum && s.week > maxWeek) maxWeek = s.week;
+  });
+  APP_STATE.settings.mesocycle.currentWeek = maxWeek;
   saveState();
   renderHomePage();
 }
@@ -6649,6 +6683,7 @@ function renderSubMuscleBreakdown(muscle) {
 
 var calendarMonth = new Date().getMonth();
 var calendarYear = new Date().getFullYear();
+var calendarSelectedDate = null;
 
 function renderCalendarPage() {
   var container = document.getElementById('calendar-content');
@@ -6657,105 +6692,170 @@ function renderCalendarPage() {
 
   // Get sessions for this month
   var sessionsThisMonth = {};
+  var monthSessionCount = 0;
   APP_STATE.sessions.forEach(function(s) {
     var d = new Date(s.date);
     if (d.getMonth() === calendarMonth && d.getFullYear() === calendarYear) {
       var day = d.getDate();
       if (!sessionsThisMonth[day]) sessionsThisMonth[day] = [];
       sessionsThisMonth[day].push(s);
+      monthSessionCount++;
     }
   });
 
-  // Build calendar grid
   var firstDay = new Date(calendarYear, calendarMonth, 1);
   var lastDay = new Date(calendarYear, calendarMonth + 1, 0);
   var startDow = firstDay.getDay();
-  startDow = startDow === 0 ? 6 : startDow - 1; // Monday = 0
+  startDow = startDow === 0 ? 6 : startDow - 1;
   var totalDays = lastDay.getDate();
   var today = new Date();
   var todayStr = today.toISOString().split('T')[0];
 
-  var html = '<div style="padding:16px 16px 8px">';
-  // Header with nav
-  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">';
-  html += '<button class="btn btn-outline" style="padding:6px 12px;font-size:18px" onclick="calendarNav(-1)">&larr;</button>';
-  html += '<div style="font-size:17px;font-weight:600">' + monthNames[calendarMonth] + ' ' + calendarYear + '</div>';
-  html += '<button class="btn btn-outline" style="padding:6px 12px;font-size:18px" onclick="calendarNav(1)">&rarr;</button>';
+  var html = '<div style="padding:12px 16px 8px">';
+
+  // Compact header with month nav
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">';
+  html += '<button style="background:none;border:none;color:var(--text-sec);font-size:20px;padding:4px 8px;cursor:pointer" onclick="calendarNav(-1)">&lsaquo;</button>';
+  html += '<div style="font-size:16px;font-weight:600;cursor:pointer" onclick="calendarGoToday()">' + monthNames[calendarMonth] + ' ' + calendarYear + '</div>';
+  html += '<button style="background:none;border:none;color:var(--text-sec);font-size:20px;padding:4px 8px;cursor:pointer" onclick="calendarNav(1)">&rsaquo;</button>';
   html += '</div>';
 
   // Day name headers
   html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">';
   dayNames.forEach(function(dn) {
-    html += '<div style="text-align:center;font-size:11px;color:var(--text-ter);padding:4px 0">' + dn + '</div>';
+    html += '<div style="text-align:center;font-size:11px;color:var(--text-ter);padding:2px 0">' + dn + '</div>';
   });
   html += '</div>';
 
   // Day cells
-  html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">';
-  // Empty cells before first day
+  html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">';
   for (var e = 0; e < startDow; e++) {
-    html += '<div style="aspect-ratio:1;padding:2px"></div>';
+    html += '<div style="aspect-ratio:1"></div>';
   }
 
   for (var d = 1; d <= totalDays; d++) {
     var dateStr = calendarYear + '-' + String(calendarMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
     var isToday = dateStr === todayStr;
+    var isSelected = dateStr === calendarSelectedDate;
     var sessions = sessionsThisMonth[d] || [];
     var hasSession = sessions.length > 0;
 
-    var cellStyle = 'aspect-ratio:1;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative;';
-    if (isToday) cellStyle += 'border:2px solid var(--orange);';
-    if (hasSession) cellStyle += 'background:rgba(232,114,12,0.15);';
+    var cellStyle = 'aspect-ratio:1;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;';
+    if (isSelected) cellStyle += 'background:var(--orange);';
+    else if (hasSession) cellStyle += 'background:rgba(232,114,12,0.15);';
+    if (isToday && !isSelected) cellStyle += 'border:2px solid var(--orange);';
+
+    var textColor = isSelected ? '#fff' : (isToday ? 'var(--orange)' : 'var(--text)');
+    var fontWeight = (isToday || isSelected) ? '700' : '400';
 
     html += '<div style="' + cellStyle + '" onclick="calendarDayTap(\'' + dateStr + '\')">';
-    html += '<div style="font-size:13px;font-weight:' + (isToday ? '700' : '400') + ';color:' + (isToday ? 'var(--orange)' : 'var(--text)') + '">' + d + '</div>';
+    html += '<div style="font-size:13px;font-weight:' + fontWeight + ';color:' + textColor + '">' + d + '</div>';
 
     if (hasSession) {
-      // Dots for each session
-      var dotHtml = '<div style="display:flex;gap:2px;margin-top:2px">';
+      var dotColor = isSelected ? '#fff' : 'var(--orange)';
+      html += '<div style="display:flex;gap:2px;margin-top:1px">';
       sessions.forEach(function(s) {
         var plan = WORKOUT_PLANS[s.workoutId];
-        var color = 'var(--orange)';
-        if (plan && plan.isFree) color = '#8B5CF6';
-        dotHtml += '<div style="width:5px;height:5px;border-radius:50%;background:' + color + '"></div>';
+        var c = (plan && plan.isFree && !isSelected) ? '#8B5CF6' : dotColor;
+        html += '<div style="width:4px;height:4px;border-radius:50%;background:' + c + '"></div>';
       });
-      dotHtml += '</div>';
-      html += dotHtml;
+      html += '</div>';
     }
     html += '</div>';
   }
   html += '</div>';
 
-  // Sessions list for selected day or current month summary
-  html += '<div id="calendar-day-detail" style="margin-top:16px"></div>';
+  // Month summary
+  var trainDays = Object.keys(sessionsThisMonth).length;
+  html += '<div style="display:flex;justify-content:center;gap:16px;margin-top:10px;font-size:11px;color:var(--text-ter)">';
+  html += '<span>' + monthSessionCount + ' Sessions</span>';
+  html += '<span>' + trainDays + ' Trainingstage</span>';
+  html += '</div>';
+
+  // Detail area
+  html += '<div id="calendar-day-detail" style="margin-top:12px"></div>';
   html += '</div>';
 
   container.innerHTML = html;
+
+  // Show detail for selected day
+  if (calendarSelectedDate) {
+    renderCalendarDayDetail(calendarSelectedDate);
+  }
 }
 
 function calendarNav(delta) {
   calendarMonth += delta;
   if (calendarMonth > 11) { calendarMonth = 0; calendarYear++; }
   if (calendarMonth < 0) { calendarMonth = 11; calendarYear--; }
+  calendarSelectedDate = null;
   renderCalendarPage();
 }
 
+function calendarGoToday() {
+  var today = new Date();
+  calendarMonth = today.getMonth();
+  calendarYear = today.getFullYear();
+  calendarSelectedDate = today.toISOString().split('T')[0];
+  renderCalendarPage();
+}
+
+function getWorkoutSuggestionsForDate(dateStr) {
+  var d = new Date(dateStr);
+  var dow = d.getDay(); // 0=Sun, 1=Mon, ...
+  var suggestions = [];
+
+  // Mon/Fri = Vorderseite (va, vb), Di/Sa = Rueckseite (ra, rb)
+  if (dow === 1 || dow === 5) {
+    var vWorkouts = ['va', 'vb'];
+    var vVariants = [];
+    vWorkouts.forEach(function(wid) {
+      var variants = typeof getWorkoutVariants === 'function' ? getWorkoutVariants(wid) : [];
+      vVariants.push({ id: wid, name: WORKOUT_PLANS[wid] ? WORKOUT_PLANS[wid].name : wid });
+      variants.forEach(function(vid) {
+        if (WORKOUT_PLANS[vid]) vVariants.push({ id: vid, name: WORKOUT_PLANS[vid].name });
+      });
+    });
+    suggestions = vVariants;
+  } else if (dow === 2 || dow === 6) {
+    var rWorkouts = ['ra', 'rb'];
+    var rVariants = [];
+    rWorkouts.forEach(function(wid) {
+      var variants = typeof getWorkoutVariants === 'function' ? getWorkoutVariants(wid) : [];
+      rVariants.push({ id: wid, name: WORKOUT_PLANS[wid] ? WORKOUT_PLANS[wid].name : wid });
+      variants.forEach(function(vid) {
+        if (WORKOUT_PLANS[vid]) rVariants.push({ id: vid, name: WORKOUT_PLANS[vid].name });
+      });
+    });
+    suggestions = rVariants;
+  } else {
+    // Other days — show all
+    WEEK_SCHEDULE.forEach(function(wid) {
+      if (WORKOUT_PLANS[wid]) suggestions.push({ id: wid, name: WORKOUT_PLANS[wid].name });
+    });
+  }
+  return suggestions;
+}
+
 function calendarDayTap(dateStr) {
+  calendarSelectedDate = dateStr;
+  renderCalendarPage();
+}
+
+function renderCalendarDayDetail(dateStr) {
   var sessions = APP_STATE.sessions.filter(function(s) { return s.date === dateStr; });
   var detail = document.getElementById('calendar-day-detail');
   if (!detail) return;
 
   var parts = dateStr.split('-');
   var dayLabel = parseInt(parts[2]) + '.' + parseInt(parts[1]) + '.' + parts[0];
+  var d = new Date(dateStr);
+  var dayNames = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+  var dayName = dayNames[d.getDay()];
 
-  if (sessions.length === 0) {
-    detail.innerHTML = '<div class="card" style="padding:16px;text-align:center;color:var(--text-ter)">' +
-      '<div style="font-size:13px">' + dayLabel + '</div>' +
-      '<div style="margin-top:4px">Kein Training</div></div>';
-    return;
-  }
+  var html = '<div style="font-size:13px;font-weight:600;margin-bottom:8px">' + dayName + ', ' + dayLabel + '</div>';
 
-  var html = '';
+  // Show existing sessions
   sessions.forEach(function(s) {
     var plan = WORKOUT_PLANS[s.workoutId];
     var name = plan ? plan.name : s.workoutId;
@@ -6763,27 +6863,70 @@ function calendarDayTap(dateStr) {
     var setCount = 0;
     Object.keys(s.sets || {}).forEach(function(k) { setCount += (s.sets[k] || []).length; });
     var isFree = plan && plan.isFree;
-    var badge = isFree ? '<span style="background:#8B5CF6;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;margin-left:6px">Free</span>' : '';
+    var badge = isFree ? '<span style="background:#8B5CF6;color:#fff;padding:1px 5px;border-radius:3px;font-size:9px;margin-left:4px">Free</span>' : '';
     var mesoWeek = 'M' + (s.mesocycle || '?') + ' W' + (s.week || '?');
 
-    html += '<div class="card" style="padding:14px;margin-bottom:8px">';
-    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
-    html += '<div style="font-weight:600;font-size:14px">' + name + badge + '</div>';
-    html += '<div style="font-size:11px;color:var(--text-ter)">' + mesoWeek + '</div>';
+    html += '<div class="card" style="padding:12px;margin-bottom:8px">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
+    html += '<div style="font-weight:600;font-size:13px">' + name + badge + '</div>';
+    html += '<div style="font-size:10px;color:var(--text-ter)">' + mesoWeek + '</div>';
     html += '</div>';
-    html += '<div style="display:flex;gap:12px;font-size:12px;color:var(--text-sec);margin-bottom:10px">';
-    html += '<span>' + dayLabel + '</span>';
+    html += '<div style="display:flex;gap:10px;font-size:11px;color:var(--text-sec);margin-bottom:8px">';
     if (dur) html += '<span>' + dur + '</span>';
     html += '<span>' + setCount + ' Sets</span>';
     html += '</div>';
-    html += '<div style="display:flex;gap:8px">';
-    html += '<button class="btn btn-outline" style="flex:1;font-size:12px;padding:6px" onclick="showChangeDateDialog(\'' + s.id + '\')">Datum aendern</button>';
-    html += '<button class="btn btn-outline" style="flex:1;font-size:12px;padding:6px" onclick="openSessionFromCalendar(\'' + s.id + '\')">Details</button>';
+    html += '<div style="display:flex;gap:6px">';
+    html += '<button class="btn btn-outline" style="flex:1;font-size:11px;padding:5px" onclick="showChangeDateDialog(\'' + s.id + '\')">Verschieben</button>';
+    html += '<button class="btn btn-outline" style="flex:1;font-size:11px;padding:5px" onclick="openSessionFromCalendar(\'' + s.id + '\')">Details</button>';
     html += '</div>';
     html += '</div>';
   });
 
+  // "Add training" section
+  var suggestions = getWorkoutSuggestionsForDate(dateStr);
+  html += '<div class="card" style="padding:12px">';
+  html += '<div style="font-size:12px;color:var(--text-sec);margin-bottom:8px">Training eintragen</div>';
+  html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+  suggestions.forEach(function(s) {
+    html += '<button class="btn btn-outline" style="font-size:11px;padding:5px 10px" onclick="calendarStartWorkout(\'' + s.id + '\',\'' + dateStr + '\')">' + s.name + '</button>';
+  });
+  html += '<button class="btn btn-outline" style="font-size:11px;padding:5px 10px;color:#8B5CF6;border-color:#8B5CF6" onclick="calendarStartFree(\'' + dateStr + '\')">Freies Workout</button>';
+  html += '</div>';
+  html += '</div>';
+
   detail.innerHTML = html;
+}
+
+function calendarStartWorkout(workoutId, dateStr) {
+  // Navigate to training and open the workout
+  activeWorkoutId = workoutId;
+  trainingView = 'workout-detail';
+  activeSubTab = 'prep';
+
+  // Calculate week from date
+  var meso = APP_STATE.settings.mesocycle;
+  var week = meso.currentWeek;
+  if (meso.startDate) {
+    var startMs = new Date(meso.startDate).getTime();
+    var dateMs = new Date(dateStr).getTime();
+    var diffDays = Math.floor((dateMs - startMs) / 86400000);
+    if (diffDays >= 0) week = Math.floor(diffDays / 7) + 1;
+  }
+  selectedWeek = week;
+
+  navigateTo('training');
+}
+
+function calendarStartFree(dateStr) {
+  // Open free designer with pre-set date
+  freeDesignerState = {
+    date: dateStr,
+    name: '',
+    blocks: []
+  };
+  freeDesignerCounter = 0;
+  trainingView = 'free-designer';
+  navigateTo('training');
 }
 
 function openSessionFromCalendar(sessionId) {
@@ -6806,15 +6949,19 @@ function openSessionFromCalendar(sessionId) {
 function showChangeDateDialog(sessionId) {
   var session = APP_STATE.sessions.find(function(s) { return s.id === sessionId; });
   if (!session) return;
+  var plan = WORKOUT_PLANS[session.workoutId];
+  var name = plan ? plan.name : session.workoutId;
+  var parts = session.date.split('-');
+  var currentLabel = parseInt(parts[2]) + '.' + parseInt(parts[1]) + '.' + parts[0];
 
   showModal(
     '<div style="padding:20px">' +
-    '<h3 style="margin-bottom:16px;font-size:16px">Datum aendern</h3>' +
-    '<div style="font-size:12px;color:var(--text-sec);margin-bottom:4px">Aktuell: ' + session.date + '</div>' +
-    '<input type="date" class="input-field" id="change-date-input" value="' + session.date + '" style="width:100%;font-size:14px;padding:8px;margin-bottom:16px">' +
+    '<div style="font-size:15px;font-weight:600;margin-bottom:4px">Training verschieben</div>' +
+    '<div style="font-size:12px;color:var(--text-sec);margin-bottom:14px">' + name + ' — aktuell ' + currentLabel + '</div>' +
+    '<input type="date" class="input-field" id="change-date-input" value="' + session.date + '" style="width:100%;font-size:15px;padding:10px;margin-bottom:14px;-webkit-appearance:none">' +
     '<div style="display:flex;gap:8px">' +
-    '<button class="btn btn-outline" style="flex:1" onclick="closeModal()">Abbrechen</button>' +
-    '<button class="btn btn-orange" style="flex:1" onclick="confirmChangeDate(\'' + sessionId + '\')">Speichern</button>' +
+    '<button class="btn btn-outline" style="flex:1;padding:10px" onclick="closeModal()">Abbrechen</button>' +
+    '<button class="btn btn-orange" style="flex:1;padding:10px" onclick="confirmChangeDate(\'' + sessionId + '\')">Verschieben</button>' +
     '</div>' +
     '</div>'
   );
@@ -6827,6 +6974,7 @@ function confirmChangeDate(sessionId) {
   var session = APP_STATE.sessions.find(function(s) { return s.id === sessionId; });
   if (!session) return;
 
+  var oldDate = session.date;
   session.date = newDate;
 
   // Recalculate week based on meso startDate
@@ -6842,15 +6990,16 @@ function confirmChangeDate(sessionId) {
 
   saveState();
   closeModal();
-  showToast('Datum geaendert: ' + newDate);
 
-  // Re-render calendar if we're on it
+  var parts = newDate.split('-');
+  showToast('Verschoben: ' + parseInt(parts[2]) + '.' + parseInt(parts[1]) + '.');
+
   if (currentPage === 'calendar') {
     var d = new Date(newDate);
     calendarMonth = d.getMonth();
     calendarYear = d.getFullYear();
+    calendarSelectedDate = newDate;
     renderCalendarPage();
-    calendarDayTap(newDate);
   }
 }
 
@@ -7145,7 +7294,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '7.3';
+const APP_VERSION = '7.4';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
