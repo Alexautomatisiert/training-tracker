@@ -6695,7 +6695,9 @@ var MESO_COLORS = [
 ];
 
 function getCalendarMesoRanges() {
-  // Derive date ranges per mesocycle from session data + current meso startDate
+  var meso = APP_STATE.settings.mesocycle;
+
+  // Collect session dates per meso number
   var mesoSessions = {};
   APP_STATE.sessions.forEach(function(s) {
     if (!s.mesocycle || !s.date) return;
@@ -6703,42 +6705,49 @@ function getCalendarMesoRanges() {
     mesoSessions[s.mesocycle].push(s.date);
   });
 
+  // Ensure current meso is included even without sessions
+  if (!mesoSessions[meso.number] && meso.startDate) {
+    mesoSessions[meso.number] = [meso.startDate];
+  }
+
   var ranges = {};
   var mesoNums = Object.keys(mesoSessions).map(Number).sort(function(a,b){return a-b;});
 
   mesoNums.forEach(function(mn) {
     var dates = mesoSessions[mn].sort();
     var startStr = dates[0];
-    // For current meso, use official startDate if available
-    var meso = APP_STATE.settings.mesocycle;
+    // For current meso, use official startDate if earlier
     if (mn === meso.number && meso.startDate && meso.startDate < startStr) {
       startStr = meso.startDate;
     }
-    // Start from Monday of the start week
+    // Snap start to Monday of that week
     var startD = new Date(startStr);
     var dow = startD.getDay();
     dow = dow === 0 ? 6 : dow - 1;
     startD.setDate(startD.getDate() - dow);
+    var startIso = startD.toISOString().split('T')[0];
 
-    // End: use last session date + extend to Sunday of that week
-    var endStr = dates[dates.length - 1];
-    // For current meso, extend to end of current week
+    // End date
+    var endIso;
     if (mn === meso.number) {
+      // Current meso: extend to full planned duration
       var totalWeeks = meso.weeksHard + meso.weeksDeload;
       var endD = new Date(startD);
       endD.setDate(endD.getDate() + totalWeeks * 7 - 1);
-      endStr = endD.toISOString().split('T')[0];
+      endIso = endD.toISOString().split('T')[0];
     } else {
-      var endD2 = new Date(endStr);
+      // Past meso: extend last session to Sunday of its week
+      var lastDate = dates[dates.length - 1];
+      var endD2 = new Date(lastDate);
       var edow = endD2.getDay();
       edow = edow === 0 ? 6 : edow - 1;
       endD2.setDate(endD2.getDate() + (6 - edow));
-      endStr = endD2.toISOString().split('T')[0];
+      endIso = endD2.toISOString().split('T')[0];
     }
 
     ranges[mn] = {
-      start: startStr.replace(/-/g,''),
-      end: endStr.replace(/-/g,''),
+      start: startIso.replace(/-/g,''),
+      end: endIso.replace(/-/g,''),
       color: MESO_COLORS[(mn - 1) % MESO_COLORS.length]
     };
   });
@@ -6831,12 +6840,13 @@ function renderCalendarPage() {
     var cellStyle = 'aspect-ratio:1;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative;';
     if (isSelected) {
       cellStyle += 'background:var(--orange);';
-    } else if (hasSession) {
-      cellStyle += 'background:rgba(232,114,12,0.15);';
     } else if (mesoInfo) {
       cellStyle += 'background:' + mesoInfo.color.bg + ';';
+      if (hasSession) cellStyle += 'border:2px solid var(--orange);';
+    } else if (hasSession) {
+      cellStyle += 'border:2px solid var(--orange);';
     }
-    if (isToday && !isSelected) cellStyle += 'border:2px solid var(--orange);';
+    if (isToday && !isSelected && !hasSession) cellStyle += 'border:2px solid var(--orange);';
 
     var textColor = isSelected ? '#fff' : (isToday ? 'var(--orange)' : 'var(--text)');
     var fontWeight = (isToday || isSelected) ? '700' : '400';
@@ -7417,7 +7427,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '7.5';
+const APP_VERSION = '7.6';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
