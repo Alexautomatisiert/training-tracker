@@ -3121,10 +3121,13 @@ function renderHomePage() {
     learningsHtml = '<div style="text-align:center;padding:12px;color:var(--text-ter);font-size:13px">Noch keine Learnings</div>';
   }
 
-  // Mesocycle selector: find all distinct meso numbers
+  // Mesocycle selector: find all distinct meso numbers (from sessions + mesoHistory + current)
   var allMesoNumbers = [];
   APP_STATE.sessions.forEach(function(s) {
     if (s.mesocycle && allMesoNumbers.indexOf(s.mesocycle) === -1) allMesoNumbers.push(s.mesocycle);
+  });
+  (APP_STATE.mesoHistory || []).forEach(function(h) {
+    if (h.number && allMesoNumbers.indexOf(h.number) === -1) allMesoNumbers.push(h.number);
   });
   if (allMesoNumbers.indexOf(meso.number) === -1) allMesoNumbers.push(meso.number);
   allMesoNumbers.sort(function(a, b) { return a - b; });
