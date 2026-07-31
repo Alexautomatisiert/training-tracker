@@ -2801,6 +2801,7 @@ let activeWorkoutId = null;
 let activeSubTab = 'prep';
 let selectedWeek = null;
 let statsTab = 'alle';
+var selectedExDetail = {}; // { muscle: exerciseId } — selected exercise for detail graphs
 
 // Active workout state
 let activeSession = null;
@@ -6496,6 +6497,209 @@ function getMesoVolumeComparison(muscle) {
 }
 
 // =============================================
+// EXERCISE DETAIL GRAPHS (1RM + Volume over time)
+// =============================================
+
+function getExerciseTimeSeries(exerciseId) {
+  var exDef = getExerciseInfo(exerciseId);
+  if (!exDef) return [];
+  // Find all matching IDs (aliases + same-name across variants)
+  var matchIds = [exerciseId];
+  var alias = EXERCISE_ID_ALIASES[exerciseId];
+  if (alias) matchIds.push(alias);
+  Object.keys(WORKOUT_PLANS).forEach(function(wid) {
+    var wp = WORKOUT_PLANS[wid];
+    var allEx = (wp.strength || []).concat(wp.accessories || []);
+    (wp.circuits || []).forEach(function(c) { allEx = allEx.concat(c.exercises || []); });
+    allEx.forEach(function(e) {
+      if (e.name === exDef.name && matchIds.indexOf(e.id) === -1) matchIds.push(e.id);
+    });
+  });
+  // Gather data points from all sessions
+  var points = [];
+  APP_STATE.sessions.forEach(function(s) {
+    var sets = null;
+    for (var i = 0; i < matchIds.length; i++) {
+      if (s.sets[matchIds[i]] && s.sets[matchIds[i]].length > 0) { sets = s.sets[matchIds[i]]; break; }
+    }
+    if (!sets || sets.length === 0) return;
+    // Calculate best 1RM and total volume
+    var best1RM = 0;
+    var totalVol = 0;
+    sets.forEach(function(set) {
+      var w = Number(set.weight) || 0;
+      var r = Number(set.reps) || 0;
+      var est = estimate1RM(set, exDef);
+      if (est > best1RM) best1RM = est;
+      var vw = getVolumeWeight(exerciseId, w);
+      totalVol += vw * r * getRepMultiplier(exerciseId);
+    });
+    if (best1RM > 0 || totalVol > 0) {
+      points.push({ date: s.date, week: s.week, meso: s.mesocycle, est1RM: Math.round(best1RM * 10) / 10, totalVol: Math.round(totalVol) });
+    }
+  });
+  points.sort(function(a, b) { return a.date.localeCompare(b.date); });
+  return points;
+}
+
+function renderSvgLineChart(points, valueKey, options) {
+  if (!points || points.length < 2) return '<div style="font-size:12px;color:var(--text-ter);padding:12px">Zu wenig Daten (min. 2 Sessions)</div>';
+  var opt = options || {};
+  var W = opt.width || 320;
+  var H = opt.height || 160;
+  var pad = { top: 24, right: 12, bottom: 28, left: 44 };
+  var chartW = W - pad.left - pad.right;
+  var chartH = H - pad.top - pad.bottom;
+
+  var values = points.map(function(p) { return p[valueKey]; });
+  var minV = Math.min.apply(null, values);
+  var maxV = Math.max.apply(null, values);
+  // Add 10% padding to range
+  var range = maxV - minV || 1;
+  minV = minV - range * 0.05;
+  maxV = maxV + range * 0.1;
+  if (minV < 0) minV = 0;
+
+  function xPos(i) { return pad.left + (i / (points.length - 1)) * chartW; }
+  function yPos(v) { return pad.top + chartH - ((v - minV) / (maxV - minV)) * chartH; }
+
+  var color = opt.color || 'var(--orange)';
+  var unit = opt.unit || '';
+
+  // Build path
+  var pathD = '';
+  var dots = '';
+  var areaD = '';
+  points.forEach(function(p, i) {
+    var x = xPos(i);
+    var y = yPos(p[valueKey]);
+    pathD += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1);
+    if (i === 0) areaD = 'M' + x.toFixed(1) + ',' + (pad.top + chartH);
+    areaD += 'L' + x.toFixed(1) + ',' + y.toFixed(1);
+    // Dot + hover label
+    var label = valueKey === 'totalVol' ? (p[valueKey] / 1000).toFixed(1) + 't' : p[valueKey].toFixed(1) + unit;
+    var dateLabel = p.date.split('-').slice(1).reverse().join('.');
+    dots += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="3" fill="' + color + '" stroke="var(--card)" stroke-width="1.5"/>';
+    // Show label on first, last, and every ~4th point
+    if (i === 0 || i === points.length - 1 || (points.length > 6 && i % Math.ceil(points.length / 5) === 0)) {
+      var anchor = i === 0 ? 'start' : i === points.length - 1 ? 'end' : 'middle';
+      dots += '<text x="' + x.toFixed(1) + '" y="' + (y - 8).toFixed(1) + '" fill="' + color + '" font-size="9" font-weight="600" text-anchor="' + anchor + '">' + label + '</text>';
+    }
+  });
+  areaD += 'L' + xPos(points.length - 1).toFixed(1) + ',' + (pad.top + chartH) + 'Z';
+
+  // Y-axis labels
+  var yLabels = '';
+  for (var yi = 0; yi <= 3; yi++) {
+    var val = minV + (maxV - minV) * (yi / 3);
+    var yy = yPos(val);
+    var displayVal = valueKey === 'totalVol' ? (val / 1000).toFixed(1) + 't' : Math.round(val) + unit;
+    yLabels += '<text x="' + (pad.left - 4) + '" y="' + (yy + 3).toFixed(1) + '" fill="var(--text-ter)" font-size="9" text-anchor="end">' + displayVal + '</text>';
+    yLabels += '<line x1="' + pad.left + '" y1="' + yy.toFixed(1) + '" x2="' + (W - pad.right) + '" y2="' + yy.toFixed(1) + '" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3,3"/>';
+  }
+
+  // X-axis labels (dates)
+  var xLabels = '';
+  var step = Math.max(1, Math.ceil(points.length / 6));
+  points.forEach(function(p, i) {
+    if (i % step === 0 || i === points.length - 1) {
+      var x = xPos(i);
+      var dateStr = p.date.split('-').slice(1).reverse().join('.');
+      xLabels += '<text x="' + x.toFixed(1) + '" y="' + (H - 4) + '" fill="var(--text-ter)" font-size="8" text-anchor="middle">' + dateStr + '</text>';
+    }
+  });
+
+  // Trend indicator
+  var firstVal = values[0];
+  var lastVal = values[values.length - 1];
+  var trendPct = firstVal > 0 ? Math.round((lastVal - firstVal) / firstVal * 100) : 0;
+  var trendColor = trendPct >= 0 ? 'var(--green)' : 'var(--red)';
+  var trendText = (trendPct >= 0 ? '+' : '') + trendPct + '%';
+
+  return '<div style="position:relative">' +
+    '<span style="position:absolute;top:2px;right:4px;font-size:11px;font-weight:600;color:' + trendColor + '">' + trendText + '</span>' +
+    '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="display:block">' +
+    yLabels + xLabels +
+    '<path d="' + areaD + '" fill="' + color + '" opacity="0.08"/>' +
+    '<path d="' + pathD + '" fill="none" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+    dots +
+    '</svg></div>';
+}
+
+function getExercisesForMuscle(muscle) {
+  var exercises = [];
+  var seenNames = {};
+  Object.values(WORKOUT_PLANS).forEach(function(plan) {
+    var allEx = (plan.strength || []).slice();
+    (plan.circuits || []).forEach(function(c) { allEx = allEx.concat(c.exercises || []); });
+    allEx = allEx.concat(plan.accessories || []);
+    allEx.forEach(function(ex) {
+      if (EXERCISE_MUSCLE[ex.id] === muscle && !seenNames[ex.name]) {
+        seenNames[ex.name] = true;
+        exercises.push({ id: ex.id, name: ex.name });
+      }
+    });
+  });
+  return exercises;
+}
+
+function selectExDetail(muscle, exId) {
+  selectedExDetail[muscle] = exId;
+  renderStatsPage();
+}
+
+function renderExerciseDetailSection(muscle) {
+  var exercises = getExercisesForMuscle(muscle);
+  if (exercises.length === 0) return '';
+
+  var selected = selectedExDetail[muscle] || exercises[0].id;
+  // Ensure selected is valid
+  if (!exercises.some(function(e) { return e.id === selected; })) selected = exercises[0].id;
+  selectedExDetail[muscle] = selected;
+
+  var exDef = getExerciseInfo(selected);
+  var points = getExerciseTimeSeries(selected);
+  var muscleColors = { ruecken: 'var(--blue)', brust: 'var(--orange)', quads: 'var(--green)', hams: 'var(--purple)', bizeps: 'var(--red)', trizeps: '#3498DB' };
+  var color = muscleColors[muscle] || 'var(--orange)';
+
+  // Dropdown
+  var opts = '';
+  exercises.forEach(function(ex) {
+    opts += '<option value="' + ex.id + '"' + (ex.id === selected ? ' selected' : '') + '>' + ex.name + '</option>';
+  });
+  var dropdown = '<select onchange="selectExDetail(\'' + muscle + '\', this.value)" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;font-weight:600;width:100%">' + opts + '</select>';
+
+  // 1RM chart
+  var rm1Html = '';
+  var rmPoints = points.filter(function(p) { return p.est1RM > 0; });
+  if (rmPoints.length >= 2) {
+    var unit = exDef && exDef.dumbbell ? 'kg/DB' : 'kg';
+    rm1Html = '<div style="margin-top:12px">' +
+      '<div style="font-size:12px;font-weight:600;color:var(--text-sec);margin-bottom:4px">Estimated 1RM</div>' +
+      renderSvgLineChart(rmPoints, 'est1RM', { color: color, unit: unit }) +
+      '</div>';
+  }
+
+  // Volume chart
+  var volHtml = '';
+  var volPoints = points.filter(function(p) { return p.totalVol > 0; });
+  if (volPoints.length >= 2) {
+    volHtml = '<div style="margin-top:12px">' +
+      '<div style="font-size:12px;font-weight:600;color:var(--text-sec);margin-bottom:4px">Session-Volumen</div>' +
+      renderSvgLineChart(volPoints, 'totalVol', { color: color }) +
+      '</div>';
+  }
+
+  var noData = (!rm1Html && !volHtml) ? '<div style="font-size:12px;color:var(--text-ter);padding:8px 0">Zu wenig Daten fuer Graphen</div>' : '';
+
+  return '<div class="card">' +
+    '<h3 style="margin-bottom:8px">Uebungs-Detail</h3>' +
+    dropdown +
+    noData + rm1Html + volHtml +
+    '</div>';
+}
+
+// =============================================
 // VOLUME TIMELINE
 // =============================================
 
@@ -6920,6 +7124,8 @@ function renderStatsMuscle(muscle) {
     ${prHtml ? '<div class="card"><h3 style="margin-bottom:8px">PRs</h3><div style="display:flex;flex-wrap:wrap;gap:4px">' + prHtml + '</div></div>' : ''}
     </div>
     </div>
+
+    ${renderExerciseDetailSection(muscle)}
   `;
 }
 
@@ -7724,7 +7930,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '8.5';
+const APP_VERSION = '8.6';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
