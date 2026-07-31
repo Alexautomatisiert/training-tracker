@@ -807,6 +807,35 @@ h3 { font-size: 15px; font-weight: 600; }
 /* ROUND PILL CLICKABLE */
 .round-pill.clickable { cursor: pointer; }
 .round-pill.viewing { border-color: var(--blue); color: var(--blue); background: rgba(52,152,219,0.15); }
+
+/* =============================================
+   DESKTOP RESPONSIVE LAYOUT
+   ============================================= */
+@media (min-width: 768px) {
+  #app {
+    max-width: 960px;
+  }
+  .bottom-nav {
+    max-width: 960px;
+  }
+  .page {
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+  .desktop-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+  .sub-tabs {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .sub-tab {
+    white-space: nowrap;
+  }
+}
 </style>
 </head>
 <body>
@@ -3158,6 +3187,8 @@ function renderHomePage() {
 
     ${mesoSelectorHtml}
 
+    <div class="desktop-cols">
+    <div>
     <!-- C) Mesocycle Card with clickable week pills -->
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
@@ -3191,7 +3222,9 @@ function renderHomePage() {
 
     <!-- Meso Goals Widget -->
     ${getMesoGoalWidget()}
+    </div>
 
+    <div>
     <!-- D) Muskel-Check + Top Performer -->
     ${muskelCheckHtml}
     ${topPerformerHtml}
@@ -3208,6 +3241,8 @@ function renderHomePage() {
     </div>
     <div class="card">
       ${learningsHtml}
+    </div>
+    </div>
     </div>
   `;
 }
@@ -6507,13 +6542,13 @@ function renderVolumeTimeline(muscle) {
 
   var prevMeso = null;
   points.forEach(function(p, i) {
-    var pct = maxVol > 0 ? (p.vol / maxVol * 100) : 0;
+    var barPx = maxVol > 0 ? Math.max(4, Math.round(p.vol / maxVol * 120)) : 4;
     var isMesoBoundary = prevMeso !== null && p.mesoNum !== prevMeso;
     var boundaryStyle = isMesoBoundary ? 'border-left:2px dashed var(--text-ter);' : '';
     var isLast = i === points.length - 1;
     html += '<div class="chart-bar-wrapper" style="' + boundaryStyle + '">' +
       '<div class="chart-value" style="font-size:9px">' + (p.vol / 1000).toFixed(1) + 't</div>' +
-      '<div class="chart-bar" style="height:' + pct + '%;background:' + barColor + ';opacity:' + (isLast ? '1' : '0.6') + '"></div>' +
+      '<div class="chart-bar" style="height:' + barPx + 'px;background:' + barColor + ';opacity:' + (isLast ? '1' : '0.6') + '"></div>' +
       '<div class="chart-label" style="font-size:8px">' + (p.week === 1 ? 'M' + p.mesoNum : 'W' + p.week) + '</div>' +
     '</div>';
     prevMeso = p.mesoNum;
@@ -6580,17 +6615,16 @@ function renderStatsAll() {
 
   for (let w = 1; w <= cw; w++) {
     const vol = calcWeekVolume(w);
-    const pct = maxVol > 0 ? (vol / maxVol * 100) : 0;
+    const barPx = maxVol > 0 ? Math.max(4, Math.round(vol / maxVol * 120)) : 4;
     bars += `
       <div class="chart-bar-wrapper">
         <div class="chart-value">${(vol/1000).toFixed(1)}t</div>
-        <div class="chart-bar" style="height:${pct}%"></div>
+        <div class="chart-bar" style="height:${barPx}px"></div>
         <div class="chart-label">W${w}</div>
       </div>`;
   }
 
-  const goalPct = maxVol > 0 ? (goal / maxVol * 100) : 50;
-  const goalBottom = goalPct;
+  const goalBottomPx = maxVol > 0 ? Math.round(20 + (goal / maxVol * 120)) : 80;
 
   // Mesocycle progress
   const startVol = calcWeekVolume(1);
@@ -6666,6 +6700,8 @@ function renderStatsAll() {
   const timelineHtml = renderVolumeTimeline(null);
 
   return `
+    <div class="desktop-cols">
+    <div>
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <h3 style="margin:0">Wochen-Volumen</h3>
@@ -6679,7 +6715,7 @@ function renderStatsAll() {
               <span class="chart-y-label">${(maxVol/2000).toFixed(1)}t</span>
               <span class="chart-y-label">0</span>
             </div>
-            <div class="chart-goal-line" style="bottom:${goalBottom}%"></div>
+            <div class="chart-goal-line" style="bottom:${goalBottomPx}px"></div>
             ${bars}
           </div>
           <div style="text-align:right;font-size:10px;color:var(--text-ter);margin-top:4px">--- Ziel: ${(goal/1000).toFixed(1)}t</div>
@@ -6697,13 +6733,17 @@ function renderStatsAll() {
       <div class="progress-bar"><div class="progress-fill" style="width:${progressPct}%"></div></div>
       ${mesoCompHtml}
     </div>
+    </div>
 
+    <div>
     <div class="card">
       <h3 style="margin-bottom:8px">Lift Progression</h3>
       ${rmHtml}
     </div>
 
     ${prHtml ? '<div class="card"><h3 style="margin-bottom:8px">PRs Mesozyklus</h3><div style="display:flex;flex-wrap:wrap;gap:4px">' + prHtml + '</div></div>' : ''}
+    </div>
+    </div>
   `;
 }
 
@@ -6725,11 +6765,11 @@ function renderStatsMuscle(muscle) {
 
   for (let w = 1; w <= cw; w++) {
     const vol = calcWeekMuscleVolume(w, muscle);
-    const pct = maxVol > 0 ? (vol / maxVol * 100) : 0;
+    const barPx = maxVol > 0 ? Math.max(4, Math.round(vol / maxVol * 120)) : 4;
     bars += `
       <div class="chart-bar-wrapper">
         <div class="chart-value">${(vol/1000).toFixed(1)}t</div>
-        <div class="chart-bar" style="height:${pct}%;background:${barColor}"></div>
+        <div class="chart-bar" style="height:${barPx}px;background:${barColor}"></div>
         <div class="chart-label">W${w}</div>
       </div>`;
   }
@@ -6824,10 +6864,12 @@ function renderStatsMuscle(muscle) {
     prHtml += `<div class="pr-badge">${ICONS.trophy} ${getExerciseName(pr.exerciseId)} ${pr.weight}kg x${pr.reps}</div>`;
   });
 
-  const goalPct = maxVol > 0 ? (goal / maxVol * 100) : 50;
+  const goalBottomPx = maxVol > 0 ? Math.round(20 + (goal / maxVol * 120)) : 80;
   const muscleTimelineHtml = renderVolumeTimeline(muscle);
 
   return `
+    <div class="desktop-cols">
+    <div>
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <h3 style="margin:0">${muscleLabels[muscle]} Wochen-Volumen</h3>
@@ -6841,7 +6883,7 @@ function renderStatsMuscle(muscle) {
               <span class="chart-y-label">${(maxVol/2000).toFixed(1)}t</span>
               <span class="chart-y-label">0</span>
             </div>
-            <div class="chart-goal-line" style="bottom:${goalPct}%"></div>
+            <div class="chart-goal-line" style="bottom:${goalBottomPx}px"></div>
             ${bars}
           </div>
           <div style="text-align:right;font-size:10px;color:var(--text-ter);margin-top:4px">--- Ziel: ${(goal/1000).toFixed(1)}t</div>
@@ -6867,13 +6909,17 @@ function renderStatsMuscle(muscle) {
       })()}
       ${renderSubMuscleBreakdown(muscle)}
     </div>
+    </div>
 
+    <div>
     <div class="card">
       <h3 style="margin-bottom:8px">Lift Progression</h3>
       ${exHtml || '<p style="color:var(--text-sec);font-size:14px">Keine Daten</p>'}
     </div>
 
     ${prHtml ? '<div class="card"><h3 style="margin-bottom:8px">PRs</h3><div style="display:flex;flex-wrap:wrap;gap:4px">' + prHtml + '</div></div>' : ''}
+    </div>
+    </div>
   `;
 }
 
@@ -7678,7 +7724,7 @@ function applyCustomWeights() {
   }
 }
 // Clear stale customWeights on version update
-const APP_VERSION = '8.4';
+const APP_VERSION = '8.5';
 if (APP_STATE._appVersion !== APP_VERSION) {
   APP_STATE.customWeights = {};
   APP_STATE._appVersion = APP_VERSION;
