@@ -6692,11 +6692,17 @@ function renderExerciseDetailSection(muscle) {
 
   var noData = (!rm1Html && !volHtml) ? '<div style="font-size:12px;color:var(--text-ter);padding:8px 0">Zu wenig Daten fuer Graphen</div>' : '';
 
-  return '<div class="card">' +
-    '<h3 style="margin-bottom:8px">Uebungs-Detail</h3>' +
-    dropdown +
-    noData + rm1Html + volHtml +
-    '</div>';
+  // Dropdown as section header
+  var html = '<div class="section-title" style="margin-top:16px">Uebungs-Detail</div>' + dropdown;
+
+  if (noData) {
+    html += '<div class="card" style="margin-top:8px">' + noData + '</div>';
+  } else {
+    if (rm1Html) html += '<div class="card" style="margin-top:8px">' + rm1Html + '</div>';
+    if (volHtml) html += '<div class="card" style="margin-top:8px">' + volHtml + '</div>';
+  }
+
+  return html;
 }
 
 // =============================================
@@ -7113,6 +7119,8 @@ function renderStatsMuscle(muscle) {
       })()}
       ${renderSubMuscleBreakdown(muscle)}
     </div>
+
+    ${renderExerciseDetailSection(muscle)}
     </div>
 
     <div>
@@ -7124,8 +7132,6 @@ function renderStatsMuscle(muscle) {
     ${prHtml ? '<div class="card"><h3 style="margin-bottom:8px">PRs</h3><div style="display:flex;flex-wrap:wrap;gap:4px">' + prHtml + '</div></div>' : ''}
     </div>
     </div>
-
-    ${renderExerciseDetailSection(muscle)}
   `;
 }
 
